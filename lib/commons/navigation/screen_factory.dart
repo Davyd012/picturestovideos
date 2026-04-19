@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_screen.dart';
+import 'package:picturestovideos/features/library/library_screen.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
@@ -19,15 +20,7 @@ class ScreenFactory {
       case AppRoutes.library:
         return _buildRoute(
           settings: settings,
-          builder: (_) => const _PlannedScreen(
-            args: PlannedScreenArgs(
-              title: 'Library',
-              route: AppRoutes.library,
-              referenceFile: 'LIBRARY_SCREEN.html',
-              recommendedStartOrder: 2,
-              summary: 'Asset browser for videos, photos, and imports.',
-            ),
-          ),
+          builder: (_) => const LibraryScreen(),
         );
       case AppRoutes.audioEditor:
         return _buildRoute(
