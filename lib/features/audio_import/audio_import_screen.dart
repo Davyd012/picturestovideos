@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/core/audio/domain/audio_import_failure.dart';
+import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
+import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
+
+class AudioImportScreen extends ConsumerWidget {
+  const AudioImportScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final importState = ref.watch(audioImportViewModelProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Stage 1: Audio ingestion'),
+      ),
+      body: switch (importState) {
+        AsyncLoading<AudioImportState>() => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        AsyncError<AudioImportState>(:final error) => _AudioImportError(
+            error: error,
+            onRetry: () =>
+                ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
+          ),
+        AsyncData<AudioImportState>(:final value) => _AudioImportContent(
+            state: value,
+            onImportPressed: () =>
+                ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
+          ),
+        _ => _AudioImportContent(
+            state: const AudioImportState.initial(),
+            onImportPressed: () =>
+                ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
+          ),
+      },
+    );
+  }
+}
+
+class _AudioImportContent extends StatelessWidget {
+  const _AudioImportContent({
+    required this.state,
+    required this.onImportPressed,
+  });
+
+  final AudioImportState state;
+  final VoidCallback onImportPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final source = state.source;
+    final audioData = state.audioData;
+
+    return ListView(
+      children: [
+        const ListTile(
+          title: Text('Import a WAV file'),
+          subtitle: Text(
+            'Stage 1 supports WAV decoding into normalized PCM samples.',
+          ),
+        ),
+        Center(
+          child: FilledButton(
+            onPressed: onImportPressed,
+            child: const Text('Choose audio file'),
+          ),
+        ),
+        if (source != null && audioData != null) ...[
+          ListTile(
+            title: const Text('File'),
+            subtitle: Text(source.fileName),
+          ),
+          ListTile(
+            title: const Text('Sample rate'),
+            subtitle: Text('${audioData.sampleRate} Hz'),
+          ),
+          ListTile(
+            title: const Text('Duration'),
+            subtitle: Text(_formatDuration(audioData.duration)),
+          ),
+          ListTile(
+            title: const Text('Channels'),
+            subtitle: Text('${audioData.channelCount}'),
+          ),
+          ListTile(
+            title: const Text('Samples'),
+            subtitle: Text('${audioData.samples.length}'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final millis =
+        duration.inMilliseconds.remainder(1000).toString().padLeft(3, '0');
+
+    return '$minutes:$seconds.$millis';
+  }
+}
+
+class _AudioImportError extends StatelessWidget {
+  const _AudioImportError({
+    required this.error,
+    required this.onRetry,
+  });
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      children: [
+        ListTile(
+          title: const Text('Import failed'),
+          subtitle: Text(_errorMessage(error)),
+        ),
+        Center(
+          child: FilledButton(
+            onPressed: onRetry,
+            child: const Text('Try again'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _errorMessage(Object error) {
+    if (error is AudioImportException) {
+      return error.failure.message;
+    }
+
+    return error.toString();
+  }
+}
