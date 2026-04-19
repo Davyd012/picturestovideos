@@ -8,6 +8,8 @@ import 'package:picturestovideos/features/audio_analysis/audio_analysis_state.da
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_model.dart';
 import 'package:picturestovideos/features/beat_detection/beat_detection_state.dart';
 import 'package:picturestovideos/features/beat_detection/beat_detection_view_model.dart';
+import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
+import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
 
@@ -19,6 +21,7 @@ class AudioImportScreen extends ConsumerWidget {
     final importState = ref.watch(audioImportViewModelProvider);
     final analysisState = ref.watch(audioAnalysisViewModelProvider);
     final beatState = ref.watch(beatDetectionViewModelProvider);
+    final beatMapState = ref.watch(beatMapViewModelProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,6 +40,7 @@ class AudioImportScreen extends ConsumerWidget {
             state: value,
             analysisState: analysisState,
             beatState: beatState,
+            beatMapState: beatMapState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
             onAnalyzePressed: () {
@@ -57,15 +61,25 @@ class AudioImportScreen extends ConsumerWidget {
                     .detectBeats(value.frames),
               _ => null,
             },
+            onBuildBeatMapPressed: switch (beatState) {
+              AsyncData<BeatDetectionState>(:final value)
+                  when value.beats.isNotEmpty =>
+                () => ref
+                    .read(beatMapViewModelProvider.notifier)
+                    .buildBeatMap(value.beats),
+              _ => null,
+            },
           ),
         _ => _AudioImportContent(
             state: const AudioImportState.initial(),
             analysisState: analysisState,
             beatState: beatState,
+            beatMapState: beatMapState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
             onAnalyzePressed: null,
             onDetectBeatsPressed: null,
+            onBuildBeatMapPressed: null,
           ),
       },
     );
@@ -77,17 +91,21 @@ class _AudioImportContent extends StatelessWidget {
     required this.state,
     required this.analysisState,
     required this.beatState,
+    required this.beatMapState,
     required this.onImportPressed,
     required this.onAnalyzePressed,
     required this.onDetectBeatsPressed,
+    required this.onBuildBeatMapPressed,
   });
 
   final AudioImportState state;
   final AsyncValue<AudioAnalysisState> analysisState;
   final AsyncValue<BeatDetectionState> beatState;
+  final AsyncValue<BeatMapState> beatMapState;
   final VoidCallback onImportPressed;
   final VoidCallback? onAnalyzePressed;
   final VoidCallback? onDetectBeatsPressed;
+  final VoidCallback? onBuildBeatMapPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +138,12 @@ class _AudioImportContent extends StatelessWidget {
             child: const Text('Detect beats'),
           ),
         ),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: onBuildBeatMapPressed,
+            child: const Text('Build beat map'),
+          ),
+        ),
         if (source != null && audioData != null) ...[
           ListTile(
             title: const Text('File'),
@@ -147,6 +171,7 @@ class _AudioImportContent extends StatelessWidget {
           analysisState: analysisState,
         ),
         _BeatDetectionSection(beatState: beatState),
+        _BeatMapSection(beatMapState: beatMapState),
       ],
     );
   }
@@ -280,6 +305,50 @@ class _BeatDetectionSection extends StatelessWidget {
     final seconds =
         beat.time.inMilliseconds / Duration.millisecondsPerSecond;
     return '${seconds.toStringAsFixed(3)} s';
+  }
+}
+
+class _BeatMapSection extends StatelessWidget {
+  const _BeatMapSection({
+    required this.beatMapState,
+  });
+
+  final AsyncValue<BeatMapState> beatMapState;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (beatMapState) {
+      AsyncLoading<BeatMapState>() => const ListTile(
+          title: Text('Stage 4: Beat map'),
+          subtitle: Text('Building beat map...'),
+        ),
+      AsyncError<BeatMapState>(:final error) => ListTile(
+          title: const Text('Stage 4: Beat map'),
+          subtitle: Text(error.toString()),
+        ),
+      AsyncData<BeatMapState>(:final value) when value.hasBeatMap => Column(
+          children: [
+            ListTile(
+              title: const Text('Stage 4: Beat map'),
+              subtitle: Text('${value.beatMap.beats.length} beats mapped'),
+            ),
+            ListTile(
+              title: const Text('Estimated BPM'),
+              subtitle: Text(value.beatMap.bpm.toStringAsFixed(2)),
+            ),
+            ListTile(
+              title: const Text('Average beat interval'),
+              subtitle: Text(
+                '${value.beatMap.averageBeatInterval.inMilliseconds} ms',
+              ),
+            ),
+          ],
+        ),
+      _ => const ListTile(
+          title: Text('Stage 4: Beat map'),
+          subtitle: Text('Detect beats first, then build a reusable beat map.'),
+        ),
+    };
   }
 }
 
