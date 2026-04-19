@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/audio_import_failure.dart';
+import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
+import 'package:picturestovideos/core/audio/domain/audio_data.dart';
+import 'package:picturestovideos/features/audio_analysis/audio_analysis_state.dart';
+import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
 
@@ -10,10 +14,11 @@ class AudioImportScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final importState = ref.watch(audioImportViewModelProvider);
+    final analysisState = ref.watch(audioAnalysisViewModelProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Stage 1: Audio ingestion'),
+        title: const Text('Audio pipeline foundation'),
       ),
       body: switch (importState) {
         AsyncLoading<AudioImportState>() => const Center(
@@ -26,13 +31,26 @@ class AudioImportScreen extends ConsumerWidget {
           ),
         AsyncData<AudioImportState>(:final value) => _AudioImportContent(
             state: value,
+            analysisState: analysisState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
+            onAnalyzePressed: () {
+              final audioData = value.audioData;
+              if (audioData == null) {
+                return;
+              }
+
+              ref
+                  .read(audioAnalysisViewModelProvider.notifier)
+                  .analyzeAudio(audioData);
+            },
           ),
         _ => _AudioImportContent(
             state: const AudioImportState.initial(),
+            analysisState: analysisState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
+            onAnalyzePressed: null,
           ),
       },
     );
@@ -42,11 +60,15 @@ class AudioImportScreen extends ConsumerWidget {
 class _AudioImportContent extends StatelessWidget {
   const _AudioImportContent({
     required this.state,
+    required this.analysisState,
     required this.onImportPressed,
+    required this.onAnalyzePressed,
   });
 
   final AudioImportState state;
+  final AsyncValue<AudioAnalysisState> analysisState;
   final VoidCallback onImportPressed;
+  final VoidCallback? onAnalyzePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +87,12 @@ class _AudioImportContent extends StatelessWidget {
           child: FilledButton(
             onPressed: onImportPressed,
             child: const Text('Choose audio file'),
+          ),
+        ),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: onAnalyzePressed,
+            child: const Text('Run energy analysis'),
           ),
         ),
         if (source != null && audioData != null) ...[
@@ -89,6 +117,10 @@ class _AudioImportContent extends StatelessWidget {
             subtitle: Text('${audioData.samples.length}'),
           ),
         ],
+        _AudioAnalysisSection(
+          audioData: audioData,
+          analysisState: analysisState,
+        ),
       ],
     );
   }
@@ -100,6 +132,71 @@ class _AudioImportContent extends StatelessWidget {
         duration.inMilliseconds.remainder(1000).toString().padLeft(3, '0');
 
     return '$minutes:$seconds.$millis';
+  }
+}
+
+class _AudioAnalysisSection extends StatelessWidget {
+  const _AudioAnalysisSection({
+    required this.audioData,
+    required this.analysisState,
+  });
+
+  final AudioData? audioData;
+  final AsyncValue<AudioAnalysisState> analysisState;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (analysisState) {
+      AsyncLoading<AudioAnalysisState>() => const ListTile(
+          title: Text('Stage 2: Energy analysis'),
+          subtitle: Text('Analyzing frames...'),
+        ),
+      AsyncError<AudioAnalysisState>(:final error) => ListTile(
+          title: const Text('Stage 2: Energy analysis'),
+          subtitle: Text(error.toString()),
+        ),
+      AsyncData<AudioAnalysisState>(:final value) when value.frames.isNotEmpty =>
+        Column(
+          children: [
+            ListTile(
+              title: const Text('Stage 2: Energy analysis'),
+              subtitle: Text(
+                '${value.frameCount} frames, peak energy ${value.peakEnergy.toStringAsFixed(4)}',
+              ),
+            ),
+            ListTile(
+              title: const Text('Frame window'),
+              subtitle: Text(
+                '${value.config.frameSize} samples, hop ${value.config.hopSize}',
+              ),
+            ),
+            ListTile(
+              title: const Text('Timeline span'),
+              subtitle: Text(
+                '${_formatFrameTime(value.firstFrame)} -> ${_formatFrameTime(value.lastFrame)}',
+              ),
+            ),
+          ],
+        ),
+      _ when audioData == null => const ListTile(
+          title: Text('Stage 2: Energy analysis'),
+          subtitle: Text('Import audio first.'),
+        ),
+      _ => const ListTile(
+          title: Text('Stage 2: Energy analysis'),
+          subtitle: Text('Ready to build audio frames from imported samples.'),
+        ),
+    };
+  }
+
+  String _formatFrameTime(AudioFrame? frame) {
+    if (frame == null) {
+      return 'n/a';
+    }
+
+    final seconds =
+        frame.time.inMilliseconds / Duration.millisecondsPerSecond;
+    return '${seconds.toStringAsFixed(3)} s';
   }
 }
 
