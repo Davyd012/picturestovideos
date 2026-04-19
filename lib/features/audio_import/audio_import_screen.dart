@@ -15,6 +15,8 @@ import 'package:picturestovideos/features/event_system/event_system_state.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
+import 'package:picturestovideos/features/timeline/timeline_state.dart';
+import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
 
@@ -29,6 +31,7 @@ class AudioImportScreen extends ConsumerWidget {
     final beatMapState = ref.watch(beatMapViewModelProvider);
     final eventState = ref.watch(eventSystemViewModelProvider);
     final playbackState = ref.watch(playbackViewModelProvider);
+    final timelineState = ref.watch(timelineViewModelProvider);
 
     ref.listen(playbackViewModelProvider, (_, next) {
       final playback = next.value;
@@ -61,6 +64,7 @@ class AudioImportScreen extends ConsumerWidget {
             beatMapState: beatMapState,
             eventState: eventState,
             playbackState: playbackState,
+            timelineState: timelineState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
             onAnalyzePressed: () {
@@ -109,6 +113,18 @@ class AudioImportScreen extends ConsumerWidget {
             onPlaybackSeekPressed: () => ref
                 .read(playbackViewModelProvider.notifier)
                 .seek(Duration.zero),
+            onBuildTimelinePressed: switch ((beatMapState, eventState)) {
+              (
+                AsyncData<BeatMapState>(value: final beatMapValue),
+                AsyncData<EventSystemState>(value: final eventValue),
+              )
+                  when beatMapValue.hasBeatMap && eventValue.hasEvents =>
+                () => ref.read(timelineViewModelProvider.notifier).buildProjectTimeline(
+                      beatMap: beatMapValue.beatMap,
+                      events: eventValue.events,
+                    ),
+              _ => null,
+            },
           ),
       },
     );
@@ -123,6 +139,7 @@ class _AudioImportContent extends StatelessWidget {
     required this.beatMapState,
     required this.eventState,
     required this.playbackState,
+    required this.timelineState,
     required this.onImportPressed,
     required this.onAnalyzePressed,
     required this.onDetectBeatsPressed,
@@ -131,6 +148,7 @@ class _AudioImportContent extends StatelessWidget {
     required this.onLoadEventsPressed,
     required this.onPlaybackStepPressed,
     required this.onPlaybackSeekPressed,
+    required this.onBuildTimelinePressed,
   });
 
   final AudioImportState state;
@@ -139,6 +157,7 @@ class _AudioImportContent extends StatelessWidget {
   final AsyncValue<BeatMapState> beatMapState;
   final AsyncValue<EventSystemState> eventState;
   final AsyncValue<PlaybackState> playbackState;
+  final AsyncValue<TimelineState> timelineState;
   final VoidCallback onImportPressed;
   final VoidCallback? onAnalyzePressed;
   final VoidCallback? onDetectBeatsPressed;
@@ -147,6 +166,7 @@ class _AudioImportContent extends StatelessWidget {
   final VoidCallback? onLoadEventsPressed;
   final VoidCallback onPlaybackStepPressed;
   final VoidCallback onPlaybackSeekPressed;
+  final VoidCallback? onBuildTimelinePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -209,6 +229,12 @@ class _AudioImportContent extends StatelessWidget {
             child: const Text('Reset playback'),
           ),
         ),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: onBuildTimelinePressed,
+            child: const Text('Build project timeline'),
+          ),
+        ),
         if (source != null && audioData != null) ...[
           ListTile(
             title: const Text('File'),
@@ -239,6 +265,7 @@ class _AudioImportContent extends StatelessWidget {
         _BeatMapSection(beatMapState: beatMapState),
         _EventSystemSection(eventState: eventState),
         _PlaybackSection(playbackState: playbackState),
+        _TimelineSection(timelineState: timelineState),
       ],
     );
   }
@@ -468,6 +495,46 @@ class _EventSystemSection extends StatelessWidget {
     }
 
     return '${execution.event.type} at ${execution.executedAt.inMilliseconds} ms';
+  }
+}
+
+class _TimelineSection extends StatelessWidget {
+  const _TimelineSection({
+    required this.timelineState,
+  });
+
+  final AsyncValue<TimelineState> timelineState;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (timelineState) {
+      AsyncLoading<TimelineState>() => const ListTile(
+          title: Text('Stage 7: Timeline model'),
+          subtitle: Text('Building project timeline...'),
+        ),
+      AsyncError<TimelineState>(:final error) => ListTile(
+          title: const Text('Stage 7: Timeline model'),
+          subtitle: Text(error.toString()),
+        ),
+      AsyncData<TimelineState>(:final value) when value.hasProject => Column(
+          children: [
+            ListTile(
+              title: const Text('Stage 7: Timeline model'),
+              subtitle: Text(
+                '${value.project!.tracks.length} tracks in ${value.project!.name}',
+              ),
+            ),
+            ListTile(
+              title: const Text('Serialized project'),
+              subtitle: Text('${value.serializedProject}'),
+            ),
+          ],
+        ),
+      _ => const ListTile(
+          title: Text('Stage 7: Timeline model'),
+          subtitle: Text('Load events and beat map first, then build the project timeline.'),
+        ),
+    };
   }
 }
 
