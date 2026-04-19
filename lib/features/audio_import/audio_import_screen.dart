@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/audio_import_failure.dart';
+import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_state.dart';
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_model.dart';
+import 'package:picturestovideos/features/beat_detection/beat_detection_state.dart';
+import 'package:picturestovideos/features/beat_detection/beat_detection_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
 
@@ -15,6 +18,7 @@ class AudioImportScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final importState = ref.watch(audioImportViewModelProvider);
     final analysisState = ref.watch(audioAnalysisViewModelProvider);
+    final beatState = ref.watch(beatDetectionViewModelProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -32,6 +36,7 @@ class AudioImportScreen extends ConsumerWidget {
         AsyncData<AudioImportState>(:final value) => _AudioImportContent(
             state: value,
             analysisState: analysisState,
+            beatState: beatState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
             onAnalyzePressed: () {
@@ -44,13 +49,23 @@ class AudioImportScreen extends ConsumerWidget {
                   .read(audioAnalysisViewModelProvider.notifier)
                   .analyzeAudio(audioData);
             },
+            onDetectBeatsPressed: switch (analysisState) {
+              AsyncData<AudioAnalysisState>(:final value)
+                  when value.frames.isNotEmpty =>
+                () => ref
+                    .read(beatDetectionViewModelProvider.notifier)
+                    .detectBeats(value.frames),
+              _ => null,
+            },
           ),
         _ => _AudioImportContent(
             state: const AudioImportState.initial(),
             analysisState: analysisState,
+            beatState: beatState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
             onAnalyzePressed: null,
+            onDetectBeatsPressed: null,
           ),
       },
     );
@@ -61,14 +76,18 @@ class _AudioImportContent extends StatelessWidget {
   const _AudioImportContent({
     required this.state,
     required this.analysisState,
+    required this.beatState,
     required this.onImportPressed,
     required this.onAnalyzePressed,
+    required this.onDetectBeatsPressed,
   });
 
   final AudioImportState state;
   final AsyncValue<AudioAnalysisState> analysisState;
+  final AsyncValue<BeatDetectionState> beatState;
   final VoidCallback onImportPressed;
   final VoidCallback? onAnalyzePressed;
+  final VoidCallback? onDetectBeatsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +112,12 @@ class _AudioImportContent extends StatelessWidget {
           child: FilledButton.tonal(
             onPressed: onAnalyzePressed,
             child: const Text('Run energy analysis'),
+          ),
+        ),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: onDetectBeatsPressed,
+            child: const Text('Detect beats'),
           ),
         ),
         if (source != null && audioData != null) ...[
@@ -121,6 +146,7 @@ class _AudioImportContent extends StatelessWidget {
           audioData: audioData,
           analysisState: analysisState,
         ),
+        _BeatDetectionSection(beatState: beatState),
       ],
     );
   }
@@ -196,6 +222,63 @@ class _AudioAnalysisSection extends StatelessWidget {
 
     final seconds =
         frame.time.inMilliseconds / Duration.millisecondsPerSecond;
+    return '${seconds.toStringAsFixed(3)} s';
+  }
+}
+
+class _BeatDetectionSection extends StatelessWidget {
+  const _BeatDetectionSection({
+    required this.beatState,
+  });
+
+  final AsyncValue<BeatDetectionState> beatState;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (beatState) {
+      AsyncLoading<BeatDetectionState>() => const ListTile(
+          title: Text('Stage 3: Beat detection'),
+          subtitle: Text('Detecting beat candidates...'),
+        ),
+      AsyncError<BeatDetectionState>(:final error) => ListTile(
+          title: const Text('Stage 3: Beat detection'),
+          subtitle: Text(error.toString()),
+        ),
+      AsyncData<BeatDetectionState>(:final value) when value.beats.isNotEmpty =>
+        Column(
+          children: [
+            ListTile(
+              title: const Text('Stage 3: Beat detection'),
+              subtitle: Text('${value.beatCount} beats detected'),
+            ),
+            ListTile(
+              title: const Text('Detector config'),
+              subtitle: Text(
+                'Sensitivity ${value.config.sensitivity.toStringAsFixed(2)}, window ${value.config.movingAverageWindow}',
+              ),
+            ),
+            ListTile(
+              title: const Text('Beat span'),
+              subtitle: Text(
+                '${_formatBeatTime(value.firstBeat)} -> ${_formatBeatTime(value.lastBeat)}',
+              ),
+            ),
+          ],
+        ),
+      _ => const ListTile(
+          title: Text('Stage 3: Beat detection'),
+          subtitle: Text('Run energy analysis first, then detect beats.'),
+        ),
+    };
+  }
+
+  String _formatBeatTime(Beat? beat) {
+    if (beat == null) {
+      return 'n/a';
+    }
+
+    final seconds =
+        beat.time.inMilliseconds / Duration.millisecondsPerSecond;
     return '${seconds.toStringAsFixed(3)} s';
   }
 }
