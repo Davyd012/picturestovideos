@@ -4,12 +4,15 @@ import 'package:picturestovideos/core/audio/domain/audio_import_failure.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
+import 'package:picturestovideos/core/timeline/domain/event_execution.dart';
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_state.dart';
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_model.dart';
 import 'package:picturestovideos/features/beat_detection/beat_detection_state.dart';
 import 'package:picturestovideos/features/beat_detection/beat_detection_view_model.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
+import 'package:picturestovideos/features/event_system/event_system_state.dart';
+import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
@@ -24,7 +27,19 @@ class AudioImportScreen extends ConsumerWidget {
     final analysisState = ref.watch(audioAnalysisViewModelProvider);
     final beatState = ref.watch(beatDetectionViewModelProvider);
     final beatMapState = ref.watch(beatMapViewModelProvider);
+    final eventState = ref.watch(eventSystemViewModelProvider);
     final playbackState = ref.watch(playbackViewModelProvider);
+
+    ref.listen(playbackViewModelProvider, (_, next) {
+      final playback = next.value;
+      if (playback == null || !playback.hasBeatMap) {
+        return;
+      }
+
+      ref
+          .read(eventSystemViewModelProvider.notifier)
+          .dispatchForPlaybackTime(playback.currentTime);
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -44,6 +59,7 @@ class AudioImportScreen extends ConsumerWidget {
             analysisState: analysisState,
             beatState: beatState,
             beatMapState: beatMapState,
+            eventState: eventState,
             playbackState: playbackState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
@@ -80,25 +96,13 @@ class AudioImportScreen extends ConsumerWidget {
                     .loadBeatMap(value.beatMap),
               _ => null,
             },
-            onPlaybackStepPressed: () => ref
-                .read(playbackViewModelProvider.notifier)
-                .step(const Duration(milliseconds: 100)),
-            onPlaybackSeekPressed: () => ref
-                .read(playbackViewModelProvider.notifier)
-                .seek(Duration.zero),
-          ),
-        _ => _AudioImportContent(
-            state: const AudioImportState.initial(),
-            analysisState: analysisState,
-            beatState: beatState,
-            beatMapState: beatMapState,
-            playbackState: playbackState,
-            onImportPressed: () =>
-                ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
-            onAnalyzePressed: null,
-            onDetectBeatsPressed: null,
-            onBuildBeatMapPressed: null,
-            onLoadPlaybackPressed: null,
+            onLoadEventsPressed: switch (beatMapState) {
+              AsyncData<BeatMapState>(:final value) when value.hasBeatMap =>
+                () => ref
+                    .read(eventSystemViewModelProvider.notifier)
+                    .loadMarkerEventsFromBeatMap(value.beatMap),
+              _ => null,
+            },
             onPlaybackStepPressed: () => ref
                 .read(playbackViewModelProvider.notifier)
                 .step(const Duration(milliseconds: 100)),
@@ -117,12 +121,14 @@ class _AudioImportContent extends StatelessWidget {
     required this.analysisState,
     required this.beatState,
     required this.beatMapState,
+    required this.eventState,
     required this.playbackState,
     required this.onImportPressed,
     required this.onAnalyzePressed,
     required this.onDetectBeatsPressed,
     required this.onBuildBeatMapPressed,
     required this.onLoadPlaybackPressed,
+    required this.onLoadEventsPressed,
     required this.onPlaybackStepPressed,
     required this.onPlaybackSeekPressed,
   });
@@ -131,12 +137,14 @@ class _AudioImportContent extends StatelessWidget {
   final AsyncValue<AudioAnalysisState> analysisState;
   final AsyncValue<BeatDetectionState> beatState;
   final AsyncValue<BeatMapState> beatMapState;
+  final AsyncValue<EventSystemState> eventState;
   final AsyncValue<PlaybackState> playbackState;
   final VoidCallback onImportPressed;
   final VoidCallback? onAnalyzePressed;
   final VoidCallback? onDetectBeatsPressed;
   final VoidCallback? onBuildBeatMapPressed;
   final VoidCallback? onLoadPlaybackPressed;
+  final VoidCallback? onLoadEventsPressed;
   final VoidCallback onPlaybackStepPressed;
   final VoidCallback onPlaybackSeekPressed;
 
@@ -185,6 +193,12 @@ class _AudioImportContent extends StatelessWidget {
         ),
         Center(
           child: FilledButton.tonal(
+            onPressed: onLoadEventsPressed,
+            child: const Text('Load marker events'),
+          ),
+        ),
+        Center(
+          child: FilledButton.tonal(
             onPressed: onPlaybackStepPressed,
             child: const Text('Step +100 ms'),
           ),
@@ -223,6 +237,7 @@ class _AudioImportContent extends StatelessWidget {
         ),
         _BeatDetectionSection(beatState: beatState),
         _BeatMapSection(beatMapState: beatMapState),
+        _EventSystemSection(eventState: eventState),
         _PlaybackSection(playbackState: playbackState),
       ],
     );
@@ -401,6 +416,58 @@ class _BeatMapSection extends StatelessWidget {
           subtitle: Text('Detect beats first, then build a reusable beat map.'),
         ),
     };
+  }
+}
+
+class _EventSystemSection extends StatelessWidget {
+  const _EventSystemSection({
+    required this.eventState,
+  });
+
+  final AsyncValue<EventSystemState> eventState;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (eventState) {
+      AsyncLoading<EventSystemState>() => const ListTile(
+          title: Text('Stage 6: Event system'),
+          subtitle: Text('Preparing event state...'),
+        ),
+      AsyncError<EventSystemState>(:final error) => ListTile(
+          title: const Text('Stage 6: Event system'),
+          subtitle: Text(error.toString()),
+        ),
+      AsyncData<EventSystemState>(:final value) when value.hasEvents => Column(
+          children: [
+            ListTile(
+              title: const Text('Stage 6: Event system'),
+              subtitle: Text(
+                '${value.events.length} scheduled, ${value.executions.length} executed',
+              ),
+            ),
+            ListTile(
+              title: const Text('Next event index'),
+              subtitle: Text('${value.nextEventIndex}'),
+            ),
+            ListTile(
+              title: const Text('Last execution'),
+              subtitle: Text(_formatExecution(value.lastExecution)),
+            ),
+          ],
+        ),
+      _ => const ListTile(
+          title: Text('Stage 6: Event system'),
+          subtitle: Text('Load events from the beat map to start dispatching.'),
+        ),
+    };
+  }
+
+  String _formatExecution(Object? execution) {
+    if (execution is! EventExecution) {
+      return 'n/a';
+    }
+
+    return '${execution.event.type} at ${execution.executedAt.inMilliseconds} ms';
   }
 }
 

@@ -12,7 +12,9 @@ final buildBeatMapUseCaseProvider = Provider<BuildBeatMapUseCase>(
 class BuildBeatMapUseCase {
   const BuildBeatMapUseCase({
     required BeatMapBuilder beatMapBuilder,
-  }) : _beatMapBuilder = beatMapBuilder;
+  }) : this._(beatMapBuilder);
+
+  const BuildBeatMapUseCase._(this._beatMapBuilder);
 
   final BeatMapBuilder _beatMapBuilder;
 

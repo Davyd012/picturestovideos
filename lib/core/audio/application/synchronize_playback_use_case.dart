@@ -12,7 +12,9 @@ final synchronizePlaybackUseCaseProvider = Provider<SynchronizePlaybackUseCase>(
 class SynchronizePlaybackUseCase {
   const SynchronizePlaybackUseCase({
     required PlaybackCoordinator playbackCoordinator,
-  }) : _playbackCoordinator = playbackCoordinator;
+  }) : this._(playbackCoordinator);
+
+  const SynchronizePlaybackUseCase._(this._playbackCoordinator);
 
   final PlaybackCoordinator _playbackCoordinator;
 

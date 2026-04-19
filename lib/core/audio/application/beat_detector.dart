@@ -77,8 +77,10 @@ class BeatDetector {
     required int endIndexInclusive,
     required int window,
   }) {
-    final startIndex =
-        (endIndexInclusive - window + 1).clamp(0, endIndexInclusive) as int;
+    final startIndex = (endIndexInclusive - window + 1).clamp(
+      0,
+      endIndexInclusive,
+    );
     var sum = 0.0;
 
     for (var index = startIndex; index <= endIndexInclusive; index++) {

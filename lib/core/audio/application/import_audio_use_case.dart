@@ -12,7 +12,9 @@ final importAudioUseCaseProvider = Provider<ImportAudioUseCase>(
 class ImportAudioUseCase {
   const ImportAudioUseCase({
     required AudioRepository audioRepository,
-  }) : _audioRepository = audioRepository;
+  }) : this._(audioRepository);
+
+  const ImportAudioUseCase._(this._audioRepository);
 
   final AudioRepository _audioRepository;
 

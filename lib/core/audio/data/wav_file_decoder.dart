@@ -178,8 +178,7 @@ class WavFileDecoder {
     required int bitsPerSample,
   }) {
     if (audioFormat == 3 && bitsPerSample == 32) {
-      return sampleData.getFloat32(offset, Endian.little).clamp(-1.0, 1.0)
-          as double;
+      return sampleData.getFloat32(offset, Endian.little).clamp(-1.0, 1.0);
     }
 
     switch (bitsPerSample) {

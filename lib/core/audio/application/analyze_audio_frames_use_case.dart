@@ -13,7 +13,9 @@ final analyzeAudioFramesUseCaseProvider = Provider<AnalyzeAudioFramesUseCase>(
 class AnalyzeAudioFramesUseCase {
   const AnalyzeAudioFramesUseCase({
     required FrameEnergyAnalyzer frameEnergyAnalyzer,
-  }) : _frameEnergyAnalyzer = frameEnergyAnalyzer;
+  }) : this._(frameEnergyAnalyzer);
+
+  const AnalyzeAudioFramesUseCase._(this._frameEnergyAnalyzer);
 
   final FrameEnergyAnalyzer _frameEnergyAnalyzer;
 

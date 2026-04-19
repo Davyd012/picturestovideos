@@ -13,7 +13,9 @@ final detectBeatsUseCaseProvider = Provider<DetectBeatsUseCase>(
 class DetectBeatsUseCase {
   const DetectBeatsUseCase({
     required BeatDetector beatDetector,
-  }) : _beatDetector = beatDetector;
+  }) : this._(beatDetector);
+
+  const DetectBeatsUseCase._(this._beatDetector);
 
   final BeatDetector _beatDetector;
 

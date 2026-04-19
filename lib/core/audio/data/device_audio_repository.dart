@@ -25,8 +25,15 @@ class DeviceAudioRepository implements AudioRepository {
   const DeviceAudioRepository({
     required AudioFilePicker filePicker,
     required WavFileDecoder wavFileDecoder,
-  })  : _filePicker = filePicker,
-        _wavFileDecoder = wavFileDecoder;
+  }) : this._(
+          filePicker,
+          wavFileDecoder,
+        );
+
+  const DeviceAudioRepository._(
+    this._filePicker,
+    this._wavFileDecoder,
+  );
 
   final AudioFilePicker _filePicker;
   final WavFileDecoder _wavFileDecoder;
