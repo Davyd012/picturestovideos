@@ -15,6 +15,8 @@ import 'package:picturestovideos/features/event_system/event_system_state.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
+import 'package:picturestovideos/features/preprocessing/preprocessing_state.dart';
+import 'package:picturestovideos/features/preprocessing/preprocessing_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
@@ -31,6 +33,7 @@ class AudioImportScreen extends ConsumerWidget {
     final beatMapState = ref.watch(beatMapViewModelProvider);
     final eventState = ref.watch(eventSystemViewModelProvider);
     final playbackState = ref.watch(playbackViewModelProvider);
+    final preprocessingState = ref.watch(preprocessingViewModelProvider);
     final timelineState = ref.watch(timelineViewModelProvider);
 
     ref.listen(playbackViewModelProvider, (_, next) {
@@ -64,6 +67,7 @@ class AudioImportScreen extends ConsumerWidget {
             beatMapState: beatMapState,
             eventState: eventState,
             playbackState: playbackState,
+            preprocessingState: preprocessingState,
             timelineState: timelineState,
             onImportPressed: () =>
                 ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
@@ -125,6 +129,24 @@ class AudioImportScreen extends ConsumerWidget {
                     ),
               _ => null,
             },
+            onSaveCachePressed: switch ((value.audioData, beatMapState)) {
+              (
+                final AudioData audioData?,
+                AsyncData<BeatMapState>(value: final beatMapValue),
+              )
+                  when beatMapValue.hasBeatMap =>
+                () => ref.read(preprocessingViewModelProvider.notifier).saveBeatMap(
+                      audioData: audioData,
+                      beatMap: beatMapValue.beatMap,
+                    ),
+              _ => null,
+            },
+            onLoadCachePressed: switch (value.audioData) {
+              final AudioData audioData? => () => ref
+                  .read(preprocessingViewModelProvider.notifier)
+                  .loadCachedBeatMap(audioData),
+              _ => null,
+            },
           ),
       },
     );
@@ -139,6 +161,7 @@ class _AudioImportContent extends StatelessWidget {
     required this.beatMapState,
     required this.eventState,
     required this.playbackState,
+    required this.preprocessingState,
     required this.timelineState,
     required this.onImportPressed,
     required this.onAnalyzePressed,
@@ -149,6 +172,8 @@ class _AudioImportContent extends StatelessWidget {
     required this.onPlaybackStepPressed,
     required this.onPlaybackSeekPressed,
     required this.onBuildTimelinePressed,
+    required this.onSaveCachePressed,
+    required this.onLoadCachePressed,
   });
 
   final AudioImportState state;
@@ -157,6 +182,7 @@ class _AudioImportContent extends StatelessWidget {
   final AsyncValue<BeatMapState> beatMapState;
   final AsyncValue<EventSystemState> eventState;
   final AsyncValue<PlaybackState> playbackState;
+  final AsyncValue<PreprocessingState> preprocessingState;
   final AsyncValue<TimelineState> timelineState;
   final VoidCallback onImportPressed;
   final VoidCallback? onAnalyzePressed;
@@ -167,6 +193,8 @@ class _AudioImportContent extends StatelessWidget {
   final VoidCallback onPlaybackStepPressed;
   final VoidCallback onPlaybackSeekPressed;
   final VoidCallback? onBuildTimelinePressed;
+  final VoidCallback? onSaveCachePressed;
+  final VoidCallback? onLoadCachePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +263,18 @@ class _AudioImportContent extends StatelessWidget {
             child: const Text('Build project timeline'),
           ),
         ),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: onSaveCachePressed,
+            child: const Text('Save beat map cache'),
+          ),
+        ),
+        Center(
+          child: FilledButton.tonal(
+            onPressed: onLoadCachePressed,
+            child: const Text('Load beat map cache'),
+          ),
+        ),
         if (source != null && audioData != null) ...[
           ListTile(
             title: const Text('File'),
@@ -265,6 +305,7 @@ class _AudioImportContent extends StatelessWidget {
         _BeatMapSection(beatMapState: beatMapState),
         _EventSystemSection(eventState: eventState),
         _PlaybackSection(playbackState: playbackState),
+        _PreprocessingSection(preprocessingState: preprocessingState),
         _TimelineSection(timelineState: timelineState),
       ],
     );
@@ -495,6 +536,44 @@ class _EventSystemSection extends StatelessWidget {
     }
 
     return '${execution.event.type} at ${execution.executedAt.inMilliseconds} ms';
+  }
+}
+
+class _PreprocessingSection extends StatelessWidget {
+  const _PreprocessingSection({
+    required this.preprocessingState,
+  });
+
+  final AsyncValue<PreprocessingState> preprocessingState;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (preprocessingState) {
+      AsyncLoading<PreprocessingState>() => const ListTile(
+          title: Text('Stage 8: Preprocessing cache'),
+          subtitle: Text('Reading or writing cache...'),
+        ),
+      AsyncError<PreprocessingState>(:final error) => ListTile(
+          title: const Text('Stage 8: Preprocessing cache'),
+          subtitle: Text(error.toString()),
+        ),
+      AsyncData<PreprocessingState>(:final value) => Column(
+          children: [
+            ListTile(
+              title: const Text('Stage 8: Preprocessing cache'),
+              subtitle: Text(value.lastAction),
+            ),
+            ListTile(
+              title: const Text('Cached beat map'),
+              subtitle: Text(
+                value.hasCachedBeatMap
+                    ? '${value.cachedBeatMap!.beats.length} beats, ${value.cachedBeatMap!.bpm.toStringAsFixed(2)} BPM'
+                    : 'No cached beat map loaded',
+              ),
+            ),
+          ],
+        ),
+    };
   }
 }
 
