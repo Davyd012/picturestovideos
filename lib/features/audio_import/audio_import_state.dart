@@ -1,7 +1,24 @@
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/core/audio/domain/audio_source.dart';
 
-enum AudioImportPipelineStatus { idle, running, success, failure }
+enum AudioImportPipelineStatus {
+  idle,
+  pickingFile,
+  running,
+  success,
+  failure,
+  cancelled,
+}
+
+enum AudioImportFlowState {
+  empty,
+  pickingFile,
+  importing,
+  analyzing,
+  completed,
+  failed,
+  cancelled,
+}
 
 enum AudioImportPipelineStage {
   importFile,
@@ -47,18 +64,43 @@ class AudioImportState {
 
   bool get hasSelectedFile => source != null;
   bool get hasAudio => source != null && audioData != null;
+  bool get isPickingFile => status == AudioImportPipelineStatus.pickingFile;
   bool get isRunning => status == AudioImportPipelineStatus.running;
+  bool get isBusy => isPickingFile || isRunning;
   bool get isSuccess => status == AudioImportPipelineStatus.success;
   bool get isFailure => status == AudioImportPipelineStatus.failure;
+  bool get isCancelled => status == AudioImportPipelineStatus.cancelled;
   bool get hasWarning => warningMessage != null && warningMessage!.isNotEmpty;
 
   bool get canOpenEditor =>
       hasAudio &&
       completedStages.contains(AudioImportPipelineStage.buildTimeline);
 
+  AudioImportFlowState get flowState {
+    return switch (status) {
+      AudioImportPipelineStatus.pickingFile => AudioImportFlowState.pickingFile,
+      AudioImportPipelineStatus.running =>
+        activeStage == AudioImportPipelineStage.analyzeAudio ||
+                activeStage == AudioImportPipelineStage.detectBeats ||
+                activeStage == AudioImportPipelineStage.buildBeatMap
+            ? AudioImportFlowState.analyzing
+            : AudioImportFlowState.importing,
+      AudioImportPipelineStatus.success => AudioImportFlowState.completed,
+      AudioImportPipelineStatus.failure => AudioImportFlowState.failed,
+      AudioImportPipelineStatus.cancelled => AudioImportFlowState.cancelled,
+      AudioImportPipelineStatus.idle =>
+        hasSelectedFile
+            ? AudioImportFlowState.importing
+            : AudioImportFlowState.empty,
+    };
+  }
+
   double get progressValue {
     if (isSuccess) {
       return 1;
+    }
+    if (isPickingFile) {
+      return 0;
     }
 
     final totalStages = AudioImportPipelineStage.values.length;
@@ -72,6 +114,12 @@ class AudioImportState {
   String get progressLabel {
     if (isFailure && errorStage != null) {
       return 'Pipeline stopped during ${titleForStage(errorStage!)}';
+    }
+    if (isCancelled) {
+      return 'Import cancelled';
+    }
+    if (isPickingFile) {
+      return 'Waiting for file selection';
     }
     if (isSuccess) {
       return hasWarning

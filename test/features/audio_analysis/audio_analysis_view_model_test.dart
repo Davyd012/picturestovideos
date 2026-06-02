@@ -15,14 +15,8 @@ void main() {
         analyzeAudioFramesUseCaseProvider.overrideWithValue(
           _FakeAnalyzeAudioFramesUseCase(
             frames: const [
-              AudioFrame(
-                time: Duration.zero,
-                energy: 0.2,
-              ),
-              AudioFrame(
-                time: Duration(milliseconds: 250),
-                energy: 0.8,
-              ),
+              AudioFrame(time: Duration.zero, energy: 0.2),
+              AudioFrame(time: Duration(milliseconds: 250), energy: 0.8),
             ],
           ),
         ),
@@ -31,7 +25,9 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(audioAnalysisViewModelProvider.future);
-    await container.read(audioAnalysisViewModelProvider.notifier).analyzeAudio(
+    await container
+        .read(audioAnalysisViewModelProvider.notifier)
+        .analyzeAudio(
           const AudioData(
             samples: [0.1, 0.2],
             sampleRate: 4,
@@ -49,17 +45,16 @@ void main() {
 }
 
 class _FakeAnalyzeAudioFramesUseCase extends AnalyzeAudioFramesUseCase {
-  _FakeAnalyzeAudioFramesUseCase({
-    required this.frames,
-  }) : super(frameEnergyAnalyzer: const _NoopFrameEnergyAnalyzer());
+  _FakeAnalyzeAudioFramesUseCase({required this.frames})
+    : super(frameEnergyAnalyzer: const _NoopFrameEnergyAnalyzer());
 
   final List<AudioFrame> frames;
 
   @override
-  List<AudioFrame> call({
+  Future<List<AudioFrame>> call({
     required AudioData audioData,
     AudioAnalysisConfig config = const AudioAnalysisConfig.defaults(),
-  }) {
+  }) async {
     return frames;
   }
 }

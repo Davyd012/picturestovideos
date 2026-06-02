@@ -25,6 +25,7 @@ final audioImportViewModelProvider =
 
 class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
   static const _tag = 'AudioImportViewModel';
+  int _pipelineSession = 0;
 
   @override
   Future<AudioImportState> build() async {
@@ -35,11 +36,19 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
   Future<void> pickAudioFile() async {
     final logger = ref.read(appLoggerProvider);
     final previousState = state.value ?? const AudioImportState.initial();
-    if (previousState.isRunning) {
+    if (previousState.isBusy) {
       return;
     }
 
     logger.info(_tag, 'Pick audio requested');
+    state = AsyncData(
+      previousState.copyWith(
+        status: AudioImportPipelineStatus.pickingFile,
+        clearActiveStage: true,
+        clearError: true,
+        clearWarning: true,
+      ),
+    );
     final selectedFile = await ref.read(importAudioUseCaseProvider).call();
     await _runImportPipeline(selectedFile, previousState: previousState);
   }
@@ -47,26 +56,48 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
   Future<void> importAudioFromPath(String path) async {
     final logger = ref.read(appLoggerProvider);
     final previousState = state.value ?? const AudioImportState.initial();
-    if (previousState.isRunning) {
+    if (previousState.isBusy) {
       return;
     }
 
     logger.info(_tag, 'Manual audio import requested for $path');
+    state = AsyncData(
+      previousState.copyWith(
+        status: AudioImportPipelineStatus.pickingFile,
+        clearActiveStage: true,
+        clearError: true,
+        clearWarning: true,
+      ),
+    );
     final selectedFile = await ref
         .read(importAudioUseCaseProvider)
         .fromPath(path);
     await _runImportPipeline(selectedFile, previousState: previousState);
   }
 
+  Future<void> stopImport() async {
+    _pipelineSession++;
+    ref.read(appLoggerProvider).warning(_tag, 'Import stopped by user');
+    await _resetDownstreamState();
+    state = const AsyncData(AudioImportState.initial());
+  }
+
+  Future<void> importAnotherFile() async {
+    await stopImport();
+  }
+
   Future<void> _runImportPipeline(
     SelectedAudioFile? selectedFile, {
     required AudioImportState previousState,
   }) async {
+    final session = ++_pipelineSession;
     if (selectedFile == null) {
       ref
           .read(appLoggerProvider)
           .warning(_tag, 'Audio import canceled or returned no file');
-      state = AsyncData(previousState);
+      if (_isCurrentSession(session)) {
+        state = AsyncData(previousState);
+      }
       return;
     }
 
@@ -92,9 +123,15 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       final analysisFile = await ref
           .read(prepareAudioForAnalysisUseCaseProvider)
           .call(selectedFile);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       final audioData = await ref
           .read(decodeWavAudioUseCaseProvider)
           .call(request: DecodeWavAudioRequest(bytes: analysisFile.bytes));
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       currentState = _advanceState(
         currentState.copyWith(audioData: audioData),
         completedStage: AudioImportPipelineStage.decodeAudio,
@@ -105,6 +142,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       await ref
           .read(audioAnalysisViewModelProvider.notifier)
           .analyzeAudio(audioData);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       currentState = _advanceState(
         currentState,
         completedStage: AudioImportPipelineStage.analyzeAudio,
@@ -118,6 +158,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       await ref
           .read(beatDetectionViewModelProvider.notifier)
           .detectBeats(frames);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       currentState = _advanceState(
         currentState,
         completedStage: AudioImportPipelineStage.detectBeats,
@@ -129,6 +172,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           ref.read(beatDetectionViewModelProvider).asData?.value.beats ??
           const <Beat>[];
       await ref.read(beatMapViewModelProvider.notifier).buildBeatMap(beats);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       currentState = _advanceState(
         currentState,
         completedStage: AudioImportPipelineStage.buildBeatMap,
@@ -144,6 +190,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       await ref
           .read(eventSystemViewModelProvider.notifier)
           .loadMarkerEventsFromBeatMap(beatMap);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       currentState = _advanceState(
         currentState,
         completedStage: AudioImportPipelineStage.loadEvents,
@@ -158,6 +207,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
               beatMap: beatMap,
               audioSourcePath: selectedFile.source.path,
             );
+        if (!_isCurrentSession(session)) {
+          return;
+        }
       } catch (error, stackTrace) {
         ref
             .read(appLoggerProvider)
@@ -183,6 +235,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       await ref
           .read(timelineViewModelProvider.notifier)
           .buildProjectTimeline(beatMap: beatMap, events: events);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
 
       currentState =
           _advanceState(
@@ -194,6 +249,9 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           );
       state = AsyncData(currentState);
     } catch (error, stackTrace) {
+      if (!_isCurrentSession(session)) {
+        return;
+      }
       ref
           .read(appLoggerProvider)
           .error(
@@ -211,6 +269,10 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
         ),
       );
     }
+  }
+
+  bool _isCurrentSession(int session) {
+    return session == _pipelineSession;
   }
 
   Future<void> _resetDownstreamState() async {

@@ -15,14 +15,8 @@ void main() {
         detectBeatsUseCaseProvider.overrideWithValue(
           _FakeDetectBeatsUseCase(
             beats: const [
-              Beat(
-                time: Duration(milliseconds: 200),
-                strength: 1.6,
-              ),
-              Beat(
-                time: Duration(milliseconds: 500),
-                strength: 1.8,
-              ),
+              Beat(time: Duration(milliseconds: 200), strength: 1.6),
+              Beat(time: Duration(milliseconds: 500), strength: 1.8),
             ],
           ),
         ),
@@ -32,13 +26,8 @@ void main() {
 
     await container.read(beatDetectionViewModelProvider.future);
     await container.read(beatDetectionViewModelProvider.notifier).detectBeats(
-          const [
-            AudioFrame(
-              time: Duration.zero,
-              energy: 0.1,
-            ),
-          ],
-        );
+      const [AudioFrame(time: Duration.zero, energy: 0.1)],
+    );
 
     final state = container.read(beatDetectionViewModelProvider);
 
@@ -49,17 +38,16 @@ void main() {
 }
 
 class _FakeDetectBeatsUseCase extends DetectBeatsUseCase {
-  _FakeDetectBeatsUseCase({
-    required this.beats,
-  }) : super(beatDetector: const _NoopBeatDetector());
+  _FakeDetectBeatsUseCase({required this.beats})
+    : super(beatDetector: const _NoopBeatDetector());
 
   final List<Beat> beats;
 
   @override
-  List<Beat> call({
+  Future<List<Beat>> call({
     required List<AudioFrame> frames,
     BeatDetectionConfig config = const BeatDetectionConfig.defaults(),
-  }) {
+  }) async {
     return beats;
   }
 }

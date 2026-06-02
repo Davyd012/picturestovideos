@@ -1,0 +1,138 @@
+import 'package:flutter/material.dart';
+import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+
+class ImportEmptyState extends StatelessWidget {
+  const ImportEmptyState({
+    required this.onChooseFile,
+    required this.onImportFromPath,
+    super.key,
+  });
+
+  final VoidCallback onChooseFile;
+  final VoidCallback onImportFromPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Import audio',
+                      style: context.textTheme.headlineMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Bring WAV tracks into the workspace and let the rhythm pipeline prepare everything automatically.',
+                      style: context.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 24),
+                    _UploadCard(
+                      onChooseFile: onChooseFile,
+                      onImportFromPath: onImportFromPath,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _UploadCard extends StatelessWidget {
+  const _UploadCard({
+    required this.onChooseFile,
+    required this.onImportFromPath,
+  });
+
+  final VoidCallback onChooseFile;
+  final VoidCallback onImportFromPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(color: context.colors.outline),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.cloud_upload_outlined,
+              size: 48,
+              color: context.colors.primary,
+            ),
+            const SizedBox(height: 16),
+            Text('Drop a WAV file here', style: context.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Only WAV files are supported for now.',
+              style: context.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: onChooseFile,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Choose file'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onImportFromPath,
+                  icon: const Icon(Icons.terminal),
+                  label: const Text('Import from path'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  const _DashedBorderPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(16)),
+      );
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 8), paint);
+        distance += 16;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorderPainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
+}
