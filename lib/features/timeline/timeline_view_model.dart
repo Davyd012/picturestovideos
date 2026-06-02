@@ -4,6 +4,7 @@ import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/timeline/application/build_project_timeline_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
@@ -95,6 +96,69 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         project: updatedProject,
         serializedProject: _serialize(updatedProject),
         selectedMarker: TimelineMarkerSelection(time: time),
+      ),
+    );
+  }
+
+  void addManualImagePointAt({
+    required Duration time,
+    required BeatMap? beatMap,
+    required List<LibraryMediaItem> selectedMedia,
+    required Duration? audioDuration,
+  }) {
+    if (selectedMedia.isEmpty) {
+      return;
+    }
+
+    final currentState = _currentState;
+    final project =
+        currentState.project ??
+        ProjectTimeline(
+          id: 'project-main',
+          name: 'Picture To Videos Project',
+          beatMap: beatMap ?? _manualBeatMap(audioDuration),
+          tracks: const [
+            TimelineTrack(id: 'track-markers', name: 'Markers', events: []),
+          ],
+        );
+    final mediaIndex = currentState.nextQueuedMediaIndex % selectedMedia.length;
+    final item = selectedMedia[mediaIndex];
+    final markerEvent = BeatEvent(
+      time: time,
+      type: 'marker',
+      payload: item.title,
+    );
+    final mediaEvent = BeatEvent(
+      time: time,
+      type: 'image',
+      payload: MediaTrackClipPayload(
+        mediaId: item.id,
+        title: item.title,
+        tagline: item.tagline,
+        start: time,
+        end: time + _manualClipSpan(project.beatMap),
+        sourcePath: item.sourcePath,
+      ),
+    );
+    final tracksWithMarker = _upsertMarkerTrack(
+      tracks: project.tracks,
+      markerEvent: markerEvent,
+    );
+    final updatedProject = project.copyWith(
+      beatMap: beatMap ?? project.beatMap,
+      tracks: _upsertManualMediaTrack(
+        tracks: tracksWithMarker,
+        mediaEvent: mediaEvent,
+        beatMap: beatMap ?? project.beatMap,
+      ),
+    );
+
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
+        selectedMarker: TimelineMarkerSelection(time: time, mediaId: item.id),
+        nextQueuedMediaIndex: currentState.nextQueuedMediaIndex + 1,
       ),
     );
   }
@@ -196,6 +260,52 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     ]);
   }
 
+  List<TimelineTrack> _upsertManualMediaTrack({
+    required List<TimelineTrack> tracks,
+    required BeatEvent mediaEvent,
+    required BeatMap beatMap,
+  }) {
+    final mediaTrack =
+        _trackById(tracks, 'track-media') ??
+        const TimelineTrack(id: 'track-media', name: 'Images', events: []);
+    final sortedEvents = _sortedEvents([
+      for (final event in mediaTrack.events)
+        if (event.time != mediaEvent.time) event,
+      mediaEvent,
+    ]);
+    final normalizedEvents = <BeatEvent>[];
+
+    for (var index = 0; index < sortedEvents.length; index++) {
+      final event = sortedEvents[index];
+      final payload = event.payload;
+      if (payload is! MediaTrackClipPayload) {
+        normalizedEvents.add(event);
+        continue;
+      }
+
+      final nextStart = index + 1 < sortedEvents.length
+          ? sortedEvents[index + 1].time
+          : event.time + _manualClipSpan(beatMap);
+      normalizedEvents.add(
+        BeatEvent(
+          time: event.time,
+          type: event.type,
+          payload: payload.copyWith(start: event.time, end: nextStart),
+        ),
+      );
+    }
+
+    final updatedMediaTrack = mediaTrack.copyWith(
+      events: List.unmodifiable(normalizedEvents),
+    );
+
+    return List.unmodifiable([
+      for (final track in tracks)
+        if (track.id != 'track-media') track,
+      updatedMediaTrack,
+    ]);
+  }
+
   List<BeatEvent> _resolveMarkerEvents({
     required ProjectTimeline? currentProject,
     required List<BeatEvent> fallbackEvents,
@@ -226,5 +336,30 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   List<BeatEvent> _sortedEvents(List<BeatEvent> events) {
     final sortedEvents = [...events]..sort((a, b) => a.time.compareTo(b.time));
     return List.unmodifiable(sortedEvents);
+  }
+
+  BeatMap _manualBeatMap(Duration? audioDuration) {
+    return BeatMap(
+      beats: const [],
+      bpm: 0,
+      averageBeatInterval: _manualAverageInterval(audioDuration),
+    );
+  }
+
+  Duration _manualAverageInterval(Duration? audioDuration) {
+    if (audioDuration != null && audioDuration > Duration.zero) {
+      final segment = audioDuration ~/ 12;
+      if (segment > Duration.zero) {
+        return segment;
+      }
+    }
+    return const Duration(seconds: 2);
+  }
+
+  Duration _manualClipSpan(BeatMap beatMap) {
+    if (beatMap.averageBeatInterval > const Duration(seconds: 2)) {
+      return beatMap.averageBeatInterval;
+    }
+    return const Duration(seconds: 2);
   }
 }

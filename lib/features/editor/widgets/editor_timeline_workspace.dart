@@ -20,8 +20,10 @@ class EditorTimelineWorkspace extends StatefulWidget {
     required this.playback,
     required this.selectedMedia,
     required this.selectedMarker,
+    required this.audioDuration,
     required this.onCurrentPointChanged,
     required this.onAddMarker,
+    required this.onAddManualImagePoint,
     required this.onDeleteSelectedMarker,
     required this.onMarkerSelected,
     required this.onMarkerSelectionCleared,
@@ -32,8 +34,10 @@ class EditorTimelineWorkspace extends StatefulWidget {
   final PlaybackState? playback;
   final List<LibraryMediaItem> selectedMedia;
   final TimelineMarkerSelection? selectedMarker;
+  final Duration? audioDuration;
   final ValueChanged<Duration> onCurrentPointChanged;
   final VoidCallback onAddMarker;
+  final VoidCallback onAddManualImagePoint;
   final VoidCallback onDeleteSelectedMarker;
   final ValueChanged<TimelineMarkerSelection> onMarkerSelected;
   final VoidCallback onMarkerSelectionCleared;
@@ -71,7 +75,7 @@ class _EditorTimelineWorkspaceState extends State<EditorTimelineWorkspace> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyP, control: true):
-            widget.onAddMarker,
+            widget.onAddManualImagePoint,
         const SingleActivator(LogicalKeyboardKey.delete):
             widget.onDeleteSelectedMarker,
         const SingleActivator(LogicalKeyboardKey.backspace):
@@ -92,7 +96,7 @@ class _EditorTimelineWorkspaceState extends State<EditorTimelineWorkspace> {
                   selectedMedia: widget.selectedMedia,
                 ),
                 const SizedBox(height: 24),
-                if (widget.beatMap == null)
+                if (widget.beatMap == null && widget.project == null)
                   const _EditorEmptyState()
                 else
                   _buildCanvas(context),
@@ -258,15 +262,21 @@ class _EditorTimelineWorkspaceState extends State<EditorTimelineWorkspace> {
   }
 
   Duration _resolveTimelineDuration(List<Beat> beats) {
+    final mediaEnd = _projectMediaEnd();
+    final importedDuration = widget.audioDuration ?? Duration.zero;
+
     if (beats.isEmpty) {
-      return const Duration(seconds: 1);
+      final manualDuration = _maxDuration(mediaEnd, importedDuration);
+      return manualDuration > Duration.zero
+          ? manualDuration
+          : const Duration(seconds: 30);
     }
 
     final averageBeatInterval =
         widget.beatMap!.averageBeatInterval > Duration.zero
         ? widget.beatMap!.averageBeatInterval
         : const Duration(milliseconds: 500);
-    return beats.last.time + averageBeatInterval;
+    return _maxDuration(beats.last.time + averageBeatInterval, mediaEnd);
   }
 
   List<Beat> _timelineMarkers() {
@@ -312,11 +322,12 @@ class _EditorTimelineWorkspaceState extends State<EditorTimelineWorkspace> {
     required Duration timelineDuration,
   }) {
     final project = widget.project;
-    if (project == null || widget.beatMap == null) {
+    final beatMap = widget.beatMap ?? project?.beatMap;
+    if (project == null || beatMap == null) {
       return const [];
     }
     final clips = const ResolveMediaTrackClipsUseCase().call(
-      beatMap: widget.beatMap!,
+      beatMap: beatMap,
       project: project,
     );
     if (clips.isEmpty) {
@@ -351,13 +362,35 @@ class _EditorTimelineWorkspaceState extends State<EditorTimelineWorkspace> {
 
   Duration _fallbackClipSpan(List<Beat> visibleBeats) {
     final averageBeatInterval =
-        widget.beatMap!.averageBeatInterval > Duration.zero
-        ? widget.beatMap!.averageBeatInterval
-        : const Duration(milliseconds: 500);
+        (widget.beatMap ?? widget.project?.beatMap)?.averageBeatInterval;
+    final resolvedInterval =
+        averageBeatInterval != null && averageBeatInterval > Duration.zero
+        ? averageBeatInterval
+        : const Duration(seconds: 2);
     final beatMultiplier = visibleBeats.length >= 16 ? 4 : 2;
     return Duration(
-      microseconds: averageBeatInterval.inMicroseconds * beatMultiplier,
+      microseconds: resolvedInterval.inMicroseconds * beatMultiplier,
     );
+  }
+
+  Duration _projectMediaEnd() {
+    final project = widget.project;
+    final beatMap = widget.beatMap ?? project?.beatMap;
+    if (project == null || beatMap == null) {
+      return Duration.zero;
+    }
+
+    final clips = const ResolveMediaTrackClipsUseCase().call(
+      beatMap: beatMap,
+      project: project,
+    );
+    var end = Duration.zero;
+    for (final clip in clips) {
+      if (clip.end > end) {
+        end = clip.end;
+      }
+    }
+    return end;
   }
 
   Duration _coerceClipEnd({
@@ -432,6 +465,8 @@ class _TimelineHeader extends StatelessWidget {
           label: Text(
             beatMap == null
                 ? 'No sync'
+                : beatMap!.beats.isEmpty
+                ? 'Manual mode'
                 : '${beatMap!.bpm.toStringAsFixed(1)} BPM',
           ),
         ),
@@ -981,5 +1016,7 @@ int _minInt(int a, int b) => a < b ? a : b;
 double _maxDouble(num a, num b) {
   return (a > b ? a : b).toDouble();
 }
+
+Duration _maxDuration(Duration a, Duration b) => a > b ? a : b;
 
 bool _isMajorBeat(int index) => index % 4 == 0;

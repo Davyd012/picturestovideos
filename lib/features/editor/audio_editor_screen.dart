@@ -102,7 +102,9 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
     final selectedMarker = timeline?.selectedMarker;
     final playback = playbackState.asData?.value;
     final events = eventState.asData?.value.events ?? const [];
-    final audioSourcePath = importState.asData?.value.source?.path;
+    final importedAudio = importState.asData?.value;
+    final audioSourcePath = importedAudio?.source?.path;
+    final audioDuration = importedAudio?.audioData?.duration;
 
     return AppShellScaffold(
       currentRoute: AppRoutes.audioEditor,
@@ -140,6 +142,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                         project: project,
                         playback: playback,
                         audioSourcePath: audioSourcePath,
+                        audioDuration: audioDuration,
                         selectedMedia: mediaSelection.selectedMedia,
                         selectedMarker: selectedMarker,
                         events: events,
@@ -154,6 +157,8 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                         project: project,
                         playback: playback,
                         eventState: eventState,
+                        audioSourcePath: audioSourcePath,
+                        audioDuration: audioDuration,
                         eventsCount: events.length,
                         selectedMediaCount: mediaSelection.selectedCount,
                         selectedMedia: mediaSelection.selectedMedia,
@@ -168,6 +173,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                   project: project,
                   playback: playback,
                   audioSourcePath: audioSourcePath,
+                  audioDuration: audioDuration,
                   selectedMedia: mediaSelection.selectedMedia,
                   selectedMarker: selectedMarker,
                   events: events,
@@ -179,6 +185,8 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                   project: project,
                   playback: playback,
                   eventState: eventState,
+                  audioSourcePath: audioSourcePath,
+                  audioDuration: audioDuration,
                   eventsCount: events.length,
                   selectedMediaCount: mediaSelection.selectedCount,
                   selectedMedia: mediaSelection.selectedMedia,
@@ -198,7 +206,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
     required AsyncValue<PlaybackState> playbackState,
   }) {
     final projectBeatMap = timelineState.asData?.value.project?.beatMap;
-    if (projectBeatMap != null && projectBeatMap.beats.isNotEmpty) {
+    if (projectBeatMap != null) {
       return projectBeatMap;
     }
 
@@ -222,6 +230,7 @@ class _MainEditorColumn extends ConsumerWidget {
     required this.project,
     required this.playback,
     required this.audioSourcePath,
+    required this.audioDuration,
     required this.selectedMedia,
     required this.selectedMarker,
     required this.events,
@@ -232,6 +241,7 @@ class _MainEditorColumn extends ConsumerWidget {
   final ProjectTimeline? project;
   final PlaybackState? playback;
   final String? audioSourcePath;
+  final Duration? audioDuration;
   final List<LibraryMediaItem> selectedMedia;
   final TimelineMarkerSelection? selectedMarker;
   final List<BeatEvent> events;
@@ -261,11 +271,19 @@ class _MainEditorColumn extends ConsumerWidget {
           playback: playback,
           selectedMedia: selectedMedia,
           selectedMarker: selectedMarker,
+          audioDuration: audioDuration,
           onAddMarker: () => _addMarkerAtCurrentPoint(
             ref: ref,
             beatMap: beatMap,
             playback: playback,
             events: events,
+          ),
+          onAddManualImagePoint: () => _addManualImagePointAtCurrentPoint(
+            ref: ref,
+            beatMap: beatMap,
+            playback: playback,
+            selectedMedia: selectedMedia,
+            audioDuration: audioDuration,
           ),
           onDeleteSelectedMarker: () => ref
               .read(timelineViewModelProvider.notifier)
@@ -400,6 +418,8 @@ class _EditorSidePanel extends StatelessWidget {
     required this.project,
     required this.playback,
     required this.eventState,
+    required this.audioSourcePath,
+    required this.audioDuration,
     required this.eventsCount,
     required this.selectedMediaCount,
     required this.selectedMedia,
@@ -410,6 +430,8 @@ class _EditorSidePanel extends StatelessWidget {
   final ProjectTimeline? project;
   final PlaybackState? playback;
   final AsyncValue<EventSystemState> eventState;
+  final String? audioSourcePath;
+  final Duration? audioDuration;
   final int eventsCount;
   final int selectedMediaCount;
   final List<LibraryMediaItem> selectedMedia;
@@ -458,6 +480,8 @@ class _EditorSidePanel extends StatelessWidget {
           project: project,
           playback: playback,
           eventState: eventState,
+          audioSourcePath: audioSourcePath,
+          audioDuration: audioDuration,
           selectedMedia: selectedMedia,
           selectedMarker: selectedMarker,
         ),
@@ -472,6 +496,8 @@ class _EditorToolsCard extends ConsumerWidget {
     required this.project,
     required this.playback,
     required this.eventState,
+    required this.audioSourcePath,
+    required this.audioDuration,
     required this.selectedMedia,
     required this.selectedMarker,
   });
@@ -480,6 +506,8 @@ class _EditorToolsCard extends ConsumerWidget {
   final ProjectTimeline? project;
   final PlaybackState? playback;
   final AsyncValue<EventSystemState> eventState;
+  final String? audioSourcePath;
+  final Duration? audioDuration;
   final List<LibraryMediaItem> selectedMedia;
   final TimelineMarkerSelection? selectedMarker;
 
@@ -488,6 +516,10 @@ class _EditorToolsCard extends ConsumerWidget {
     final events = eventState.asData?.value.events ?? const <BeatEvent>[];
     final canAutoSync = beatMap != null && selectedMedia.isNotEmpty;
     final canAddMarker = beatMap != null;
+    final canAddManualPoint =
+        selectedMedia.isNotEmpty &&
+        (project != null ||
+            (audioSourcePath != null && audioSourcePath!.isNotEmpty));
     final canDeleteMarker = selectedMarker != null;
     final hasMediaTrack =
         project?.tracks.any((track) => track.id == 'track-media') ?? false;
@@ -540,6 +572,20 @@ class _EditorToolsCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: canAddManualPoint
+                  ? () => _addManualImagePointAtCurrentPoint(
+                      ref: ref,
+                      beatMap: beatMap,
+                      playback: playback,
+                      selectedMedia: selectedMedia,
+                      audioDuration: audioDuration,
+                    )
+                  : null,
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              label: const Text('Add image point'),
+            ),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -570,8 +616,8 @@ class _EditorToolsCard extends ConsumerWidget {
             const SizedBox(height: 12),
             Text(
               selectedMedia.isEmpty
-                  ? 'Queue images from the library to generate marker-synced clips.'
-                  : 'Image clips start on timeline markers.',
+                  ? 'Queue images from the library to place them manually or sync them to markers.'
+                  : 'Manual points place queued images at the playhead. Auto-sync still uses markers.',
               style: context.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -602,6 +648,23 @@ void _addMarkerAtCurrentPoint({
         time: playback?.currentTime ?? Duration.zero,
         beatMap: beatMap,
         fallbackMarkerEvents: events,
+      );
+}
+
+void _addManualImagePointAtCurrentPoint({
+  required WidgetRef ref,
+  required BeatMap? beatMap,
+  required PlaybackState? playback,
+  required List<LibraryMediaItem> selectedMedia,
+  required Duration? audioDuration,
+}) {
+  ref
+      .read(timelineViewModelProvider.notifier)
+      .addManualImagePointAt(
+        time: playback?.currentTime ?? Duration.zero,
+        beatMap: beatMap,
+        selectedMedia: selectedMedia,
+        audioDuration: audioDuration,
       );
 }
 
