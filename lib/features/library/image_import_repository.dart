@@ -37,7 +37,9 @@ class ImportedImageAsset {
 
 abstract interface class ImageImportRepository {
   Future<List<ImportedImageAsset>> pickImages();
-  Future<List<ImportedImageAsset>> importImagesFromFolderPath(String folderPath);
+  Future<List<ImportedImageAsset>> importImagesFromFolderPath(
+    String folderPath,
+  );
 }
 
 class DeviceImageImportRepository implements ImageImportRepository {

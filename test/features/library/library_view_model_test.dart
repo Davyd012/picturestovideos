@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 
@@ -37,10 +38,11 @@ void main() {
     container.read(libraryViewModelProvider.notifier).searchChanged('neon');
 
     final state = container.read(libraryViewModelProvider);
+    final visibleItems = state.visibleItems(const {});
 
     expect(state.totalCount, 2);
-    expect(state.filteredItems, hasLength(1));
-    expect(state.filteredItems.first.title, 'Neon_City_D04.png');
+    expect(visibleItems, hasLength(1));
+    expect(visibleItems.first.title, 'Neon_City_D04.png');
     expect(state.statusMessage, 'Added 2 images to the library.');
   });
 
@@ -74,6 +76,53 @@ void main() {
     expect(state.folderPathInput, '/tmp');
     expect(state.items.single.title, 'Photo.webp');
     expect(state.isImporting, isFalse);
+  });
+
+  test('reorderMedia updates staged editor order', () async {
+    final container = ProviderContainer(
+      overrides: [
+        imageImportRepositoryProvider.overrideWithValue(
+          _FakeImageImportRepository(
+            assets: [
+              ImportedImageAsset(
+                id: '/tmp/first.png',
+                fileName: 'First.png',
+                sourcePath: '/tmp/first.png',
+                bytes: Uint8List.fromList([1]),
+                importedOn: DateTime(2026),
+              ),
+              ImportedImageAsset(
+                id: '/tmp/second.png',
+                fileName: 'Second.png',
+                sourcePath: '/tmp/second.png',
+                bytes: Uint8List.fromList([2]),
+                importedOn: DateTime(2026),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(libraryViewModelProvider.notifier).pickImages();
+    final items = container.read(libraryViewModelProvider).items;
+    container
+        .read(editorMediaSelectionViewModelProvider.notifier)
+        .addAllMedia(items);
+
+    container
+        .read(editorMediaSelectionViewModelProvider.notifier)
+        .reorderMedia(oldIndex: 0, newIndex: 1);
+
+    final selectedMedia = container
+        .read(editorMediaSelectionViewModelProvider)
+        .selectedMedia;
+
+    expect(selectedMedia.map((item) => item.title), [
+      'Second.png',
+      'First.png',
+    ]);
   });
 }
 

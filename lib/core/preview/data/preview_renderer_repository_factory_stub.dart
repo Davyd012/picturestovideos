@@ -13,8 +13,9 @@ class _UnsupportedPreviewRendererRepository
 
   @override
   Future<BuildPreviewVideoResult> buildPreviewVideo(
-    BuildPreviewVideoRequest request,
-  ) {
+    BuildPreviewVideoRequest request, {
+    BuildPreviewVideoProgressCallback? onProgress,
+  }) {
     throw UnsupportedError(
       'FFmpeg preview rendering is only available on IO desktop platforms.',
     );

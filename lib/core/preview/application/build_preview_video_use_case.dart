@@ -14,7 +14,13 @@ class BuildPreviewVideoUseCase {
 
   final PreviewRendererRepository _previewRendererRepository;
 
-  Future<BuildPreviewVideoResult> call(BuildPreviewVideoRequest request) {
-    return _previewRendererRepository.buildPreviewVideo(request);
+  Future<BuildPreviewVideoResult> call(
+    BuildPreviewVideoRequest request, {
+    BuildPreviewVideoProgressCallback? onProgress,
+  }) {
+    return _previewRendererRepository.buildPreviewVideo(
+      request,
+      onProgress: onProgress,
+    );
   }
 }

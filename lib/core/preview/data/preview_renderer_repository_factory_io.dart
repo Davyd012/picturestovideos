@@ -28,8 +28,9 @@ class DesktopPreviewRendererRepository implements PreviewRendererRepository {
 
   @override
   Future<BuildPreviewVideoResult> buildPreviewVideo(
-    BuildPreviewVideoRequest request,
-  ) async {
+    BuildPreviewVideoRequest request, {
+    BuildPreviewVideoProgressCallback? onProgress,
+  }) async {
     if (!_isDesktopPlatform) {
       throw UnsupportedError('FFmpeg preview is limited to desktop platforms.');
     }
@@ -41,8 +42,23 @@ class DesktopPreviewRendererRepository implements PreviewRendererRepository {
     await _verifyDesktopFfmpeg();
 
     try {
+      onProgress?.call(
+        const BuildPreviewVideoProgress(
+          completedSteps: 0,
+          totalSteps: 1,
+          currentStepLabel: 'Rendering video export',
+        ),
+      );
       final result = await Isolate.run(
         () => _renderPreviewVideoOnWorker(request),
+      );
+      onProgress?.call(
+        const BuildPreviewVideoProgress(
+          completedSteps: 0,
+          totalSteps: 1,
+          currentStepLabel: 'Rendering video export',
+          currentStepProgress: 1,
+        ),
       );
       _logger.info(
         _tag,
@@ -75,8 +91,9 @@ class AndroidPreviewRendererRepository implements PreviewRendererRepository {
 
   @override
   Future<BuildPreviewVideoResult> buildPreviewVideo(
-    BuildPreviewVideoRequest request,
-  ) async {
+    BuildPreviewVideoRequest request, {
+    BuildPreviewVideoProgressCallback? onProgress,
+  }) async {
     _logger.info(
       _tag,
       'Starting Android FFmpeg render for ${request.clips.length} clips',
@@ -89,6 +106,7 @@ class AndroidPreviewRendererRepository implements PreviewRendererRepository {
         tempRoot: tempRoot,
         segmentVideoArgs: const ['-c:v', 'mpeg4', '-q:v', '4'],
         runFfmpeg: _runAndroidFfmpeg,
+        onProgress: onProgress,
       );
       _logger.info(
         _tag,
@@ -113,8 +131,9 @@ class UnsupportedPreviewRendererRepository
 
   @override
   Future<BuildPreviewVideoResult> buildPreviewVideo(
-    BuildPreviewVideoRequest request,
-  ) {
+    BuildPreviewVideoRequest request, {
+    BuildPreviewVideoProgressCallback? onProgress,
+  }) {
     throw UnsupportedError(
       'Preview rendering is only available on Android and desktop platforms.',
     );
@@ -150,7 +169,8 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
   BuildPreviewVideoRequest request, {
   required Directory tempRoot,
   required List<String> segmentVideoArgs,
-  required Future<void> Function(List<String> args) runFfmpeg,
+  required _RunFfmpeg runFfmpeg,
+  BuildPreviewVideoProgressCallback? onProgress,
 }) async {
   final signature = _buildSignature(request);
   final tempDir = await tempRoot.createTemp('picturestovideos-preview-');
@@ -160,6 +180,39 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
   }
   final segmentPaths = <String>[];
   final thumbnails = <PreviewImageFrame>[];
+  final totalSteps = request.clips.length * 2 + 1;
+  var completedSteps = 0;
+
+  void emitProgress(String label, {double stepProgress = 0}) {
+    onProgress?.call(
+      BuildPreviewVideoProgress(
+        completedSteps: completedSteps,
+        totalSteps: totalSteps,
+        currentStepLabel: label,
+        currentStepProgress: stepProgress,
+      ),
+    );
+  }
+
+  Future<void> runStep(
+    String label,
+    List<String> args, {
+    Duration? expectedDuration,
+  }) async {
+    emitProgress(label);
+    await runFfmpeg(
+      args,
+      expectedDuration: expectedDuration,
+      onProgress: (progress) => emitProgress(label, stepProgress: progress),
+    );
+    emitProgress(label, stepProgress: 1);
+    completedSteps++;
+  }
+
+  void completeCachedStep(String label) {
+    emitProgress(label, stepProgress: 1);
+    completedSteps++;
+  }
 
   for (var index = 0; index < request.clips.length; index++) {
     final clip = request.clips[index];
@@ -192,7 +245,7 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
 
     if (!File(thumbnailPath).existsSync()) {
       final renderPath = '${tempDir.path}/thumbnail_$index.png';
-      await runFfmpeg([
+      await runStep('Rendering thumbnail ${index + 1}', [
         '-hide_banner',
         '-loglevel',
         'error',
@@ -206,31 +259,39 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
         renderPath,
       ]);
       await File(renderPath).copy(thumbnailPath);
+    } else {
+      completeCachedStep('Using cached thumbnail ${index + 1}');
     }
 
     if (!File(segmentPath).existsSync()) {
       final renderPath = '${tempDir.path}/segment_$index.mp4';
-      await runFfmpeg([
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-y',
-        '-loop',
-        '1',
-        '-i',
-        clip.sourcePath,
-        '-vf',
-        filter,
-        '-t',
-        '$durationSeconds',
-        '-r',
-        '${request.frameRate}',
-        '-pix_fmt',
-        'yuv420p',
-        ...segmentVideoArgs,
-        renderPath,
-      ]);
+      await runStep(
+        'Rendering clip ${index + 1} of ${request.clips.length}',
+        [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-y',
+          '-loop',
+          '1',
+          '-i',
+          clip.sourcePath,
+          '-vf',
+          filter,
+          '-t',
+          '$durationSeconds',
+          '-r',
+          '${request.frameRate}',
+          '-pix_fmt',
+          'yuv420p',
+          ...segmentVideoArgs,
+          renderPath,
+        ],
+        expectedDuration: clip.end - clip.start,
+      );
       await File(renderPath).copy(segmentPath);
+    } else {
+      completeCachedStep('Using cached clip ${index + 1}');
     }
 
     thumbnails.add(
@@ -255,7 +316,7 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
   final totalDurationSeconds = request.clips.last.end.inMilliseconds / 1000;
 
   if (hasAudioSource) {
-    await runFfmpeg([
+    await runStep('Combining video and audio', [
       '-hide_banner',
       '-loglevel',
       'error',
@@ -280,9 +341,9 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
       '$totalDurationSeconds',
       '-shortest',
       outputPath,
-    ]);
+    ], expectedDuration: request.clips.last.end);
   } else {
-    await runFfmpeg([
+    await runStep('Combining video segments', [
       '-hide_banner',
       '-loglevel',
       'error',
@@ -296,7 +357,7 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
       '-c',
       'copy',
       outputPath,
-    ]);
+    ], expectedDuration: request.clips.last.end);
   }
 
   return BuildPreviewVideoResult(
@@ -307,7 +368,18 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
   );
 }
 
-Future<void> _runDesktopFfmpeg(List<String> args) async {
+typedef _RunFfmpeg =
+    Future<void> Function(
+      List<String> args, {
+      Duration? expectedDuration,
+      void Function(double progress)? onProgress,
+    });
+
+Future<void> _runDesktopFfmpeg(
+  List<String> args, {
+  Duration? expectedDuration,
+  void Function(double progress)? onProgress,
+}) async {
   final result = await Process.run('ffmpeg', args, runInShell: false);
   if (result.exitCode != 0) {
     throw ProcessException(
@@ -319,9 +391,22 @@ Future<void> _runDesktopFfmpeg(List<String> args) async {
   }
 }
 
-Future<void> _runAndroidFfmpeg(List<String> args) async {
+Future<void> _runAndroidFfmpeg(
+  List<String> args, {
+  Duration? expectedDuration,
+  void Function(double progress)? onProgress,
+}) async {
   await FFmpegKitExtended.initialize();
   final session = FFmpegKit.createSessionFromArguments(args);
+  session.setExpectedTranscodingDuration(expectedDuration);
+  session.setStatisticsCallback((statistics) {
+    final progress =
+        statistics.transcodingProgress ??
+        session.calculateTranscodingProgress(statistics.time);
+    if (progress != null) {
+      onProgress?.call(progress);
+    }
+  });
   await session.executeAsync();
   final returnCode = session.getReturnCode();
   if (ReturnCode.isSuccess(returnCode)) {

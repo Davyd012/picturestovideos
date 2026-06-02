@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
@@ -370,6 +371,10 @@ class _ExportActionCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (exportState.hasRenderProgress) ...[
+              const SizedBox(height: 24),
+              _ExportProgressPanel(progress: exportState.renderProgress!),
+            ],
             const SizedBox(height: 24),
             Wrap(
               spacing: 16,
@@ -390,6 +395,44 @@ class _ExportActionCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ExportProgressPanel extends StatelessWidget {
+  const _ExportProgressPanel({required this.progress});
+
+  final BuildPreviewVideoProgress progress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label:
+          'Export progress ${progress.percent} percent, ${progress.stepLabel}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  progress.currentStepLabel,
+                  style: context.textTheme.titleMedium,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                '${progress.percent}%',
+                style: context.textTheme.titleMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearProgressIndicator(value: progress.value),
+          const SizedBox(height: 8),
+          Text(progress.stepLabel, style: context.textTheme.bodyMedium),
+        ],
       ),
     );
   }

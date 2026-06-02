@@ -9,8 +9,11 @@ class LibraryMediaItem {
     required this.sizeLabel,
     required this.tagline,
     required this.importedOnLabel,
+    required this.importedOn,
+    required this.byteLength,
     required this.thumbnailBytes,
     required this.sourcePath,
+    this.isFavorite = false,
   });
 
   final String id;
@@ -18,8 +21,11 @@ class LibraryMediaItem {
   final String sizeLabel;
   final String tagline;
   final String importedOnLabel;
+  final DateTime importedOn;
+  final int byteLength;
   final Uint8List thumbnailBytes;
   final String sourcePath;
+  final bool isFavorite;
 
   factory LibraryMediaItem.fromImportedImageAsset(ImportedImageAsset asset) {
     return LibraryMediaItem(
@@ -28,6 +34,8 @@ class LibraryMediaItem {
       sizeLabel: _sizeLabel(asset.byteLength),
       tagline: 'Ready for beat-synced image clips',
       importedOnLabel: _dateLabel(asset.importedOn),
+      importedOn: asset.importedOn,
+      byteLength: asset.byteLength,
       thumbnailBytes: asset.bytes,
       sourcePath: asset.sourcePath,
     );

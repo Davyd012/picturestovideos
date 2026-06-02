@@ -27,6 +27,45 @@ class LibraryViewModel extends Notifier<LibraryState> {
     state = state.copyWith(folderPathInput: value);
   }
 
+  void filterSelected(LibraryFilter filter) {
+    state = state.copyWith(selectedFilter: filter);
+  }
+
+  void sortOrderSelected(LibrarySortOrder sortOrder) {
+    state = state.copyWith(sortOrder: sortOrder);
+  }
+
+  void itemSelectionToggled(String itemId) {
+    final selectedIds = {...state.selectedItemIds};
+    if (selectedIds.contains(itemId)) {
+      selectedIds.remove(itemId);
+    } else {
+      selectedIds.add(itemId);
+    }
+    state = state.copyWith(selectedItemIds: Set.unmodifiable(selectedIds));
+  }
+
+  void itemSelectionRemoved(String itemId) {
+    if (!state.selectedItemIds.contains(itemId)) {
+      return;
+    }
+
+    final selectedIds = {...state.selectedItemIds}..remove(itemId);
+    state = state.copyWith(selectedItemIds: Set.unmodifiable(selectedIds));
+  }
+
+  void clearItemSelection() {
+    state = state.copyWith(selectedItemIds: const {});
+  }
+
+  void reviewStagedOpened() {
+    state = state.copyWith(isReviewingStaged: true);
+  }
+
+  void libraryOpened() {
+    state = state.copyWith(isReviewingStaged: false);
+  }
+
   Future<void> pickImages() async {
     await _importImages(
       action: 'system picker',
@@ -52,7 +91,9 @@ class LibraryViewModel extends Notifier<LibraryState> {
     required String action,
     required Future<List<ImportedImageAsset>> Function() importCall,
   }) async {
-    ref.read(appLoggerProvider).info(_tag, 'Starting image import from $action');
+    ref
+        .read(appLoggerProvider)
+        .info(_tag, 'Starting image import from $action');
     state = state.copyWith(
       isImporting: true,
       clearError: true,
@@ -73,12 +114,14 @@ class LibraryViewModel extends Notifier<LibraryState> {
         clearError: true,
       );
     } catch (error, stackTrace) {
-      ref.read(appLoggerProvider).error(
-        _tag,
-        error,
-        stackTrace,
-        message: 'Image import failed from $action',
-      );
+      ref
+          .read(appLoggerProvider)
+          .error(
+            _tag,
+            error,
+            stackTrace,
+            message: 'Image import failed from $action',
+          );
       state = state.copyWith(
         isImporting: false,
         errorMessage: error.toString(),

@@ -3,6 +3,7 @@ import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/preview/application/build_preview_video_use_case.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
+import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/export/export_repository.dart';
@@ -19,6 +20,7 @@ class ExportViewModel extends Notifier<ExportState> {
   static const _exportPortraitWidth = 1080;
   static const _exportPortraitHeight = 1920;
   static const _exportFrameRate = 30;
+  int _renderSession = 0;
 
   @override
   ExportState build() {
@@ -34,6 +36,7 @@ class ExportViewModel extends Notifier<ExportState> {
       return;
     }
     if (project == null) {
+      _renderSession++;
       state = const ExportState(
         status: ExportStatus.failure,
         statusMessage: 'Build the timeline before exporting.',
@@ -46,6 +49,7 @@ class ExportViewModel extends Notifier<ExportState> {
         .read(resolvePreviewClipsUseCaseProvider)
         .call(beatMap: project.beatMap, project: project);
     if (clips.isEmpty) {
+      _renderSession++;
       state = const ExportState(
         status: ExportStatus.failure,
         statusMessage: 'Add beat-synced image clips before exporting.',
@@ -54,11 +58,13 @@ class ExportViewModel extends Notifier<ExportState> {
       return;
     }
 
+    final renderSession = ++_renderSession;
     state = state.copyWith(
       status: ExportStatus.rendering,
       statusMessage: 'Rendering 1080p MP4 export.',
       clearResult: true,
       clearError: true,
+      clearRenderProgress: true,
     );
 
     try {
@@ -76,14 +82,23 @@ class ExportViewModel extends Notifier<ExportState> {
               template: project.template,
               outputFileName: _outputFileName(project.name),
             ),
+            onProgress: (progress) =>
+                _renderProgressChanged(renderSession, progress),
           );
+      if (renderSession != _renderSession) {
+        return;
+      }
       state = state.copyWith(
         status: ExportStatus.ready,
         result: result,
         statusMessage: 'Export ready at ${result.outputPath}',
         clearError: true,
+        clearRenderProgress: true,
       );
     } catch (error, stackTrace) {
+      if (renderSession != _renderSession) {
+        return;
+      }
       ref
           .read(appLoggerProvider)
           .error(_tag, error, stackTrace, message: 'Export render failed');
@@ -105,6 +120,7 @@ class ExportViewModel extends Notifier<ExportState> {
       status: ExportStatus.saving,
       statusMessage: 'Saving export to gallery.',
       clearError: true,
+      clearRenderProgress: true,
     );
 
     try {
@@ -139,6 +155,7 @@ class ExportViewModel extends Notifier<ExportState> {
       status: ExportStatus.sharing,
       statusMessage: 'Opening share sheet.',
       clearError: true,
+      clearRenderProgress: true,
     );
 
     try {
@@ -161,6 +178,20 @@ class ExportViewModel extends Notifier<ExportState> {
         errorMessage: _userMessageFor(error),
       );
     }
+  }
+
+  void _renderProgressChanged(
+    int renderSession,
+    BuildPreviewVideoProgress progress,
+  ) {
+    if (renderSession != _renderSession || !state.isRendering) {
+      return;
+    }
+    state = state.copyWith(
+      renderProgress: progress,
+      statusMessage: '${progress.currentStepLabel} (${progress.percent}%)',
+      clearError: true,
+    );
   }
 
   String _outputFileName(String projectName) {

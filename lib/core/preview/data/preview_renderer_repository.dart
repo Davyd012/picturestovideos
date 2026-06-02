@@ -13,6 +13,7 @@ final previewRendererRepositoryProvider = Provider<PreviewRendererRepository>(
 
 abstract class PreviewRendererRepository {
   Future<BuildPreviewVideoResult> buildPreviewVideo(
-    BuildPreviewVideoRequest request,
-  );
+    BuildPreviewVideoRequest request, {
+    BuildPreviewVideoProgressCallback? onProgress,
+  });
 }
