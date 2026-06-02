@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:picturestovideos/core/audio/data/audio_file_picker.dart';
 import 'package:picturestovideos/core/audio/domain/audio_import_failure.dart';
@@ -15,7 +17,7 @@ class SystemAudioFilePicker implements AudioFilePicker {
     try {
       result = await FilePicker.pickFiles(
         allowMultiple: false,
-        allowedExtensions: const ['wav', 'wave'],
+        allowedExtensions: _supportedExtensions,
         type: FileType.custom,
         withData: true,
       );
@@ -64,5 +66,12 @@ class SystemAudioFilePicker implements AudioFilePicker {
       bytes: bytes,
       path: file.path,
     );
+  }
+
+  List<String> get _supportedExtensions {
+    if (Platform.isAndroid) {
+      return const ['wav', 'wave', 'mp3', 'm4a', 'aac'];
+    }
+    return const ['wav', 'wave'];
   }
 }

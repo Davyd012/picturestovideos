@@ -80,11 +80,13 @@ class DeviceAudioRepository implements AudioRepository {
     final bytes = await file.readAsBytes();
     final fileName = _fileNameForPath(normalizedPath);
     final extension = _extensionForFileName(fileName);
-    if (extension != 'wav' && extension != 'wave') {
+    if (!_isSupportedManualExtension(extension)) {
       throw AudioImportException(
         AudioImportFailure(
           type: AudioImportFailureType.unsupportedFormat,
-          message: 'Only WAV files are supported for manual import.',
+          message: Platform.isAndroid
+              ? 'Only WAV, MP3, AAC, and M4A files are supported for manual import.'
+              : 'Only WAV files are supported for manual import.',
         ),
       );
     }
@@ -112,5 +114,13 @@ class DeviceAudioRepository implements AudioRepository {
       return '';
     }
     return fileName.substring(dotIndex + 1).toLowerCase();
+  }
+
+  bool _isSupportedManualExtension(String extension) {
+    if (extension == 'wav' || extension == 'wave') {
+      return true;
+    }
+    return Platform.isAndroid &&
+        (extension == 'mp3' || extension == 'm4a' || extension == 'aac');
   }
 }

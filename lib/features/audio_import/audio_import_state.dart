@@ -27,14 +27,14 @@ class AudioImportState {
   });
 
   const AudioImportState.initial()
-      : source = null,
-        audioData = null,
-        status = AudioImportPipelineStatus.idle,
-        activeStage = null,
-        completedStages = const [],
-        errorStage = null,
-        errorMessage = null,
-        warningMessage = null;
+    : source = null,
+      audioData = null,
+      status = AudioImportPipelineStatus.idle,
+      activeStage = null,
+      completedStages = const [],
+      errorStage = null,
+      errorMessage = null,
+      warningMessage = null;
 
   final AudioSource? source;
   final AudioData? audioData;
@@ -53,7 +53,8 @@ class AudioImportState {
   bool get hasWarning => warningMessage != null && warningMessage!.isNotEmpty;
 
   bool get canOpenEditor =>
-      hasAudio && completedStages.contains(AudioImportPipelineStage.buildTimeline);
+      hasAudio &&
+      completedStages.contains(AudioImportPipelineStage.buildTimeline);
 
   double get progressValue {
     if (isSuccess) {
@@ -120,28 +121,35 @@ class AudioImportState {
 
     return switch (stage) {
       AudioImportPipelineStage.importFile =>
-        hasSelectedFile ? importDetail : 'Choose a WAV file to begin.',
-      AudioImportPipelineStage.decodeAudio => hasAudio
-          ? 'Decoded ${audioData!.samples.length} samples.'
-          : 'Decoding WAV samples in the background.',
-      AudioImportPipelineStage.analyzeAudio => isStageComplete(stage)
-          ? 'Energy frames generated.'
-          : 'Analyzing frame energy in the background.',
-      AudioImportPipelineStage.detectBeats => isStageComplete(stage)
-          ? 'Beat candidates detected.'
-          : 'Scanning for beat candidates in the background.',
-      AudioImportPipelineStage.buildBeatMap => isStageComplete(stage)
-          ? 'Beat map is ready.'
-          : 'Building beat map from detected beats.',
-      AudioImportPipelineStage.loadEvents => isStageComplete(stage)
-          ? 'Marker events loaded.'
-          : 'Preparing marker events from the beat map.',
-      AudioImportPipelineStage.preparePlayback => isStageComplete(stage)
-          ? 'Playback is prepared.'
-          : 'Preparing audio playback state.',
-      AudioImportPipelineStage.buildTimeline => isStageComplete(stage)
-          ? 'Timeline is ready for the editor.'
-          : 'Building the project timeline.',
+        hasSelectedFile ? importDetail : 'Choose an audio file to begin.',
+      AudioImportPipelineStage.decodeAudio =>
+        hasAudio
+            ? 'Decoded ${audioData!.samples.length} samples.'
+            : 'Decoding audio samples in the background.',
+      AudioImportPipelineStage.analyzeAudio =>
+        isStageComplete(stage)
+            ? 'Energy frames generated.'
+            : 'Analyzing frame energy in the background.',
+      AudioImportPipelineStage.detectBeats =>
+        isStageComplete(stage)
+            ? 'Beat candidates detected.'
+            : 'Scanning for beat candidates in the background.',
+      AudioImportPipelineStage.buildBeatMap =>
+        isStageComplete(stage)
+            ? 'Beat map is ready.'
+            : 'Building beat map from detected beats.',
+      AudioImportPipelineStage.loadEvents =>
+        isStageComplete(stage)
+            ? 'Marker events loaded.'
+            : 'Preparing marker events from the beat map.',
+      AudioImportPipelineStage.preparePlayback =>
+        isStageComplete(stage)
+            ? 'Playback is prepared.'
+            : 'Preparing audio playback state.',
+      AudioImportPipelineStage.buildTimeline =>
+        isStageComplete(stage)
+            ? 'Timeline is ready for the editor.'
+            : 'Building the project timeline.',
     };
   }
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/application/decode_wav_audio_use_case.dart';
 import 'package:picturestovideos/core/audio/application/import_audio_use_case.dart';
+import 'package:picturestovideos/core/audio/application/prepare_audio_for_analysis_use_case.dart';
 import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
 import 'package:picturestovideos/core/audio/domain/audio_processing_task.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
@@ -88,9 +89,12 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           .read(appLoggerProvider)
           .info(_tag, 'Running automatic import pipeline');
 
+      final analysisFile = await ref
+          .read(prepareAudioForAnalysisUseCaseProvider)
+          .call(selectedFile);
       final audioData = await ref
           .read(decodeWavAudioUseCaseProvider)
-          .call(request: DecodeWavAudioRequest(bytes: selectedFile.bytes));
+          .call(request: DecodeWavAudioRequest(bytes: analysisFile.bytes));
       currentState = _advanceState(
         currentState.copyWith(audioData: audioData),
         completedStage: AudioImportPipelineStage.decodeAudio,
@@ -155,10 +159,12 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
               audioSourcePath: selectedFile.source.path,
             );
       } catch (error, stackTrace) {
-        ref.read(appLoggerProvider).warning(
-          _tag,
-          'Playback preparation failed, continuing import pipeline: ${_playbackPreparationMessage(error)}',
-        );
+        ref
+            .read(appLoggerProvider)
+            .warning(
+              _tag,
+              'Playback preparation failed, continuing import pipeline: ${_playbackPreparationMessage(error)}',
+            );
         ref.read(appLoggerProvider).debug(_tag, stackTrace.toString());
         currentState = currentState.copyWith(
           warningMessage: _playbackPreparationMessage(error),

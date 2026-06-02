@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:ffmpeg_kit_flutter/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter/return_code.dart';
+import 'package:ffmpeg_kit_extended_flutter/ffmpeg_kit_extended_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/preview/data/preview_renderer_repository.dart';
@@ -66,7 +65,9 @@ class DesktopPreviewRendererRepository implements PreviewRendererRepository {
 
 class AndroidPreviewRendererRepository implements PreviewRendererRepository {
   const AndroidPreviewRendererRepository({required AppLogger logger})
-    : _logger = logger;
+    : this._(logger);
+
+  const AndroidPreviewRendererRepository._(this._logger);
 
   final AppLogger _logger;
   static const _tag = 'AndroidPreviewRendererRepository';
@@ -316,19 +317,21 @@ Future<void> _runDesktopFfmpeg(List<String> args) async {
 }
 
 Future<void> _runAndroidFfmpeg(List<String> args) async {
-  final session = await FFmpegKit.executeWithArguments(args);
-  final returnCode = await session.getReturnCode();
+  await FFmpegKitExtended.initialize();
+  final session = FFmpegKit.createSessionFromArguments(args);
+  await session.executeAsync();
+  final returnCode = session.getReturnCode();
   if (ReturnCode.isSuccess(returnCode)) {
     return;
   }
 
-  final output = await session.getOutput();
-  final stackTrace = await session.getFailStackTrace();
+  final output = session.getOutput();
+  final stackTrace = session.getFailStackTrace();
   throw ProcessException(
     'ffmpeg-kit',
     args,
     [output, stackTrace].whereType<String>().join('\n'),
-    returnCode?.getValue() ?? -1,
+    returnCode,
   );
 }
 

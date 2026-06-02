@@ -1,2 +1,1 @@
--keep class com.arthenica.ffmpegkit.** { *; }
--keep class com.antonkarpenko.ffmpegkit.** { *; }
+-keep class com.akashskypatel.ffmpeg_kit_extended_flutter.** { *; }

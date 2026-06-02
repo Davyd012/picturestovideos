@@ -166,7 +166,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       );
     } catch (error, stackTrace) {
       final userMessage = error.toString().contains('ffmpeg')
-          ? 'FFmpeg is not available on PATH. Install ffmpeg, restart the app, then try again.'
+          ? 'Video rendering failed. Check that the selected image and audio files are still available.'
           : 'Preview generation failed. Check the app logs for image render details.';
       ref
           .read(appLoggerProvider)

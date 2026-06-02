@@ -8,10 +8,10 @@ environment:
 
 dependencies:
   audioplayers: ^6.6.0
-  ffmpeg_kit_flutter: ^6.0.3
+  file_picker: ^11.0.2
+  ffmpeg_kit_extended_flutter: ^0.5.7
   flutter:
     sdk: flutter
-  file_picker: ^11.0.2
   flutter_riverpod: ^3.3.1
   gal: ^2.3.2
   media_kit: ^1.2.6
@@ -29,3 +29,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+ffmpeg_kit_extended_config:
+  type: "full"
+  gpl: false
+  small: true
