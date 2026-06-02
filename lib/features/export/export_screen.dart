@@ -34,7 +34,8 @@ class ExportScreen extends ConsumerWidget {
     );
     final playback = playbackState.asData?.value;
     final audioSourcePath = importState.asData?.value.source?.path;
-    final canRender = beatMap != null && project != null && !exportState.isRendering;
+    final canRender =
+        beatMap != null && project != null && !exportState.isRendering;
 
     return AppShellScaffold(
       currentRoute: AppRoutes.download,
@@ -219,7 +220,7 @@ class _PreviewSummaryCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: AspectRatio(
-        aspectRatio: 16 / 9,
+        aspectRatio: project?.template.aspectRatio.value ?? 16 / 9,
         child: Stack(
           children: [
             ColoredBox(color: context.colors.surfaceContainerHighest),
@@ -378,6 +379,7 @@ class _ExportActionCard extends StatelessWidget {
                   label: 'Resolution',
                   value: details.resolutionLabel,
                 ),
+                _DetailTile(label: 'Template', value: details.templateLabel),
                 _DetailTile(label: 'Frame rate', value: details.frameRateLabel),
                 _DetailTile(label: 'Codec', value: details.codecLabel),
                 _DetailTile(
@@ -394,10 +396,7 @@ class _ExportActionCard extends StatelessWidget {
 }
 
 class _ShareActionsCard extends StatelessWidget {
-  const _ShareActionsCard({
-    required this.exportState,
-    required this.onShare,
-  });
+  const _ShareActionsCard({required this.exportState, required this.onShare});
 
   final ExportState exportState;
   final VoidCallback onShare;
@@ -470,6 +469,10 @@ class _ExportSidePanel extends StatelessWidget {
                 _StatusTile(
                   label: 'Tracks',
                   value: project == null ? '0' : '${project!.tracks.length}',
+                ),
+                _StatusTile(
+                  label: 'Template',
+                  value: project?.template.name ?? 'Default',
                 ),
                 _StatusTile(
                   label: 'Beat markers',
@@ -570,12 +573,14 @@ class _ExportDetails {
     required this.frameRateLabel,
     required this.codecLabel,
     required this.fileSizeLabel,
+    required this.templateLabel,
   });
 
   final String resolutionLabel;
   final String frameRateLabel;
   final String codecLabel;
   final String fileSizeLabel;
+  final String templateLabel;
 
   factory _ExportDetails.fromData({
     required ProjectTimeline? project,
@@ -583,10 +588,11 @@ class _ExportDetails {
   }) {
     if (beatMap == null || beatMap.beats.isEmpty) {
       return const _ExportDetails(
-        resolutionLabel: '1080p',
+        resolutionLabel: '1080 x 1920',
         frameRateLabel: '30 fps',
         codecLabel: 'MP4',
         fileSizeLabel: 'Unavailable',
+        templateLabel: 'Default',
       );
     }
 
@@ -594,10 +600,13 @@ class _ExportDetails {
         96 + (beatMap.beats.length * 3) + ((project?.tracks.length ?? 1) * 8);
 
     return _ExportDetails(
-      resolutionLabel: '1080p',
+      resolutionLabel: project?.template.aspectRatio.value == 9 / 16
+          ? '1080 x 1920'
+          : '1920 x 1080',
       frameRateLabel: '30 fps',
       codecLabel: 'MP4 video',
       fileSizeLabel: '$sizeEstimate MB',
+      templateLabel: project?.template.name ?? 'Default',
     );
   }
 }

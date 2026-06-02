@@ -3,6 +3,7 @@ import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/preview/application/build_preview_video_use_case.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/editor/editor_preview_state.dart';
@@ -14,8 +15,10 @@ final editorPreviewViewModelProvider =
 
 class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
   static const _tag = 'EditorPreviewViewModel';
-  static const _previewWidth = 1280;
-  static const _previewHeight = 720;
+  static const _previewLandscapeWidth = 1280;
+  static const _previewLandscapeHeight = 720;
+  static const _previewPortraitWidth = 720;
+  static const _previewPortraitHeight = 1280;
   static const _previewFrameRate = 12;
   int _renderGeneration = 0;
 
@@ -77,6 +80,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       projectId: project.id,
       clips: clips,
       audioSourcePath: audioSourcePath,
+      template: project.template,
     );
     if (state.signature == signature && (state.isRendering || state.isReady)) {
       return;
@@ -123,6 +127,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       projectId: project.id,
       clips: clips,
       audioSourcePath: audioSourcePath,
+      template: project.template,
     );
     if (state.signature == signature && (state.isRendering || state.isReady)) {
       return;
@@ -142,6 +147,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
     );
 
     try {
+      final renderSize = _renderSizeFor(project.template);
       final result = await ref
           .read(buildPreviewVideoUseCaseProvider)
           .call(
@@ -149,9 +155,10 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
               projectId: project.id,
               clips: clips,
               audioSourcePath: audioSourcePath,
-              width: _previewWidth,
-              height: _previewHeight,
+              width: renderSize.width,
+              height: renderSize.height,
               frameRate: _previewFrameRate,
+              template: project.template,
             ),
           );
       if (renderGeneration != _renderGeneration) {
@@ -201,14 +208,47 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
     required String projectId,
     required List<MediaTrackClipPayload> clips,
     required String? audioSourcePath,
+    required VideoTemplate template,
   }) {
+    final renderSize = _renderSizeFor(template);
     return [
       projectId,
+      _templateSignature(template),
       audioSourcePath ?? 'no-audio',
-      '${_previewWidth}x$_previewHeight',
+      '${renderSize.width}x${renderSize.height}',
       '$_previewFrameRate',
       for (final clip in clips)
         '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}',
     ].join('|');
   }
+
+  String _templateSignature(VideoTemplate template) {
+    return template
+        .toJson()
+        .entries
+        .map((entry) {
+          return '${entry.key}:${entry.value}';
+        })
+        .join(';');
+  }
+
+  _RenderSize _renderSizeFor(VideoTemplate template) {
+    if (template.aspectRatio == VideoTemplateAspectRatio.portrait) {
+      return const _RenderSize(
+        width: _previewPortraitWidth,
+        height: _previewPortraitHeight,
+      );
+    }
+    return const _RenderSize(
+      width: _previewLandscapeWidth,
+      height: _previewLandscapeHeight,
+    );
+  }
+}
+
+class _RenderSize {
+  const _RenderSize({required this.width, required this.height});
+
+  final int width;
+  final int height;
 }

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -17,6 +19,7 @@ class ProjectSerializer {
     return {
       'id': project.id,
       'name': project.name,
+      'template': project.template.toJson(),
       'beatMap': {
         'bpm': project.beatMap.bpm,
         'averageBeatIntervalMs':
@@ -51,6 +54,7 @@ class ProjectSerializer {
     return ProjectTimeline(
       id: json['id']! as String,
       name: json['name']! as String,
+      template: _deserializeTemplate(json['template']),
       beatMap: BeatMap(
         beats: [
           for (final beatJson in beatMapJson['beats']! as List<Object?>)
@@ -73,6 +77,19 @@ class ProjectSerializer {
       time: Duration(milliseconds: json['timeMs']! as int),
       strength: (json['strength']! as num).toDouble(),
     );
+  }
+
+  VideoTemplate _deserializeTemplate(Object? template) {
+    if (template is Map<String, Object?>) {
+      return VideoTemplate.fromJson(template);
+    }
+    if (template is Map) {
+      return VideoTemplate.fromJson(Map<String, Object?>.from(template));
+    }
+    if (template is String) {
+      return VideoTemplates.byId(template);
+    }
+    return VideoTemplates.cleanMemories;
   }
 
   TimelineTrack _deserializeTrack(Map<String, Object?> json) {

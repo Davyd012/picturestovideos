@@ -7,6 +7,7 @@ import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/preview/data/preview_renderer_repository.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 
 PreviewRendererRepository createPreviewRendererRepository(AppLogger logger) {
@@ -173,6 +174,7 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
     final durationSeconds = _durationSeconds(clip);
     final filter = _buildVisualFilter(
       clip: clip,
+      template: request.template,
       width: request.width,
       height: request.height,
     );
@@ -182,6 +184,7 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
       width: request.width,
       height: request.height,
       frameRate: request.frameRate,
+      template: request.template,
       segmentVideoArgs: segmentVideoArgs,
     );
     final thumbnailPath = '${cacheDir.path}/$cacheKey.png';
@@ -337,27 +340,188 @@ Future<void> _runAndroidFfmpeg(List<String> args) async {
 
 String _buildVisualFilter({
   required MediaTrackClipPayload clip,
+  required VideoTemplate template,
   required int width,
   required int height,
 }) {
   final title = _escapeDrawText(clip.title);
-  final subtitle = _escapeDrawText(
-    clip.tagline.isEmpty ? 'IMAGE CLIP' : clip.tagline.toUpperCase(),
-  );
-  final label = _escapeDrawText('BEAT-SYNCED IMAGE');
-  final panelY = height - 212;
-  final subtitleY = height - 126;
-  final labelY = height - 190;
+  final subtitle = _escapeDrawText(clip.tagline);
+  final filters = <String>[
+    _imageFilter(template: template, width: width, height: height),
+    ..._frameFilters(template: template, width: width, height: height),
+    ..._overlayFilters(template: template, width: width, height: height),
+    ..._textFilters(
+      template: template,
+      title: title,
+      subtitle: subtitle,
+      width: width,
+      height: height,
+    ),
+  ];
+
+  return filters.join(',');
+}
+
+String _imageFilter({
+  required VideoTemplate template,
+  required int width,
+  required int height,
+}) {
+  if (template.imageFit == VideoTemplateImageFit.cover) {
+    return [
+      'scale=w=$width:h=$height:force_original_aspect_ratio=increase',
+      'crop=$width:$height',
+    ].join(',');
+  }
+
+  final backgroundColor =
+      template.frameStyle == VideoTemplateFrameStyle.polaroid
+      ? '0xF4EFE7'
+      : 'black';
 
   return [
     'scale=w=$width:h=$height:force_original_aspect_ratio=decrease',
-    'pad=$width:$height:(ow-iw)/2:(oh-ih)/2:black',
-    'drawbox=x=48:y=${height - 244}:w=${width - 96}:h=196:color=black@0.30:t=fill',
-    'drawbox=x=48:y=${height - 244}:w=${width - 96}:h=196:color=white@0.12:t=2',
-    "drawtext=text='$label':x=72:y=$labelY:fontsize=26:fontcolor=white",
-    "drawtext=text='$title':x=72:y=$panelY:fontsize=52:fontcolor=white",
-    "drawtext=text='$subtitle':x=72:y=$subtitleY:fontsize=28:fontcolor=white",
+    'pad=$width:$height:(ow-iw)/2:(oh-ih)/2:$backgroundColor',
   ].join(',');
+}
+
+List<String> _frameFilters({
+  required VideoTemplate template,
+  required int width,
+  required int height,
+}) {
+  return switch (template.frameStyle) {
+    VideoTemplateFrameStyle.polaroid => [
+      'drawbox=x=${width ~/ 12}:y=${height ~/ 8}:w=${width - (width ~/ 6)}:h=${height - (height ~/ 4)}:color=white@0.96:t=20',
+      'drawbox=x=${width ~/ 12}:y=${height ~/ 8}:w=${width - (width ~/ 6)}:h=${height - (height ~/ 4)}:color=black@0.18:t=2',
+    ],
+    VideoTemplateFrameStyle.cleanBorder => [
+      'drawbox=x=${width ~/ 20}:y=${height ~/ 24}:w=${width - (width ~/ 10)}:h=${height - (height ~/ 12)}:color=white@0.20:t=3',
+    ],
+    VideoTemplateFrameStyle.none => const [],
+  };
+}
+
+List<String> _overlayFilters({
+  required VideoTemplate template,
+  required int width,
+  required int height,
+}) {
+  return switch (template.overlayStyle) {
+    VideoTemplateOverlayStyle.bottomScrim => [
+      'drawbox=x=0:y=${height * 2 ~/ 3}:w=$width:h=${height ~/ 3}:color=black@0.38:t=fill',
+    ],
+    VideoTemplateOverlayStyle.cinematicScrim => [
+      'drawbox=x=0:y=0:w=$width:h=$height:color=black@0.18:t=fill',
+      'drawbox=x=0:y=${height * 3 ~/ 5}:w=$width:h=${height * 2 ~/ 5}:color=black@0.48:t=fill',
+    ],
+    VideoTemplateOverlayStyle.textPanel => [
+      'drawbox=x=${width ~/ 14}:y=${height * 2 ~/ 3}:w=${width - (width ~/ 7)}:h=${height ~/ 5}:color=black@0.52:t=fill',
+      'drawbox=x=${width ~/ 14}:y=${height * 2 ~/ 3}:w=${width - (width ~/ 7)}:h=${height ~/ 5}:color=white@0.18:t=2',
+    ],
+    VideoTemplateOverlayStyle.none => const [],
+  };
+}
+
+List<String> _textFilters({
+  required VideoTemplate template,
+  required String title,
+  required String subtitle,
+  required int width,
+  required int height,
+}) {
+  final titleSize = _titleFontSize(template, height);
+  final subtitleSize = _subtitleFontSize(template, height);
+  final titlePosition = _titlePosition(template, width, height);
+  final subtitlePosition = _subtitlePosition(template, width, height);
+  final textColor = template.frameStyle == VideoTemplateFrameStyle.polaroid
+      ? 'black'
+      : 'white';
+  final filters = <String>[
+    "drawtext=text='$title':x=${titlePosition.x}:y=${titlePosition.y}:fontsize=$titleSize:fontcolor=$textColor",
+  ];
+
+  if (subtitle.isNotEmpty) {
+    filters.add(
+      "drawtext=text='$subtitle':x=${subtitlePosition.x}:y=${subtitlePosition.y}:fontsize=$subtitleSize:fontcolor=$textColor",
+    );
+  }
+
+  return filters;
+}
+
+_TextPosition _titlePosition(VideoTemplate template, int width, int height) {
+  return switch (template.textPlacement) {
+    VideoTemplateTextPlacement.center => const _TextPosition(
+      x: '(w-text_w)/2',
+      y: '(h-text_h)/2',
+    ),
+    VideoTemplateTextPlacement.lowerThird => _TextPosition(
+      x: '${width ~/ 12}',
+      y: '${height * 2 ~/ 3}',
+    ),
+    VideoTemplateTextPlacement.belowImage => _TextPosition(
+      x: '(w-text_w)/2',
+      y: '${height * 5 ~/ 6}',
+    ),
+    VideoTemplateTextPlacement.insideTextBox => _TextPosition(
+      x: '${width ~/ 10}',
+      y: '${height * 2 ~/ 3 + height ~/ 20}',
+    ),
+    VideoTemplateTextPlacement.bottomCenter => _TextPosition(
+      x: '(w-text_w)/2',
+      y: '${height - (height ~/ 5)}',
+    ),
+  };
+}
+
+_TextPosition _subtitlePosition(VideoTemplate template, int width, int height) {
+  return switch (template.textPlacement) {
+    VideoTemplateTextPlacement.center => _TextPosition(
+      x: '(w-text_w)/2',
+      y: '${height ~/ 2 + height ~/ 16}',
+    ),
+    VideoTemplateTextPlacement.lowerThird => _TextPosition(
+      x: '${width ~/ 12}',
+      y: '${height * 2 ~/ 3 + height ~/ 14}',
+    ),
+    VideoTemplateTextPlacement.belowImage => _TextPosition(
+      x: '(w-text_w)/2',
+      y: '${height * 5 ~/ 6 + height ~/ 24}',
+    ),
+    VideoTemplateTextPlacement.insideTextBox => _TextPosition(
+      x: '${width ~/ 10}',
+      y: '${height * 2 ~/ 3 + height ~/ 9}',
+    ),
+    VideoTemplateTextPlacement.bottomCenter => _TextPosition(
+      x: '(w-text_w)/2',
+      y: '${height - (height ~/ 8)}',
+    ),
+  };
+}
+
+int _titleFontSize(VideoTemplate template, int height) {
+  final base = height ~/ 20;
+  return switch (template.textPlacement) {
+    VideoTemplateTextPlacement.center => base + 18,
+    VideoTemplateTextPlacement.lowerThird => base + 10,
+    VideoTemplateTextPlacement.insideTextBox => base,
+    _ => base + 4,
+  };
+}
+
+int _subtitleFontSize(VideoTemplate template, int height) {
+  final base = height ~/ 34;
+  return template.textPlacement == VideoTemplateTextPlacement.center
+      ? base + 8
+      : base;
+}
+
+class _TextPosition {
+  const _TextPosition({required this.x, required this.y});
+
+  final String x;
+  final String y;
 }
 
 String _escapeDrawText(String value) {
@@ -380,6 +544,7 @@ double _durationSeconds(MediaTrackClipPayload clip) {
 String _buildSignature(BuildPreviewVideoRequest request) {
   return [
     request.projectId,
+    _templateSignature(request.template),
     request.audioSourcePath ?? 'no-audio',
     '${request.width}x${request.height}',
     '${request.frameRate}',
@@ -394,6 +559,7 @@ String _previewClipCacheKey({
   required int width,
   required int height,
   required int frameRate,
+  required VideoTemplate template,
   required List<String> segmentVideoArgs,
 }) {
   return _stableHexKey([
@@ -405,11 +571,22 @@ String _previewClipCacheKey({
     clip.end.inMilliseconds,
     sourceStat.size,
     sourceStat.modified.millisecondsSinceEpoch,
+    _templateSignature(template),
     width,
     height,
     frameRate,
     segmentVideoArgs.join(' '),
   ]);
+}
+
+String _templateSignature(VideoTemplate template) {
+  return template
+      .toJson()
+      .entries
+      .map((entry) {
+        return '${entry.key}:${entry.value}';
+      })
+      .join(';');
 }
 
 String _stableHexKey(List<Object?> parts) {

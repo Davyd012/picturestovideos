@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
@@ -16,6 +18,7 @@ class BuildMediaTrackUseCase {
     required BeatMap beatMap,
     required List<LibraryMediaItem> selectedMedia,
     required List<BeatEvent> markerEvents,
+    VideoTemplate template = VideoTemplates.cleanMemories,
   }) {
     if (markerEvents.isEmpty || selectedMedia.isEmpty) {
       return null;
@@ -30,10 +33,10 @@ class BuildMediaTrackUseCase {
       final start = sortedMarkers[index].time;
       final proposedEnd = index + 1 < sortedMarkers.length
           ? sortedMarkers[index + 1].time
-          : start + _fallbackBeatSpan(beatMap);
+          : start + _fallbackClipSpan(beatMap, template);
       final end = proposedEnd > start
           ? proposedEnd
-          : start + _fallbackBeatSpan(beatMap);
+          : start + _fallbackClipSpan(beatMap, template);
 
       events.add(
         BeatEvent(
@@ -58,7 +61,10 @@ class BuildMediaTrackUseCase {
     );
   }
 
-  Duration _fallbackBeatSpan(BeatMap beatMap) {
+  Duration _fallbackClipSpan(BeatMap beatMap, VideoTemplate template) {
+    if (template.defaultSlideDuration > Duration.zero) {
+      return template.defaultSlideDuration;
+    }
     if (beatMap.averageBeatInterval > Duration.zero) {
       return beatMap.averageBeatInterval;
     }

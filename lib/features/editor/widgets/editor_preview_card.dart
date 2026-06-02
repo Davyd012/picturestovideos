@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_editor_preview_frame_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/editor_preview_frame.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/editor/editor_preview_state.dart';
 import 'package:picturestovideos/features/editor/editor_preview_view_model.dart';
@@ -95,14 +96,17 @@ class _EditorPreviewCardState extends ConsumerState<EditorPreviewCard> {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: AspectRatio(
-        aspectRatio: 16 / 9,
+        aspectRatio: widget.project?.template.aspectRatio.value ?? 16 / 9,
         child: Stack(
           fit: StackFit.expand,
           children: [
             if (hasVideoSurface)
               Video(controller: _videoController, fit: BoxFit.cover)
             else if (previewFrame.hasActiveClip)
-              _LivePreviewSurface(previewFrame: previewFrame)
+              _LivePreviewSurface(
+                previewFrame: previewFrame,
+                template: widget.project?.template,
+              )
             else
               ColoredBox(color: context.colors.surfaceContainerHighest),
             DecoratedBox(
@@ -385,9 +389,13 @@ class _ActivePreviewCopy extends StatelessWidget {
 }
 
 class _LivePreviewSurface extends StatelessWidget {
-  const _LivePreviewSurface({required this.previewFrame});
+  const _LivePreviewSurface({
+    required this.previewFrame,
+    required this.template,
+  });
 
   final EditorPreviewFrame previewFrame;
+  final VideoTemplate? template;
 
   @override
   Widget build(BuildContext context) {
@@ -399,12 +407,19 @@ class _LivePreviewSurface extends StatelessWidget {
 
     return Image.file(
       File(sourcePath),
-      fit: BoxFit.contain,
+      fit: _livePreviewFit(template),
       errorBuilder: (context, error, stackTrace) {
         return _MissingLivePreviewSurface(title: activeClip.title);
       },
     );
   }
+}
+
+BoxFit _livePreviewFit(VideoTemplate? template) {
+  if (template?.imageFit == VideoTemplateImageFit.cover) {
+    return BoxFit.cover;
+  }
+  return BoxFit.contain;
 }
 
 class _MissingLivePreviewSurface extends StatelessWidget {

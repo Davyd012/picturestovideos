@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/application/build_project_timeline_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -30,7 +31,8 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required List<BeatEvent> events,
     List<LibraryMediaItem> selectedMedia = const [],
   }) async {
-    final currentProject = _currentState.project;
+    final currentState = _currentState;
+    final currentProject = currentState.project;
     final markerEvents = _resolveMarkerEvents(
       currentProject: currentProject,
       fallbackEvents: events,
@@ -50,6 +52,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
             beatMap: beatMap,
             events: markerEvents,
             selectedMedia: selectedMedia,
+            template: currentState.selectedTemplate,
           );
       final serializedProject = ref
           .read(projectSerializerProvider)
@@ -63,8 +66,25 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         serializedProject: serializedProject,
         selectedMarker: null,
         nextQueuedMediaIndex: 0,
+        selectedTemplate: currentState.selectedTemplate,
       );
     });
+  }
+
+  void templateSelected(VideoTemplate template) {
+    final currentState = _currentState;
+    final currentProject = currentState.project;
+    final updatedProject = currentProject?.copyWith(template: template);
+
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: updatedProject == null
+            ? currentState.serializedProject
+            : _serialize(updatedProject),
+        selectedTemplate: template,
+      ),
+    );
   }
 
   void addImageMarkerAt({
@@ -77,7 +97,11 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         currentState.project ??
         ref
             .read(buildProjectTimelineUseCaseProvider)
-            .call(beatMap: beatMap, events: fallbackMarkerEvents);
+            .call(
+              beatMap: beatMap,
+              events: fallbackMarkerEvents,
+              template: currentState.selectedTemplate,
+            );
     final markerEvent = BeatEvent(
       time: time,
       type: 'marker',
@@ -120,6 +144,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
           tracks: const [
             TimelineTrack(id: 'track-markers', name: 'Markers', events: []),
           ],
+          template: currentState.selectedTemplate,
         );
     final mediaIndex = currentState.nextQueuedMediaIndex % selectedMedia.length;
     final item = selectedMedia[mediaIndex];
@@ -357,6 +382,11 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   }
 
   Duration _manualClipSpan(BeatMap beatMap) {
+    final templateDuration =
+        _currentState.selectedTemplate.defaultSlideDuration;
+    if (templateDuration > Duration.zero) {
+      return templateDuration;
+    }
     if (beatMap.averageBeatInterval > const Duration(seconds: 2)) {
       return beatMap.averageBeatInterval;
     }

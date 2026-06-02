@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
@@ -14,6 +16,7 @@ import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/editor/widgets/editor_preview_card.dart';
 import 'package:picturestovideos/features/editor/widgets/editor_timeline_workspace.dart';
+import 'package:picturestovideos/features/editor/widgets/video_template_selector.dart';
 import 'package:picturestovideos/features/event_system/event_system_state.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
@@ -99,6 +102,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
     );
     final timeline = timelineState.asData?.value;
     final project = timeline?.project;
+    final selectedTemplate = timeline?.selectedTemplate;
     final selectedMarker = timeline?.selectedMarker;
     final playback = playbackState.asData?.value;
     final events = eventState.asData?.value.events ?? const [];
@@ -157,6 +161,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                         project: project,
                         playback: playback,
                         eventState: eventState,
+                        selectedTemplate: selectedTemplate,
                         audioSourcePath: audioSourcePath,
                         audioDuration: audioDuration,
                         eventsCount: events.length,
@@ -185,6 +190,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                   project: project,
                   playback: playback,
                   eventState: eventState,
+                  selectedTemplate: selectedTemplate,
                   audioSourcePath: audioSourcePath,
                   audioDuration: audioDuration,
                   eventsCount: events.length,
@@ -418,6 +424,7 @@ class _EditorSidePanel extends StatelessWidget {
     required this.project,
     required this.playback,
     required this.eventState,
+    required this.selectedTemplate,
     required this.audioSourcePath,
     required this.audioDuration,
     required this.eventsCount,
@@ -430,6 +437,7 @@ class _EditorSidePanel extends StatelessWidget {
   final ProjectTimeline? project;
   final PlaybackState? playback;
   final AsyncValue<EventSystemState> eventState;
+  final VideoTemplate? selectedTemplate;
   final String? audioSourcePath;
   final Duration? audioDuration;
   final int eventsCount;
@@ -480,6 +488,7 @@ class _EditorSidePanel extends StatelessWidget {
           project: project,
           playback: playback,
           eventState: eventState,
+          selectedTemplate: selectedTemplate,
           audioSourcePath: audioSourcePath,
           audioDuration: audioDuration,
           selectedMedia: selectedMedia,
@@ -496,6 +505,7 @@ class _EditorToolsCard extends ConsumerWidget {
     required this.project,
     required this.playback,
     required this.eventState,
+    required this.selectedTemplate,
     required this.audioSourcePath,
     required this.audioDuration,
     required this.selectedMedia,
@@ -506,6 +516,7 @@ class _EditorToolsCard extends ConsumerWidget {
   final ProjectTimeline? project;
   final PlaybackState? playback;
   final AsyncValue<EventSystemState> eventState;
+  final VideoTemplate? selectedTemplate;
   final String? audioSourcePath;
   final Duration? audioDuration;
   final List<LibraryMediaItem> selectedMedia;
@@ -531,6 +542,16 @@ class _EditorToolsCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Editor tools', style: context.textTheme.titleLarge),
+            const SizedBox(height: 16),
+            VideoTemplateSelector(
+              selectedTemplate:
+                  selectedTemplate ??
+                  project?.template ??
+                  VideoTemplates.cleanMemories,
+              onTemplateSelected: (template) => ref
+                  .read(timelineViewModelProvider.notifier)
+                  .templateSelected(template),
+            ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,

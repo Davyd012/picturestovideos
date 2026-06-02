@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/application/build_media_track_use_case.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -22,6 +24,7 @@ class BuildProjectTimelineUseCase {
     required BeatMap beatMap,
     required List<BeatEvent> events,
     List<LibraryMediaItem> selectedMedia = const [],
+    VideoTemplate template = VideoTemplates.cleanMemories,
   }) {
     final tracks = <TimelineTrack>[
       TimelineTrack(
@@ -34,6 +37,7 @@ class BuildProjectTimelineUseCase {
       beatMap: beatMap,
       selectedMedia: selectedMedia,
       markerEvents: events,
+      template: template,
     );
     if (mediaTrack != null) {
       tracks.add(mediaTrack);
@@ -44,6 +48,7 @@ class BuildProjectTimelineUseCase {
       name: 'Picture To Videos Project',
       beatMap: beatMap,
       tracks: List.unmodifiable(tracks),
+      template: template,
     );
   }
 }

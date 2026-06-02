@@ -3,6 +3,7 @@ import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/preview/application/build_preview_video_use_case.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/export/export_repository.dart';
 import 'package:picturestovideos/features/export/export_state.dart';
@@ -13,8 +14,10 @@ final exportViewModelProvider = NotifierProvider<ExportViewModel, ExportState>(
 
 class ExportViewModel extends Notifier<ExportState> {
   static const _tag = 'ExportViewModel';
-  static const _exportWidth = 1920;
-  static const _exportHeight = 1080;
+  static const _exportLandscapeWidth = 1920;
+  static const _exportLandscapeHeight = 1080;
+  static const _exportPortraitWidth = 1080;
+  static const _exportPortraitHeight = 1920;
   static const _exportFrameRate = 30;
 
   @override
@@ -59,6 +62,7 @@ class ExportViewModel extends Notifier<ExportState> {
     );
 
     try {
+      final renderSize = _renderSizeFor(project.template);
       final result = await ref
           .read(buildPreviewVideoUseCaseProvider)
           .call(
@@ -66,9 +70,10 @@ class ExportViewModel extends Notifier<ExportState> {
               projectId: project.id,
               clips: clips,
               audioSourcePath: audioSourcePath,
-              width: _exportWidth,
-              height: _exportHeight,
+              width: renderSize.width,
+              height: renderSize.height,
               frameRate: _exportFrameRate,
+              template: project.template,
               outputFileName: _outputFileName(project.name),
             ),
           );
@@ -103,7 +108,9 @@ class ExportViewModel extends Notifier<ExportState> {
     );
 
     try {
-      await ref.read(exportRepositoryProvider).saveVideoToGallery(result.outputPath);
+      await ref
+          .read(exportRepositoryProvider)
+          .saveVideoToGallery(result.outputPath);
       state = state.copyWith(
         status: ExportStatus.saved,
         statusMessage: 'Export saved to gallery.',
@@ -180,4 +187,24 @@ class ExportViewModel extends Notifier<ExportState> {
     }
     return 'Export failed. Check the app logs for details.';
   }
+
+  _RenderSize _renderSizeFor(VideoTemplate template) {
+    if (template.aspectRatio == VideoTemplateAspectRatio.portrait) {
+      return const _RenderSize(
+        width: _exportPortraitWidth,
+        height: _exportPortraitHeight,
+      );
+    }
+    return const _RenderSize(
+      width: _exportLandscapeWidth,
+      height: _exportLandscapeHeight,
+    );
+  }
+}
+
+class _RenderSize {
+  const _RenderSize({required this.width, required this.height});
+
+  final int width;
+  final int height;
 }
