@@ -1,39 +1,108 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
-import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
+import 'package:picturestovideos/features/editor/editor_preview_state.dart';
+import 'package:picturestovideos/features/editor/editor_preview_view_model.dart';
+import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
+import 'package:picturestovideos/features/editor/widgets/editor_preview_card.dart';
+import 'package:picturestovideos/features/editor/widgets/editor_timeline_workspace.dart';
 import 'package:picturestovideos/features/event_system/event_system_state.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
+import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
+import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
 import 'package:picturestovideos/features/timeline/timeline_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
-class AudioEditorScreen extends ConsumerWidget {
+class AudioEditorScreen extends ConsumerStatefulWidget {
   const AudioEditorScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AudioEditorScreen> createState() => _AudioEditorScreenState();
+}
+
+class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
+  late final ProviderSubscription<ProjectTimeline?> _timelineSubscription;
+  Timer? _previewSyncDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _timelineSubscription = ref.listenManual<ProjectTimeline?>(
+      timelineViewModelProvider.select((next) => next.asData?.value.project),
+      (_, nextProject) {
+        _schedulePreviewSync(nextProject);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _previewSyncDebounce?.cancel();
+    _timelineSubscription.close();
+    super.dispose();
+  }
+
+  void _schedulePreviewSync(ProjectTimeline? project) {
+    if (project == null) {
+      return;
+    }
+
+    _previewSyncDebounce?.cancel();
+    _previewSyncDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) {
+        return;
+      }
+
+      ref
+          .read(editorPreviewViewModelProvider.notifier)
+          .syncPreview(
+            project,
+            audioSourcePath: _audioSourcePath,
+            reason: 'timeline listener',
+          );
+    });
+  }
+
+  String? get _audioSourcePath => ref.read(
+    audioImportViewModelProvider.select(
+      (next) => next.asData?.value.source?.path,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
     final beatMapState = ref.watch(beatMapViewModelProvider);
     final timelineState = ref.watch(timelineViewModelProvider);
     final playbackState = ref.watch(playbackViewModelProvider);
     final eventState = ref.watch(eventSystemViewModelProvider);
+    final importState = ref.watch(audioImportViewModelProvider);
+    final mediaSelection = ref.watch(editorMediaSelectionViewModelProvider);
+    final previewState = ref.watch(editorPreviewViewModelProvider);
 
     final resolvedBeatMap = _resolvedBeatMap(
       beatMapState: beatMapState,
       timelineState: timelineState,
       playbackState: playbackState,
     );
-    final project = timelineState.asData?.value.project;
+    final timeline = timelineState.asData?.value;
+    final project = timeline?.project;
+    final selectedMarker = timeline?.selectedMarker;
     final playback = playbackState.asData?.value;
     final events = eventState.asData?.value.events ?? const [];
+    final audioSourcePath = importState.asData?.value.source?.path;
 
     return AppShellScaffold(
       currentRoute: AppRoutes.audioEditor,
@@ -70,6 +139,11 @@ class AudioEditorScreen extends ConsumerWidget {
                         beatMap: resolvedBeatMap,
                         project: project,
                         playback: playback,
+                        audioSourcePath: audioSourcePath,
+                        selectedMedia: mediaSelection.selectedMedia,
+                        selectedMarker: selectedMarker,
+                        events: events,
+                        previewState: previewState,
                       ),
                     ),
                     const SizedBox(width: 24),
@@ -81,6 +155,9 @@ class AudioEditorScreen extends ConsumerWidget {
                         playback: playback,
                         eventState: eventState,
                         eventsCount: events.length,
+                        selectedMediaCount: mediaSelection.selectedCount,
+                        selectedMedia: mediaSelection.selectedMedia,
+                        selectedMarker: selectedMarker,
                       ),
                     ),
                   ],
@@ -90,6 +167,11 @@ class AudioEditorScreen extends ConsumerWidget {
                   beatMap: resolvedBeatMap,
                   project: project,
                   playback: playback,
+                  audioSourcePath: audioSourcePath,
+                  selectedMedia: mediaSelection.selectedMedia,
+                  selectedMarker: selectedMarker,
+                  events: events,
+                  previewState: previewState,
                 ),
                 const SizedBox(height: 24),
                 _EditorSidePanel(
@@ -98,6 +180,9 @@ class AudioEditorScreen extends ConsumerWidget {
                   playback: playback,
                   eventState: eventState,
                   eventsCount: events.length,
+                  selectedMediaCount: mediaSelection.selectedCount,
+                  selectedMedia: mediaSelection.selectedMedia,
+                  selectedMarker: selectedMarker,
                 ),
               ],
             ],
@@ -136,125 +221,101 @@ class _MainEditorColumn extends ConsumerWidget {
     required this.beatMap,
     required this.project,
     required this.playback,
+    required this.audioSourcePath,
+    required this.selectedMedia,
+    required this.selectedMarker,
+    required this.events,
+    required this.previewState,
   });
 
   final BeatMap? beatMap;
   final ProjectTimeline? project;
   final PlaybackState? playback;
+  final String? audioSourcePath;
+  final List<LibraryMediaItem> selectedMedia;
+  final TimelineMarkerSelection? selectedMarker;
+  final List<BeatEvent> events;
+  final EditorPreviewState previewState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       children: [
-        _PreviewCard(beatMap: beatMap, project: project, playback: playback),
-        const SizedBox(height: 24),
-        _TransportControls(hasBeatMap: beatMap != null, playback: playback),
-        const SizedBox(height: 24),
-        _TimelineWorkspace(
+        EditorPreviewCard(
           beatMap: beatMap,
           project: project,
           playback: playback,
+          audioSourcePath: audioSourcePath,
+          previewState: previewState,
+        ),
+        const SizedBox(height: 24),
+        _TransportControls(
+          beatMap: beatMap,
+          playback: playback,
+          audioSourcePath: audioSourcePath,
+        ),
+        const SizedBox(height: 24),
+        EditorTimelineWorkspace(
+          beatMap: beatMap,
+          project: project,
+          playback: playback,
+          selectedMedia: selectedMedia,
+          selectedMarker: selectedMarker,
+          onAddMarker: () => _addMarkerAtCurrentPoint(
+            ref: ref,
+            beatMap: beatMap,
+            playback: playback,
+            events: events,
+          ),
+          onDeleteSelectedMarker: () => ref
+              .read(timelineViewModelProvider.notifier)
+              .deleteSelectedImageMarker(),
+          onMarkerSelected: (selection) => ref
+              .read(timelineViewModelProvider.notifier)
+              .selectImageMarker(
+                time: selection.time,
+                mediaId: selection.mediaId,
+              ),
+          onMarkerSelectionCleared: () => ref
+              .read(timelineViewModelProvider.notifier)
+              .clearImageMarkerSelection(),
+          onCurrentPointChanged: (position) async {
+            if (beatMap == null) {
+              return;
+            }
+
+            await ref
+                .read(playbackViewModelProvider.notifier)
+                .preparePlayback(
+                  beatMap: beatMap!,
+                  audioSourcePath: audioSourcePath,
+                );
+            await ref.read(playbackViewModelProvider.notifier).seek(position);
+          },
         ),
       ],
     );
   }
 }
 
-class _PreviewCard extends StatelessWidget {
-  const _PreviewCard({
+class _TransportControls extends ConsumerWidget {
+  const _TransportControls({
     required this.beatMap,
-    required this.project,
     required this.playback,
+    required this.audioSourcePath,
   });
 
   final BeatMap? beatMap;
-  final ProjectTimeline? project;
   final PlaybackState? playback;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: Stack(
-          children: [
-            ColoredBox(color: context.colors.surfaceContainerHighest),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Chip(
-                    label: Text(
-                      beatMap == null ? 'Awaiting beat map' : 'Live preview',
-                    ),
-                  ),
-                  const Spacer(),
-                  Align(
-                    child: Icon(
-                      beatMap == null
-                          ? Icons.movie_outlined
-                          : Icons.play_circle,
-                      size: 72,
-                      color: context.colors.primary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              project?.name ?? 'Picture To Videos Project',
-                              style: context.textTheme.headlineSmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              beatMap == null
-                                  ? 'Import audio, build the beat map, and return here for beat-aware preview.'
-                                  : '${beatMap!.beats.length} beats ready • ${beatMap!.bpm.toStringAsFixed(1)} BPM',
-                              style: context.textTheme.bodyLarge,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Text(
-                        _formatDuration(playback?.currentTime ?? Duration.zero),
-                        style: context.textTheme.headlineSmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final millis = (duration.inMilliseconds.remainder(1000) ~/ 10)
-        .toString()
-        .padLeft(2, '0');
-    return '$minutes:$seconds:$millis';
-  }
-}
-
-class _TransportControls extends ConsumerWidget {
-  const _TransportControls({required this.hasBeatMap, required this.playback});
-
-  final bool hasBeatMap;
-  final PlaybackState? playback;
+  final String? audioSourcePath;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final canControlTransport =
+        beatMap != null &&
+        ((playback?.hasLoadedAudioSource ?? false) ||
+            (audioSourcePath != null && audioSourcePath!.isNotEmpty));
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -264,22 +325,19 @@ class _TransportControls extends ConsumerWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             IconButton.filledTonal(
-              onPressed: hasBeatMap
-                  ? () => ref
-                        .read(playbackViewModelProvider.notifier)
-                        .step(const Duration(seconds: -10))
+              onPressed: canControlTransport
+                  ? () async {
+                      await _preparePlayback(ref);
+                      await ref
+                          .read(playbackViewModelProvider.notifier)
+                          .step(const Duration(seconds: -10));
+                    }
                   : null,
               icon: const Icon(Icons.replay_10),
             ),
             FilledButton.icon(
-              onPressed: hasBeatMap
-                  ? () {
-                      if (playback?.isPlaying ?? false) {
-                        ref.read(playbackViewModelProvider.notifier).pause();
-                      } else {
-                        ref.read(playbackViewModelProvider.notifier).play();
-                      }
-                    }
+              onPressed: canControlTransport
+                  ? () => _togglePlayback(ref)
                   : null,
               icon: Icon(
                 playback?.isPlaying ?? false ? Icons.pause : Icons.play_arrow,
@@ -287,18 +345,24 @@ class _TransportControls extends ConsumerWidget {
               label: Text(playback?.isPlaying ?? false ? 'Pause' : 'Play'),
             ),
             IconButton.filledTonal(
-              onPressed: hasBeatMap
-                  ? () => ref
-                        .read(playbackViewModelProvider.notifier)
-                        .step(const Duration(seconds: 10))
+              onPressed: canControlTransport
+                  ? () async {
+                      await _preparePlayback(ref);
+                      await ref
+                          .read(playbackViewModelProvider.notifier)
+                          .step(const Duration(seconds: 10));
+                    }
                   : null,
               icon: const Icon(Icons.forward_10),
             ),
             OutlinedButton.icon(
-              onPressed: hasBeatMap
-                  ? () => ref
-                        .read(playbackViewModelProvider.notifier)
-                        .seek(Duration.zero)
+              onPressed: canControlTransport
+                  ? () async {
+                      await _preparePlayback(ref);
+                      await ref
+                          .read(playbackViewModelProvider.notifier)
+                          .seek(Duration.zero);
+                    }
                   : null,
               icon: const Icon(Icons.restart_alt),
               label: const Text('Reset playhead'),
@@ -308,286 +372,25 @@ class _TransportControls extends ConsumerWidget {
       ),
     );
   }
-}
 
-class _TimelineWorkspace extends StatelessWidget {
-  const _TimelineWorkspace({
-    required this.beatMap,
-    required this.project,
-    required this.playback,
-  });
+  Future<void> _preparePlayback(WidgetRef ref) async {
+    if (beatMap == null) {
+      return;
+    }
 
-  final BeatMap? beatMap;
-  final ProjectTimeline? project;
-  final PlaybackState? playback;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _TimelineHeader(
-              beatMap: beatMap,
-              project: project,
-              playback: playback,
-            ),
-            const SizedBox(height: 24),
-            if (beatMap == null)
-              _EditorEmptyState()
-            else ...[
-              _BeatMarkerRow(beatMap: beatMap!),
-              const SizedBox(height: 24),
-              if (project != null && project!.tracks.isNotEmpty)
-                for (final track in project!.tracks) ...[
-                  _TrackCanvasRow(track: track, beatMap: beatMap!),
-                  const SizedBox(height: 16),
-                ]
-              else
-                _SuggestedTrackCanvas(beatMap: beatMap!),
-            ],
-          ],
-        ),
-      ),
-    );
+    await ref
+        .read(playbackViewModelProvider.notifier)
+        .preparePlayback(beatMap: beatMap!, audioSourcePath: audioSourcePath);
   }
-}
 
-class _TimelineHeader extends StatelessWidget {
-  const _TimelineHeader({
-    required this.beatMap,
-    required this.project,
-    required this.playback,
-  });
+  Future<void> _togglePlayback(WidgetRef ref) async {
+    await _preparePlayback(ref);
+    if (playback?.isPlaying ?? false) {
+      await ref.read(playbackViewModelProvider.notifier).pause();
+      return;
+    }
 
-  final BeatMap? beatMap;
-  final ProjectTimeline? project;
-  final PlaybackState? playback;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 16,
-      runSpacing: 16,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text('Timeline workspace', style: context.textTheme.titleLarge),
-        Chip(
-          label: Text(
-            beatMap == null
-                ? 'No sync'
-                : '${beatMap!.averageBeatInterval.inMilliseconds} ms interval',
-          ),
-        ),
-        Chip(
-          label: Text(
-            project == null
-                ? 'No project timeline'
-                : '${project!.tracks.length} tracks',
-          ),
-        ),
-        Chip(label: Text('Next beat ${playback?.nextBeatIndex ?? 0}')),
-      ],
-    );
-  }
-}
-
-class _BeatMarkerRow extends StatelessWidget {
-  const _BeatMarkerRow({required this.beatMap});
-
-  final BeatMap beatMap;
-
-  @override
-  Widget build(BuildContext context) {
-    final visibleBeats = beatMap.beats.take(12).toList(growable: false);
-
-    return SizedBox(
-      height: 56,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          for (final beat in visibleBeats) ...[
-            Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  width: 2,
-                  height: 20 + (beat.strength * 12),
-                  decoration: BoxDecoration(
-                    color: context.colors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _TrackCanvasRow extends StatelessWidget {
-  const _TrackCanvasRow({required this.track, required this.beatMap});
-
-  final TimelineTrack track;
-  final BeatMap beatMap;
-
-  @override
-  Widget build(BuildContext context) {
-    final eventCount = track.events.isEmpty ? 1 : track.events.length;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(track.name, style: context.textTheme.titleMedium),
-              ),
-              Chip(label: Text('$eventCount events')),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final beat in beatMap.beats.take(12)) ...[
-                Expanded(
-                  child: Container(
-                    height: 28 + ((beat.strength * 10) % 36),
-                    decoration: BoxDecoration(
-                      color: context.colors.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final event in track.events.take(6))
-                Chip(
-                  label: Text(
-                    '${event.type} @ ${event.time.inMilliseconds} ms',
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SuggestedTrackCanvas extends StatelessWidget {
-  const _SuggestedTrackCanvas({required this.beatMap});
-
-  final BeatMap beatMap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: context.colors.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Timeline ready for track placement',
-            style: context.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Beat markers are loaded. Build the project timeline from the import flow to populate tracks here automatically.',
-            style: context.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final beat in beatMap.beats.take(12)) ...[
-                Expanded(
-                  child: Container(
-                    height: 20 + ((beat.strength * 10) % 32),
-                    decoration: BoxDecoration(
-                      color: context.colors.secondaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EditorEmptyState extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Card.outlined(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(
-              Icons.music_note_outlined,
-              size: 36,
-              color: context.colors.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Editor waiting for beat-aware data',
-              style: context.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Return to the import flow, run beat detection, build the beat map, then come back here for preview and timeline editing.',
-              style: context.textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 16,
-              runSpacing: 16,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => context.appNavigator.goToImportAudio(),
-                  icon: const Icon(Icons.audio_file_outlined),
-                  label: const Text('Go to import'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => context.appNavigator.goToLibrary(),
-                  icon: const Icon(Icons.video_library_outlined),
-                  label: const Text('Browse library'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    await ref.read(playbackViewModelProvider.notifier).play();
   }
 }
 
@@ -598,6 +401,9 @@ class _EditorSidePanel extends StatelessWidget {
     required this.playback,
     required this.eventState,
     required this.eventsCount,
+    required this.selectedMediaCount,
+    required this.selectedMedia,
+    required this.selectedMarker,
   });
 
   final BeatMap? beatMap;
@@ -605,6 +411,9 @@ class _EditorSidePanel extends StatelessWidget {
   final PlaybackState? playback;
   final AsyncValue<EventSystemState> eventState;
   final int eventsCount;
+  final int selectedMediaCount;
+  final List<LibraryMediaItem> selectedMedia;
+  final TimelineMarkerSelection? selectedMarker;
 
   @override
   Widget build(BuildContext context) {
@@ -635,57 +444,175 @@ class _EditorSidePanel extends StatelessWidget {
                   label: 'Triggered beats',
                   value: '${playback?.triggeredBeats.length ?? 0}',
                 ),
+                _StatusRow(
+                  label: 'Images queued',
+                  value: '$selectedMediaCount items',
+                ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Editor tools', style: context.textTheme.titleLarge),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    Chip(
-                      label: Text(
-                        beatMap == null ? 'Sync inactive' : 'Sync active',
-                      ),
-                    ),
-                    Chip(
-                      label: Text(
-                        playback?.isPlaying ?? false ? 'Playing' : 'Paused',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _eventStatusText(eventState),
-                  style: context.textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
+        _EditorToolsCard(
+          beatMap: beatMap,
+          project: project,
+          playback: playback,
+          eventState: eventState,
+          selectedMedia: selectedMedia,
+          selectedMarker: selectedMarker,
         ),
       ],
     );
   }
+}
 
-  String _eventStatusText(AsyncValue<EventSystemState> eventState) {
-    return switch (eventState) {
-      AsyncLoading<EventSystemState>() => 'Preparing event dispatch state.',
-      AsyncError<EventSystemState>(:final error) => error.toString(),
-      AsyncData<EventSystemState>(:final value) when value.hasEvents =>
-        'Next event index ${value.nextEventIndex} with ${value.executions.length} executions recorded.',
-      _ => 'Load marker events to see beat-triggered actions here.',
-    };
+class _EditorToolsCard extends ConsumerWidget {
+  const _EditorToolsCard({
+    required this.beatMap,
+    required this.project,
+    required this.playback,
+    required this.eventState,
+    required this.selectedMedia,
+    required this.selectedMarker,
+  });
+
+  final BeatMap? beatMap;
+  final ProjectTimeline? project;
+  final PlaybackState? playback;
+  final AsyncValue<EventSystemState> eventState;
+  final List<LibraryMediaItem> selectedMedia;
+  final TimelineMarkerSelection? selectedMarker;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final events = eventState.asData?.value.events ?? const <BeatEvent>[];
+    final canAutoSync = beatMap != null && selectedMedia.isNotEmpty;
+    final canAddMarker = beatMap != null;
+    final canDeleteMarker = selectedMarker != null;
+    final hasMediaTrack =
+        project?.tracks.any((track) => track.id == 'track-media') ?? false;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Editor tools', style: context.textTheme.titleLarge),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                Chip(
+                  label: Text(
+                    beatMap == null ? 'Sync inactive' : 'Sync active',
+                  ),
+                ),
+                Chip(
+                  label: Text(
+                    playback?.isPlaying ?? false ? 'Playing' : 'Paused',
+                  ),
+                ),
+                Chip(
+                  label: Text(
+                    hasMediaTrack ? 'Image track ready' : 'No image track',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: canAutoSync
+                  ? () => ref
+                        .read(timelineViewModelProvider.notifier)
+                        .buildProjectTimeline(
+                          beatMap: beatMap!,
+                          events: events,
+                          selectedMedia: selectedMedia,
+                        )
+                  : null,
+              icon: const Icon(Icons.auto_awesome),
+              label: Text(
+                hasMediaTrack
+                    ? 'Re-sync images to markers'
+                    : 'Auto-sync images to markers',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: canAddMarker
+                      ? () => _addMarkerAtCurrentPoint(
+                          ref: ref,
+                          beatMap: beatMap,
+                          playback: playback,
+                          events: events,
+                        )
+                      : null,
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  label: const Text('Add marker'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: canDeleteMarker
+                      ? () => ref
+                            .read(timelineViewModelProvider.notifier)
+                            .deleteSelectedImageMarker()
+                      : null,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete marker'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              selectedMedia.isEmpty
+                  ? 'Queue images from the library to generate marker-synced clips.'
+                  : 'Image clips start on timeline markers.',
+              style: context.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _editorEventStatusText(eventState),
+              style: context.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
   }
+}
+
+void _addMarkerAtCurrentPoint({
+  required WidgetRef ref,
+  required BeatMap? beatMap,
+  required PlaybackState? playback,
+  required List<BeatEvent> events,
+}) {
+  if (beatMap == null) {
+    return;
+  }
+
+  ref
+      .read(timelineViewModelProvider.notifier)
+      .addImageMarkerAt(
+        time: playback?.currentTime ?? Duration.zero,
+        beatMap: beatMap,
+        fallbackMarkerEvents: events,
+      );
+}
+
+String _editorEventStatusText(AsyncValue<EventSystemState> eventState) {
+  return switch (eventState) {
+    AsyncLoading<EventSystemState>() => 'Preparing event dispatch state.',
+    AsyncError<EventSystemState>(:final error) => error.toString(),
+    AsyncData<EventSystemState>(:final value) when value.hasEvents =>
+      'Next event index ${value.nextEventIndex} with ${value.executions.length} executions recorded.',
+    _ => 'Load markers to see timeline-triggered actions here.',
+  };
 }
 
 class _StatusRow extends StatelessWidget {

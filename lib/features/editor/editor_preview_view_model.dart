@@ -1,0 +1,214 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/core/preview/application/build_preview_video_use_case.dart';
+import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
+import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
+import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
+import 'package:picturestovideos/features/editor/editor_preview_state.dart';
+
+final editorPreviewViewModelProvider =
+    NotifierProvider<EditorPreviewViewModel, EditorPreviewState>(
+      EditorPreviewViewModel.new,
+    );
+
+class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
+  static const _tag = 'EditorPreviewViewModel';
+  static const _previewWidth = 1280;
+  static const _previewHeight = 720;
+  static const _previewFrameRate = 12;
+  int _renderGeneration = 0;
+
+  @override
+  EditorPreviewState build() {
+    ref.read(appLoggerProvider).info(_tag, 'Initializing editor preview state');
+    return const EditorPreviewState.initial().copyWith(
+      statusMessage:
+          'Preview is waiting for a timeline. Import audio, add images, then rebuild the timeline to start preview generation.',
+    );
+  }
+
+  void syncPreview(
+    ProjectTimeline? project, {
+    String? audioSourcePath,
+    String? reason,
+  }) {
+    if (project == null) {
+      _renderGeneration++;
+      ref
+          .read(appLoggerProvider)
+          .debug(
+            _tag,
+            'Preview sync skipped because the editor has no project timeline yet',
+          );
+      state = state.copyWith(
+        status: EditorPreviewStatus.idle,
+        statusMessage:
+            'Preview is waiting for a timeline. Import audio, add images, then rebuild the timeline to start preview generation.',
+        clearResult: true,
+        clearSignature: true,
+        clearError: true,
+      );
+      return;
+    }
+
+    final clips = ref
+        .read(resolvePreviewClipsUseCaseProvider)
+        .call(beatMap: project.beatMap, project: project);
+    if (clips.isEmpty) {
+      _renderGeneration++;
+      ref
+          .read(appLoggerProvider)
+          .debug(
+            _tag,
+            'Preview sync skipped because no preview clips could be resolved',
+          );
+      state = state.copyWith(
+        status: EditorPreviewStatus.idle,
+        statusMessage: 'Preview is waiting for marker-synced image clips.',
+        clearResult: true,
+        clearSignature: true,
+        clearError: true,
+      );
+      return;
+    }
+
+    final signature = _buildPreviewSignature(
+      projectId: project.id,
+      clips: clips,
+      audioSourcePath: audioSourcePath,
+    );
+    if (state.signature == signature && (state.isRendering || state.isReady)) {
+      return;
+    }
+    if (state.signature == signature && state.isLive) {
+      return;
+    }
+
+    _renderGeneration++;
+    ref
+        .read(appLoggerProvider)
+        .info(
+          _tag,
+          'Live preview synced for ${clips.length} image clips${reason == null ? '' : ' ($reason)'}',
+        );
+    state = state.copyWith(
+      status: EditorPreviewStatus.live,
+      signature: signature,
+      statusMessage:
+          'Live preview ready with ${clips.length} marker-synced image clips.',
+      clearError: true,
+      clearResult: true,
+    );
+  }
+
+  Future<void> renderPreview(
+    ProjectTimeline? project, {
+    String? audioSourcePath,
+  }) async {
+    if (project == null) {
+      syncPreview(project, audioSourcePath: audioSourcePath);
+      return;
+    }
+
+    final clips = ref
+        .read(resolvePreviewClipsUseCaseProvider)
+        .call(beatMap: project.beatMap, project: project);
+    if (clips.isEmpty) {
+      syncPreview(project, audioSourcePath: audioSourcePath);
+      return;
+    }
+
+    final signature = _buildPreviewSignature(
+      projectId: project.id,
+      clips: clips,
+      audioSourcePath: audioSourcePath,
+    );
+    if (state.signature == signature && (state.isRendering || state.isReady)) {
+      return;
+    }
+
+    final renderGeneration = ++_renderGeneration;
+    ref
+        .read(appLoggerProvider)
+        .info(_tag, 'Rendering preview for ${clips.length} image clips');
+    state = state.copyWith(
+      status: EditorPreviewStatus.rendering,
+      signature: signature,
+      statusMessage:
+          'Rendering ${clips.length} image clips into the preview video.',
+      clearError: true,
+      clearResult: true,
+    );
+
+    try {
+      final result = await ref
+          .read(buildPreviewVideoUseCaseProvider)
+          .call(
+            BuildPreviewVideoRequest(
+              projectId: project.id,
+              clips: clips,
+              audioSourcePath: audioSourcePath,
+              width: _previewWidth,
+              height: _previewHeight,
+              frameRate: _previewFrameRate,
+            ),
+          );
+      if (renderGeneration != _renderGeneration) {
+        return;
+      }
+      state = state.copyWith(
+        status: EditorPreviewStatus.ready,
+        result: result,
+        signature: result.signature,
+        statusMessage: 'Preview video ready at ${result.outputPath}',
+        clearError: true,
+      );
+    } catch (error, stackTrace) {
+      final userMessage = error.toString().contains('ffmpeg')
+          ? 'FFmpeg is not available on PATH. Install ffmpeg, restart the app, then try again.'
+          : 'Preview generation failed. Check the app logs for image render details.';
+      ref
+          .read(appLoggerProvider)
+          .error(_tag, error, stackTrace, message: 'Preview generation failed');
+      if (renderGeneration != _renderGeneration) {
+        return;
+      }
+      state = state.copyWith(
+        status: EditorPreviewStatus.failure,
+        errorMessage: userMessage,
+        statusMessage: userMessage,
+        clearResult: true,
+      );
+    }
+  }
+
+  void invalidate() {
+    _renderGeneration++;
+    state = state.copyWith(
+      status: EditorPreviewStatus.idle,
+      statusMessage:
+          'Preview has been invalidated. Waiting for the next timeline update.',
+      clearResult: true,
+      clearSignature: true,
+      clearError: true,
+    );
+  }
+
+  void clear() => invalidate();
+
+  String _buildPreviewSignature({
+    required String projectId,
+    required List<MediaTrackClipPayload> clips,
+    required String? audioSourcePath,
+  }) {
+    return [
+      projectId,
+      audioSourcePath ?? 'no-audio',
+      '${_previewWidth}x$_previewHeight',
+      '$_previewFrameRate',
+      for (final clip in clips)
+        '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}',
+    ].join('|');
+  }
+}

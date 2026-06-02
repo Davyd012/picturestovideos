@@ -7,11 +7,20 @@ environment:
   sdk: ^3.13.0-34.0.dev
 
 dependencies:
+  audioplayers: ^6.6.0
+  ffmpeg_kit_flutter: ^6.0.3
   flutter:
     sdk: flutter
   file_picker: ^11.0.2
   flutter_riverpod: ^3.3.1
+  gal: ^2.3.2
+  media_kit: ^1.2.6
+  media_kit_libs_video: ^1.0.7
+  media_kit_video: ^2.0.1
+  path_provider: ^2.1.5
+  share_plus: ^12.0.2
   shared_preferences: ^2.5.5
+  talker_flutter: ^5.1.16
 
 dev_dependencies:
   flutter_test:

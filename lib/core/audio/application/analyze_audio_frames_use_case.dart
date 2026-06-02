@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/application/frame_energy_analyzer.dart';
 import 'package:picturestovideos/core/audio/domain/audio_analysis_config.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
+import 'package:picturestovideos/core/audio/domain/audio_processing_task.dart';
 import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
 
 final analyzeAudioFramesUseCaseProvider = Provider<AnalyzeAudioFramesUseCase>(
@@ -19,13 +21,28 @@ class AnalyzeAudioFramesUseCase {
 
   final FrameEnergyAnalyzer _frameEnergyAnalyzer;
 
-  List<AudioFrame> call({
+  Future<List<AudioFrame>> call({
     required AudioData audioData,
     AudioAnalysisConfig config = const AudioAnalysisConfig.defaults(),
-  }) {
-    return _frameEnergyAnalyzer.analyze(
-      audioData: audioData,
-      config: config,
+  }) async {
+    final result = await compute(
+      _analyzeAudioFramesOnIsolate,
+      AnalyzeAudioFramesRequest(
+        audioData: audioData,
+        config: config,
+      ),
     );
+
+    return result.frames;
   }
+}
+
+AnalyzeAudioFramesResult _analyzeAudioFramesOnIsolate(
+  AnalyzeAudioFramesRequest request,
+) {
+  final frames = const FrameEnergyAnalyzer().analyze(
+    audioData: request.audioData,
+    config: request.config,
+  );
+  return AnalyzeAudioFramesResult(frames: frames);
 }

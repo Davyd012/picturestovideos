@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_state.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
@@ -14,6 +16,7 @@ class LibraryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(libraryViewModelProvider);
+    final editorSelection = ref.watch(editorMediaSelectionViewModelProvider);
 
     return AppShellScaffold(
       currentRoute: AppRoutes.library,
@@ -22,11 +25,11 @@ class LibraryScreen extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.only(right: 16),
           child: FilledButton.icon(
-            onPressed: state.filteredItems.isEmpty
-                ? null
-                : () => context.appNavigator.goToAudioEditor(),
+            onPressed: editorSelection.hasSelection
+                ? () => context.appNavigator.goToAudioEditor()
+                : null,
             icon: const Icon(Icons.playlist_add),
-            label: const Text('Use in editor'),
+            label: Text('Open editor (${editorSelection.selectedCount})'),
           ),
         ),
       ],
@@ -37,19 +40,25 @@ class LibraryScreen extends ConsumerWidget {
           return ListView(
             padding: padding,
             children: [
-              Text('Media library', style: context.textTheme.headlineMedium),
+              Text('Image library', style: context.textTheme.headlineMedium),
               const SizedBox(height: 8),
               Text(
-                'Browse saved assets, narrow by media type, and send the best match into the editor flow.',
+                'Import images, stage the strongest frames, and send them into the beat-synced editor flow.',
                 style: context.textTheme.bodyLarge,
               ),
               const SizedBox(height: 24),
-              _LibraryToolbar(state: state),
+              _LibraryToolbar(
+                state: state,
+                editorSelection: editorSelection,
+              ),
               const SizedBox(height: 24),
               if (state.filteredItems.isEmpty)
-                _EmptyLibraryState(selectedCategory: state.selectedCategory)
+                _EmptyLibraryState(hasItems: state.hasItems)
               else
-                _LibraryGrid(items: state.filteredItems),
+                _LibraryGrid(
+                  items: state.filteredItems,
+                  editorSelection: editorSelection,
+                ),
               const SizedBox(height: 24),
               const _QuickAddActions(),
             ],
@@ -61,12 +70,18 @@ class LibraryScreen extends ConsumerWidget {
 }
 
 class _LibraryToolbar extends ConsumerWidget {
-  const _LibraryToolbar({required this.state});
+  const _LibraryToolbar({
+    required this.state,
+    required this.editorSelection,
+  });
 
   final LibraryState state;
+  final EditorMediaSelectionState editorSelection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final viewModel = ref.read(libraryViewModelProvider.notifier);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -74,38 +89,20 @@ class _LibraryToolbar extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
-              onChanged: ref
-                  .read(libraryViewModelProvider.notifier)
-                  .searchChanged,
+              enabled: !state.isImporting,
+              onChanged: viewModel.searchChanged,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
-                hintText: 'Search media, tags, or dates',
+                hintText: 'Search imported images or dates',
               ),
             ),
             const SizedBox(height: 16),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SegmentedButton<LibraryCategory>(
-                segments: const [
-                  ButtonSegment(
-                    value: LibraryCategory.videos,
-                    label: Text('Videos'),
-                  ),
-                  ButtonSegment(
-                    value: LibraryCategory.photos,
-                    label: Text('Photos'),
-                  ),
-                  ButtonSegment(
-                    value: LibraryCategory.gifs,
-                    label: Text('Giphy'),
-                  ),
-                ],
-                selected: {state.selectedCategory},
-                onSelectionChanged: (selection) {
-                  ref
-                      .read(libraryViewModelProvider.notifier)
-                      .categoryChanged(selection.first);
-                },
+            TextField(
+              enabled: !state.isImporting,
+              onChanged: viewModel.folderPathChanged,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.folder_open_outlined),
+                hintText: 'Paste a folder path to import supported images',
               ),
             ),
             const SizedBox(height: 16),
@@ -114,31 +111,86 @@ class _LibraryToolbar extends ConsumerWidget {
               runSpacing: 16,
               children: [
                 _LibrarySummaryChip(
-                  label: 'Visible assets',
+                  label: 'Visible images',
+                  value: '${state.visibleCount}',
+                ),
+                _LibrarySummaryChip(
+                  label: 'Imported',
                   value: '${state.totalCount}',
                 ),
                 _LibrarySummaryChip(
-                  label: 'Category',
-                  value: _categoryLabel(state.selectedCategory),
-                ),
-                _LibrarySummaryChip(
-                  label: 'Search',
-                  value: state.query.trim().isEmpty ? 'All items' : state.query,
+                  label: 'In editor',
+                  value: '${editorSelection.selectedCount}',
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: state.isImporting ? null : viewModel.pickImages,
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text('Pick images'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: state.isImporting
+                      ? null
+                      : viewModel.importImagesFromFolderPath,
+                  icon: const Icon(Icons.drive_folder_upload_outlined),
+                  label: const Text('Import folder'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: state.filteredItems.isEmpty || state.isImporting
+                      ? null
+                      : () => ref
+                          .read(editorMediaSelectionViewModelProvider.notifier)
+                          .addAllMedia(state.filteredItems),
+                  icon: const Icon(Icons.playlist_add),
+                  label: const Text('Add visible images'),
+                ),
+                if (editorSelection.hasSelection)
+                  OutlinedButton.icon(
+                    onPressed: () => ref
+                        .read(editorMediaSelectionViewModelProvider.notifier)
+                        .clearSelection(),
+                    icon: const Icon(Icons.clear_all),
+                    label: const Text('Clear editor picks'),
+                  ),
+              ],
+            ),
+            if (state.isImporting) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+            ],
+            if (state.errorMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                state.errorMessage!,
+                style: context.textTheme.bodyMedium?.copyWith(
+                  color: context.colors.error,
+                ),
+              ),
+            ],
+            if (state.statusMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                state.statusMessage!,
+                style: context.textTheme.bodyMedium,
+              ),
+            ],
+            if (!editorSelection.hasSelection) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Tap image cards to stage them for the editor timeline.',
+                style: context.textTheme.bodyMedium,
+              ),
+            ],
           ],
         ),
       ),
     );
-  }
-
-  String _categoryLabel(LibraryCategory category) {
-    return switch (category) {
-      LibraryCategory.videos => 'Videos',
-      LibraryCategory.photos => 'Photos',
-      LibraryCategory.gifs => 'Giphy',
-    };
   }
 }
 
@@ -155,9 +207,13 @@ class _LibrarySummaryChip extends StatelessWidget {
 }
 
 class _LibraryGrid extends StatelessWidget {
-  const _LibraryGrid({required this.items});
+  const _LibraryGrid({
+    required this.items,
+    required this.editorSelection,
+  });
 
   final List<LibraryMediaItem> items;
+  final EditorMediaSelectionState editorSelection;
 
   @override
   Widget build(BuildContext context) {
@@ -181,7 +237,11 @@ class _LibraryGrid extends StatelessWidget {
             childAspectRatio: 0.88,
           ),
           itemBuilder: (context, index) {
-            return _LibraryCard(item: items[index]);
+            final item = items[index];
+            return _LibraryCard(
+              item: item,
+              isSelected: editorSelection.containsMedia(item.id),
+            );
           },
         );
       },
@@ -189,34 +249,58 @@ class _LibraryGrid extends StatelessWidget {
   }
 }
 
-class _LibraryCard extends StatelessWidget {
-  const _LibraryCard({required this.item});
+class _LibraryCard extends ConsumerWidget {
+  const _LibraryCard({
+    required this.item,
+    required this.isSelected,
+  });
 
   final LibraryMediaItem item;
+  final bool isSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => context.appNavigator.goToAudioEditor(),
+        onTap: () => ref
+            .read(editorMediaSelectionViewModelProvider.notifier)
+            .toggleMedia(item),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: ColoredBox(
-                color: item.isFeatured
-                    ? context.colors.primaryContainer
-                    : context.colors.surfaceContainerHighest,
-                child: Center(
-                  child: Icon(
-                    _categoryIcon(item.category),
-                    size: 40,
-                    color: item.isFeatured
-                        ? context.colors.onPrimaryContainer
-                        : context.colors.onSurfaceVariant,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.memory(
+                    item.thumbnailBytes,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return ColoredBox(
+                        color: context.colors.surfaceContainerHighest,
+                        child: Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            size: 40,
+                            color: context.colors.onSurfaceVariant,
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
+                  if (isSelected)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Chip(
+                          avatar: const Icon(Icons.check_circle_outline),
+                          label: const Text('Queued'),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             Padding(
@@ -235,7 +319,7 @@ class _LibraryCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Chip(label: Text(item.durationLabel)),
+                      if (!isSelected) Chip(label: Text(item.sizeLabel)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -247,14 +331,21 @@ class _LibraryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '${item.importedOnLabel} • ${item.sizeLabel}',
+                    '${item.importedOnLabel} • ${item.sourcePath}',
                     style: context.textTheme.labelMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 16),
                   FilledButton.tonalIcon(
-                    onPressed: () => context.appNavigator.goToAudioEditor(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Quick add'),
+                    onPressed: () {
+                      ref
+                          .read(editorMediaSelectionViewModelProvider.notifier)
+                          .addMedia(item);
+                      context.appNavigator.goToAudioEditor();
+                    },
+                    icon: Icon(isSelected ? Icons.check : Icons.add),
+                    label: Text(isSelected ? 'Open in editor' : 'Queue image'),
                   ),
                 ],
               ),
@@ -264,29 +355,15 @@ class _LibraryCard extends StatelessWidget {
       ),
     );
   }
-
-  IconData _categoryIcon(LibraryCategory category) {
-    return switch (category) {
-      LibraryCategory.videos => Icons.ondemand_video,
-      LibraryCategory.photos => Icons.image,
-      LibraryCategory.gifs => Icons.gif_box,
-    };
-  }
 }
 
 class _EmptyLibraryState extends StatelessWidget {
-  const _EmptyLibraryState({required this.selectedCategory});
+  const _EmptyLibraryState({required this.hasItems});
 
-  final LibraryCategory selectedCategory;
+  final bool hasItems;
 
   @override
   Widget build(BuildContext context) {
-    final categoryLabel = switch (selectedCategory) {
-      LibraryCategory.videos => 'videos',
-      LibraryCategory.photos => 'photos',
-      LibraryCategory.gifs => 'gifs',
-    };
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -294,10 +371,15 @@ class _EmptyLibraryState extends StatelessWidget {
           children: [
             Icon(Icons.search_off, size: 32, color: context.colors.primary),
             const SizedBox(height: 16),
-            Text('No matching assets', style: context.textTheme.titleLarge),
+            Text(
+              hasItems ? 'No matching images' : 'No images imported yet',
+              style: context.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              'Try a broader search or switch categories to see more $categoryLabel.',
+              hasItems
+                  ? 'Try a broader search to see more imported images.'
+                  : 'Pick images or import a folder path to start building the video from real files.',
               style: context.textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
@@ -333,7 +415,7 @@ class _QuickAddActions extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: () => context.appNavigator.goToAudioEditor(),
                   icon: const Icon(Icons.tune),
-                  label: const Text('Open editor'),
+                  label: const Text('Open image editor'),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => context.appNavigator.goToDownload(),

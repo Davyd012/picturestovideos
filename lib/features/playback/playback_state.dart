@@ -8,6 +8,7 @@ class PlaybackState {
     required this.nextBeatIndex,
     required this.triggeredBeats,
     required this.isPlaying,
+    this.audioSourcePath,
   });
 
   const PlaybackState.initial()
@@ -19,15 +20,19 @@ class PlaybackState {
         currentTime = Duration.zero,
         nextBeatIndex = 0,
         triggeredBeats = const [],
-        isPlaying = false;
+        isPlaying = false,
+        audioSourcePath = null;
 
   final BeatMap beatMap;
   final Duration currentTime;
   final int nextBeatIndex;
   final List<Beat> triggeredBeats;
   final bool isPlaying;
+  final String? audioSourcePath;
 
   bool get hasBeatMap => beatMap.beats.isNotEmpty;
+  bool get hasLoadedAudioSource =>
+      audioSourcePath != null && audioSourcePath!.isNotEmpty;
 
   Beat? get lastTriggeredBeat =>
       triggeredBeats.isEmpty ? null : triggeredBeats.last;
@@ -38,6 +43,7 @@ class PlaybackState {
     int? nextBeatIndex,
     List<Beat>? triggeredBeats,
     bool? isPlaying,
+    String? audioSourcePath,
   }) {
     return PlaybackState(
       beatMap: beatMap ?? this.beatMap,
@@ -45,6 +51,7 @@ class PlaybackState {
       nextBeatIndex: nextBeatIndex ?? this.nextBeatIndex,
       triggeredBeats: triggeredBeats ?? this.triggeredBeats,
       isPlaying: isPlaying ?? this.isPlaying,
+      audioSourcePath: audioSourcePath ?? this.audioSourcePath,
     );
   }
 }

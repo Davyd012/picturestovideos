@@ -48,12 +48,16 @@ class FrameEnergyAnalyzer {
     final frames = <AudioFrame>[];
     for (var start = 0; start < samples.length; start += config.hopSize) {
       final end = min(start + config.frameSize, samples.length);
-      var energy = 0.0;
+      var sumSquares = 0.0;
 
       for (var index = start; index < end; index++) {
         final sample = samples[index];
-        energy += sample * sample;
+        sumSquares += sample * sample;
       }
+
+      final sampleCount = end - start;
+      final energy =
+          sampleCount == 0 ? 0.0 : sqrt(sumSquares / sampleCount);
 
       frames.add(
         AudioFrame(

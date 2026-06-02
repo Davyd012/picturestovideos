@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/application/preprocess_audio_use_case.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/features/preprocessing/preprocessing_state.dart';
 
 final preprocessingViewModelProvider =
@@ -10,12 +11,16 @@ final preprocessingViewModelProvider =
 );
 
 class PreprocessingViewModel extends AsyncNotifier<PreprocessingState> {
+  static const _tag = 'PreprocessingViewModel';
+
   @override
   Future<PreprocessingState> build() async {
+    ref.read(appLoggerProvider).info(_tag, 'Initializing preprocessing state');
     return const PreprocessingState.initial();
   }
 
   Future<void> loadCachedBeatMap(AudioData audioData) async {
+    ref.read(appLoggerProvider).info(_tag, 'Loading cached beat map');
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(() async {
@@ -33,6 +38,7 @@ class PreprocessingViewModel extends AsyncNotifier<PreprocessingState> {
     required AudioData audioData,
     required BeatMap beatMap,
   }) async {
+    ref.read(appLoggerProvider).info(_tag, 'Saving beat map cache');
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(() async {

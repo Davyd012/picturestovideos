@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
 
@@ -18,13 +19,11 @@ class ProjectSerializer {
       'name': project.name,
       'beatMap': {
         'bpm': project.beatMap.bpm,
-        'averageBeatIntervalMs': project.beatMap.averageBeatInterval.inMilliseconds,
+        'averageBeatIntervalMs':
+            project.beatMap.averageBeatInterval.inMilliseconds,
         'beats': [
           for (final beat in project.beatMap.beats)
-            {
-              'timeMs': beat.time.inMilliseconds,
-              'strength': beat.strength,
-            },
+            {'timeMs': beat.time.inMilliseconds, 'strength': beat.strength},
         ],
       },
       'tracks': [
@@ -37,7 +36,7 @@ class ProjectSerializer {
                 {
                   'timeMs': event.time.inMilliseconds,
                   'type': event.type,
-                  'payload': event.payload?.toString(),
+                  'payload': _serializePayload(event.payload),
                 },
             ],
           },
@@ -91,7 +90,22 @@ class ProjectSerializer {
     return BeatEvent(
       time: Duration(milliseconds: json['timeMs']! as int),
       type: json['type']! as String,
-      payload: json['payload'],
+      payload: _deserializePayload(json['payload']),
     );
+  }
+
+  Object? _serializePayload(Object? payload) {
+    if (payload is MediaTrackClipPayload) {
+      return payload.toJson();
+    }
+    return payload?.toString();
+  }
+
+  Object? _deserializePayload(Object? payload) {
+    if (payload is Map<String, Object?> &&
+        payload['kind'] == 'media-track-clip') {
+      return MediaTrackClipPayload.fromJson(payload);
+    }
+    return payload;
   }
 }

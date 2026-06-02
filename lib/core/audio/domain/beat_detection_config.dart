@@ -7,8 +7,8 @@ class BeatDetectionConfig {
 
   const BeatDetectionConfig.defaults()
       : sensitivity = 1.35,
-        movingAverageWindow = 8,
-        minBeatInterval = const Duration(milliseconds: 250);
+        movingAverageWindow = 4,
+        minBeatInterval = const Duration(milliseconds: 180);
 
   final double sensitivity;
   final int movingAverageWindow;
