@@ -18,21 +18,22 @@ final imageImportRepositoryProvider = Provider<ImageImportRepository>(
 );
 
 class ImportedImageAsset {
-  const ImportedImageAsset({
+  ImportedImageAsset({
     required this.id,
     required this.fileName,
     required this.sourcePath,
-    required this.bytes,
     required this.importedOn,
-  });
+    Uint8List? bytes,
+    int? byteLength,
+  }) : thumbnailBytes = bytes ?? Uint8List(0),
+       byteLength = byteLength ?? bytes?.length ?? 0;
 
   final String id;
   final String fileName;
   final String sourcePath;
-  final Uint8List bytes;
   final DateTime importedOn;
-
-  int get byteLength => bytes.length;
+  final Uint8List thumbnailBytes;
+  final int byteLength;
 }
 
 abstract interface class ImageImportRepository {
@@ -75,6 +76,7 @@ class DeviceImageImportRepository implements ImageImportRepository {
           fileName: file.name,
           sourcePath: path,
           bytes: file.bytes,
+          byteLength: file.size,
           importedOn: importedOn,
         ),
       );
@@ -128,7 +130,7 @@ class DeviceImageImportRepository implements ImageImportRepository {
           id: file.path,
           fileName: fileName,
           sourcePath: file.path,
-          bytes: await file.readAsBytes(),
+          byteLength: await file.length(),
           importedOn: importedOn,
         ),
       );

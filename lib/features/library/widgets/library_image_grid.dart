@@ -16,24 +16,23 @@ class LibraryImageGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
+    return SliverLayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = switch (constraints.maxWidth) {
+        final width = constraints.crossAxisExtent;
+        final crossAxisCount = switch (width) {
           > 1200 => 5,
           > 900 => 4,
           > 640 => 3,
           _ => 2,
         };
 
-        return GridView.builder(
+        return SliverGrid.builder(
           itemCount: items.length,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: constraints.maxWidth < 420 ? 0.66 : 0.78,
+            childAspectRatio: width < 420 ? 0.66 : 0.78,
           ),
           itemBuilder: (context, index) {
             final item = items[index];

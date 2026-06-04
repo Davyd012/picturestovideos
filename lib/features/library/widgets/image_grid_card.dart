@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
@@ -31,22 +33,7 @@ class ImageGridCard extends ConsumerWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.memory(
-                    item.thumbnailBytes,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return ColoredBox(
-                        color: context.colors.surfaceContainerHighest,
-                        child: Center(
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            size: 40,
-                            color: context.colors.onSurfaceVariant,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                  _GridThumbnail(item: item),
                   Positioned(
                     left: 8,
                     top: 8,
@@ -113,6 +100,49 @@ class ImageGridCard extends ConsumerWidget {
     if (!isSelected) {
       ref.read(libraryViewModelProvider.notifier).itemSelectionToggled(item.id);
     }
+  }
+}
+
+class _GridThumbnail extends StatelessWidget {
+  const _GridThumbnail({required this.item});
+
+  final LibraryMediaItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.thumbnailBytes.isNotEmpty) {
+      return Image.memory(
+        item.thumbnailBytes,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const _BrokenThumbnail(),
+      );
+    }
+    if (item.sourcePath.isNotEmpty) {
+      return Image.file(
+        File(item.sourcePath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const _BrokenThumbnail(),
+      );
+    }
+    return const _BrokenThumbnail();
+  }
+}
+
+class _BrokenThumbnail extends StatelessWidget {
+  const _BrokenThumbnail();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: context.colors.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.broken_image_outlined,
+          size: 40,
+          color: context.colors.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 }
 

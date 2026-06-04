@@ -17,7 +17,7 @@ class SystemImageFilePicker implements ImageFilePicker {
       allowMultiple: true,
       allowedExtensions: _supportedExtensions,
       type: FileType.custom,
-      withData: true,
+      withData: false,
     );
     if (result == null || result.files.isEmpty) {
       logger.warning('ImageFilePicker', 'Image pick canceled');
@@ -26,16 +26,13 @@ class SystemImageFilePicker implements ImageFilePicker {
 
     final pickedFiles = <PickedImageFile>[];
     for (final file in result.files) {
-      final bytes = file.bytes;
-      if (bytes == null) {
-        continue;
-      }
       pickedFiles.add(
         PickedImageFile(
           name: file.name,
           extension: (file.extension ?? '').toLowerCase(),
-          bytes: bytes,
+          size: file.size,
           path: file.path,
+          bytes: file.bytes,
         ),
       );
     }

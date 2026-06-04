@@ -9,12 +9,14 @@ class AppShellScaffold extends StatelessWidget {
     required this.body,
     super.key,
     this.actions = const [],
+    this.leading,
   });
 
   final String currentRoute;
   final String title;
   final Widget body;
   final List<Widget> actions;
+  final Widget? leading;
 
   static const _destinations = <_ShellDestination>[
     _ShellDestination(
@@ -52,7 +54,11 @@ class AppShellScaffold extends StatelessWidget {
         final showRail = constraints.maxWidth >= 960;
 
         return Scaffold(
-          appBar: AppBar(title: Text(title), actions: actions),
+          appBar: AppBar(
+            leading: leading,
+            title: Text(title),
+            actions: actions,
+          ),
           body: SafeArea(
             child: showRail
                 ? Row(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
@@ -167,19 +169,35 @@ class _TileThumbnail extends StatelessWidget {
       aspectRatio: 1,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.memory(
-          item.thumbnailBytes,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return ColoredBox(
-              color: context.colors.surfaceContainerHighest,
-              child: Icon(
-                Icons.broken_image_outlined,
-                color: context.colors.onSurfaceVariant,
-              ),
-            );
-          },
-        ),
+        child: _thumbnail(context),
+      ),
+    );
+  }
+
+  Widget _thumbnail(BuildContext context) {
+    if (item.thumbnailBytes.isNotEmpty) {
+      return Image.memory(
+        item.thumbnailBytes,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _fallback(context),
+      );
+    }
+    if (item.sourcePath.isNotEmpty) {
+      return Image.file(
+        File(item.sourcePath),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _fallback(context),
+      );
+    }
+    return _fallback(context);
+  }
+
+  Widget _fallback(BuildContext context) {
+    return ColoredBox(
+      color: context.colors.surfaceContainerHighest,
+      child: Icon(
+        Icons.broken_image_outlined,
+        color: context.colors.onSurfaceVariant,
       ),
     );
   }

@@ -31,46 +31,69 @@ class LibraryBrowseView extends ConsumerWidget {
 
         return Stack(
           children: [
-            ListView(
-              padding: contentPadding.copyWith(
-                bottom: state.hasSelectedItems ? 128 : contentPadding.bottom,
-              ),
-              children: [
-                Text('Image library', style: context.textTheme.headlineMedium),
-                const SizedBox(height: 8),
-                Text(
-                  'Import images, stage the strongest frames, and send them into the beat-synced editor flow.',
-                  style: context.textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 24),
-                if (!state.hasItems)
-                  LibraryEmptyState(
-                    selectedCount: editorSelection.selectedCount,
-                    visibleCount: visibleItems.length,
-                  )
-                else ...[
-                  if (editorSelection.hasSelection) ...[
-                    StagedSummaryCard(
-                      importedCount: state.totalCount,
-                      visibleCount: visibleItems.length,
-                      stagedCount: editorSelection.selectedCount,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  LibraryToolbar(
-                    visibleCount: visibleItems.length,
-                    stagedCount: editorSelection.selectedCount,
+            CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: contentPadding.copyWith(
+                    bottom: state.hasSelectedItems
+                        ? 128
+                        : contentPadding.bottom,
                   ),
-                  const SizedBox(height: 16),
-                  if (visibleItems.isEmpty)
-                    const _NoMatchingImagesCard()
-                  else
-                    LibraryImageGrid(
-                      items: visibleItems,
-                      stagedIds: stagedIds,
-                      selectedIds: state.selectedItemIds,
-                    ),
-                ],
+                  sliver: SliverMainAxisGroup(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: Text(
+                          'Image library',
+                          style: context.textTheme.headlineMedium,
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                      SliverToBoxAdapter(
+                        child: Text(
+                          'Import images, stage the strongest frames, and send them into the beat-synced editor flow.',
+                          style: context.textTheme.bodyLarge,
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                      if (!state.hasItems)
+                        SliverToBoxAdapter(
+                          child: LibraryEmptyState(
+                            selectedCount: editorSelection.selectedCount,
+                            visibleCount: visibleItems.length,
+                          ),
+                        )
+                      else ...[
+                        if (editorSelection.hasSelection) ...[
+                          SliverToBoxAdapter(
+                            child: StagedSummaryCard(
+                              importedCount: state.totalCount,
+                              visibleCount: visibleItems.length,
+                              stagedCount: editorSelection.selectedCount,
+                            ),
+                          ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                        ],
+                        SliverToBoxAdapter(
+                          child: LibraryToolbar(
+                            visibleCount: visibleItems.length,
+                            stagedCount: editorSelection.selectedCount,
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                        if (visibleItems.isEmpty)
+                          const SliverToBoxAdapter(
+                            child: _NoMatchingImagesCard(),
+                          )
+                        else
+                          LibraryImageGrid(
+                            items: visibleItems,
+                            stagedIds: stagedIds,
+                            selectedIds: state.selectedItemIds,
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
             if (state.hasSelectedItems)

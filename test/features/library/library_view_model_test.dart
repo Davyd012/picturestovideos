@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
+import 'package:picturestovideos/features/library/image_file_picker.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 
@@ -78,6 +79,37 @@ void main() {
     expect(state.isImporting, isFalse);
   });
 
+  test('image import keeps large multi-select path-based', () async {
+    final files = [
+      for (var index = 0; index < 25; index++)
+        PickedImageFile(
+          name: 'Image_$index.jpg',
+          extension: 'jpg',
+          size: 4 * 1024 * 1024,
+          path: '/tmp/image_$index.jpg',
+        ),
+    ];
+    final container = ProviderContainer(
+      overrides: [
+        imageFilePickerProvider.overrideWithValue(
+          _FakeImageFilePicker(files: files),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final assets = await container
+        .read(imageImportRepositoryProvider)
+        .pickImages();
+
+    expect(assets, hasLength(25));
+    expect(assets.every((asset) => asset.thumbnailBytes.isEmpty), isTrue);
+    expect(
+      assets.every((asset) => asset.byteLength == 4 * 1024 * 1024),
+      isTrue,
+    );
+  });
+
   test('reorderMedia updates staged editor order', () async {
     final container = ProviderContainer(
       overrides: [
@@ -124,6 +156,17 @@ void main() {
       'First.png',
     ]);
   });
+}
+
+class _FakeImageFilePicker implements ImageFilePicker {
+  const _FakeImageFilePicker({required this.files});
+
+  final List<PickedImageFile> files;
+
+  @override
+  Future<List<PickedImageFile>> pickImageFiles() async {
+    return files;
+  }
 }
 
 class _FakeImageImportRepository implements ImageImportRepository {

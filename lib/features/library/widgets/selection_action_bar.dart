@@ -28,11 +28,7 @@ class SelectionActionBar extends ConsumerWidget {
                 FilledButton.tonalIcon(
                   onPressed: selectedItems.isEmpty
                       ? null
-                      : () => ref
-                            .read(
-                              editorMediaSelectionViewModelProvider.notifier,
-                            )
-                            .addAllMedia(selectedItems),
+                      : () => _stageSelected(ref),
                   icon: const Icon(Icons.playlist_add),
                   label: const Text('Stage selected'),
                 ),
@@ -59,6 +55,13 @@ class SelectionActionBar extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _stageSelected(WidgetRef ref) {
+    ref
+        .read(editorMediaSelectionViewModelProvider.notifier)
+        .addAllMedia(selectedItems);
+    ref.read(libraryViewModelProvider.notifier).clearItemSelection();
   }
 
   void _removeSelected(WidgetRef ref) {

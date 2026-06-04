@@ -30,6 +30,10 @@ class AppNavigator {
     );
   }
 
+  Future<bool> maybePop<T extends Object?>([T? result]) {
+    return navigatorKey.currentState!.maybePop<T>(result);
+  }
+
   Future<T?> goToImportAudio<T extends Object?>({bool replace = false}) {
     return replace
         ? replaceNamed<T, Object?>(AppRoutes.importAudio)

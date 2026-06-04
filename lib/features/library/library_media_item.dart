@@ -36,7 +36,7 @@ class LibraryMediaItem {
       importedOnLabel: _dateLabel(asset.importedOn),
       importedOn: asset.importedOn,
       byteLength: asset.byteLength,
-      thumbnailBytes: asset.bytes,
+      thumbnailBytes: asset.thumbnailBytes,
       sourcePath: asset.sourcePath,
     );
   }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/core/audio/data/audio_player_repository.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
-import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/editor/audio_editor_screen.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
@@ -11,22 +11,35 @@ import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 void main() {
-  testWidgets('audio editor shows empty guidance with no beat-aware data', (
+  testWidgets('audio editor shows mobile editor defaults with no data', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(420, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       const ProviderScope(child: MaterialApp(home: AudioEditorScreen())),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Editor waiting for beat-aware data'), findsOneWidget);
-    expect(find.text('Go to import'), findsOneWidget);
+    expect(find.text('Video editor'), findsOneWidget);
+    expect(find.text('Sequence preview'), findsOneWidget);
+    expect(find.byKey(const Key('editor-section-tab-bar')), findsOneWidget);
   });
 
   testWidgets('audio editor renders timeline details when data is loaded', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    await tester.binding.setSurfaceSize(const Size(420, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final container = ProviderContainer(
+      overrides: [
+        audioPlayerRepositoryProvider.overrideWithValue(
+          ManualAudioPlayerRepository(),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
 
     const beatMap = BeatMap(
@@ -73,9 +86,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Live preview'), findsOneWidget);
-    expect(find.text('Timeline workspace'), findsOneWidget);
-    expect(find.text('Markers'), findsOneWidget);
+    expect(find.text('Sequence preview'), findsOneWidget);
+    expect(find.byKey(const Key('editor-section-tab-bar')), findsOneWidget);
     expect(find.textContaining('120.0 BPM'), findsOneWidget);
   });
 }
