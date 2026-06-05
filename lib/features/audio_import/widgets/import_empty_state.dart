@@ -26,16 +26,8 @@ class ImportEmptyState extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Import audio',
-                      style: context.textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Bring WAV tracks into the workspace and let the rhythm pipeline prepare everything automatically.',
-                      style: context.textTheme.bodyLarge,
-                    ),
-                    const SizedBox(height: 24),
+                    const _BrandHeader(),
+                    const SizedBox(height: 32),
                     _UploadCard(
                       onChooseFile: onChooseFile,
                       onImportFromPath: onImportFromPath,
@@ -47,6 +39,34 @@ class ImportEmptyState extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Image.asset('lib/assets/icon.png', width: 112, height: 112),
+        const SizedBox(height: 24),
+        Text(
+          'Pictures to Videos',
+          style: context.textTheme.headlineMedium,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Turn rhythm and still images into motion.',
+          style: context.textTheme.bodyLarge?.copyWith(
+            color: context.colors.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }
