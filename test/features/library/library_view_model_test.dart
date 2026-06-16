@@ -2,6 +2,9 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/core/media/data/saved_image_asset_repository.dart';
+import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
+import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/image_file_picker.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
@@ -30,6 +33,9 @@ void main() {
               ),
             ],
           ),
+        ),
+        savedImageAssetRepositoryProvider.overrideWithValue(
+          _MemorySavedImageAssetRepository(),
         ),
       ],
     );
@@ -62,6 +68,9 @@ void main() {
               ),
             ],
           ),
+        ),
+        savedImageAssetRepositoryProvider.overrideWithValue(
+          _MemorySavedImageAssetRepository(),
         ),
       ],
     );
@@ -133,6 +142,9 @@ void main() {
             ],
           ),
         ),
+        savedImageAssetRepositoryProvider.overrideWithValue(
+          _MemorySavedImageAssetRepository(),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -184,5 +196,27 @@ class _FakeImageImportRepository implements ImageImportRepository {
     String folderPath,
   ) async {
     return assets;
+  }
+}
+
+class _MemorySavedImageAssetRepository implements SavedImageAssetRepository {
+  final List<SavedImageAsset> assets = [];
+
+  @override
+  Future<void> clear() async {
+    assets.clear();
+  }
+
+  @override
+  Future<List<SavedImageAsset>> loadAll() async {
+    return List.unmodifiable(assets);
+  }
+
+  @override
+  Future<void> upsertAll(List<SavedImageAsset> assets) async {
+    for (final asset in assets) {
+      this.assets.removeWhere((currentAsset) => currentAsset.id == asset.id);
+      this.assets.add(asset);
+    }
   }
 }

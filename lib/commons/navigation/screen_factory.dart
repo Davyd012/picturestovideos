@@ -4,6 +4,7 @@ import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_screen.dart';
 import 'package:picturestovideos/features/editor/audio_editor_screen.dart';
 import 'package:picturestovideos/features/export/export_screen.dart';
+import 'package:picturestovideos/features/home/home_screen.dart';
 import 'package:picturestovideos/features/library/library_screen.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
@@ -14,6 +15,10 @@ class ScreenFactory {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case AppRoutes.home:
+        return _buildRoute(
+          settings: settings,
+          builder: (_) => const HomeScreen(),
+        );
       case AppRoutes.importAudio:
         return _buildRoute(
           settings: settings,

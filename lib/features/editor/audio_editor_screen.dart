@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
+import 'package:picturestovideos/core/audio/domain/audio_data.dart';
+import 'package:picturestovideos/core/audio/domain/audio_source.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -131,6 +133,8 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
             eventState: eventState,
             selectedMedia: mediaSelection.selectedMedia,
             audioDuration: importedAudio?.audioData?.duration,
+            audioData: importedAudio?.audioData,
+            audioSource: importedAudio?.source,
             audioSourcePath: importedAudio?.source?.path,
           ),
         ],
@@ -194,6 +198,8 @@ class _EditorTabBody extends ConsumerWidget {
     required this.eventState,
     required this.selectedMedia,
     required this.audioDuration,
+    required this.audioData,
+    required this.audioSource,
     required this.audioSourcePath,
   });
 
@@ -205,6 +211,8 @@ class _EditorTabBody extends ConsumerWidget {
   final AsyncValue<EventSystemState> eventState;
   final List<LibraryMediaItem> selectedMedia;
   final Duration? audioDuration;
+  final AudioData? audioData;
+  final AudioSource? audioSource;
   final String? audioSourcePath;
 
   @override
@@ -214,12 +222,19 @@ class _EditorTabBody extends ConsumerWidget {
         beatMap: beatMap,
         project: timeline?.project,
         playback: playback,
+        timelineScale: timeline?.timelineScale ?? 1,
         selectedMedia: selectedMedia,
         events: events,
+        onTimelineScaleChanged: (scale) => ref
+            .read(timelineViewModelProvider.notifier)
+            .timelineScaleChanged(scale),
         onCurrentPointChanged: (position) => _seekTo(ref, position),
       ),
       EditorTab.clips => ClipsTabView(
         selectedMedia: selectedMedia,
+        onReorderMedia: (oldIndex, newIndex) => ref
+            .read(editorMediaSelectionViewModelProvider.notifier)
+            .reorderMedia(oldIndex: oldIndex, newIndex: newIndex),
         onOpenTimeline: () => ref
             .read(editorTabViewModelProvider.notifier)
             .tabSelected(EditorTab.timeline),
@@ -233,6 +248,11 @@ class _EditorTabBody extends ConsumerWidget {
         onDeleteMarker: () => ref
             .read(timelineViewModelProvider.notifier)
             .deleteSelectedImageMarker(),
+        onDeleteMarkerAtCurrentPoint: () => _deleteMarkerAtCurrentPoint(ref),
+        onClearMarkers: () =>
+            ref.read(timelineViewModelProvider.notifier).clearImageMarkers(),
+        canSaveMarkerPreset: audioData != null && timeline?.project != null,
+        onSaveMarkerPreset: () => _saveMarkerPreset(context, ref),
         onMarkerSelected: (time) async {
           ref
               .read(timelineViewModelProvider.notifier)
@@ -256,6 +276,9 @@ class _EditorTabBody extends ConsumerWidget {
         onDeleteMarker: () => ref
             .read(timelineViewModelProvider.notifier)
             .deleteSelectedImageMarker(),
+        onDeleteMarkerAtCurrentPoint: () => _deleteMarkerAtCurrentPoint(ref),
+        onClearMarkers: () =>
+            ref.read(timelineViewModelProvider.notifier).clearImageMarkers(),
       ),
     };
   }
@@ -297,6 +320,39 @@ class _EditorTabBody extends ConsumerWidget {
           selectedMedia: selectedMedia,
           audioDuration: audioDuration,
         );
+  }
+
+  void _deleteMarkerAtCurrentPoint(WidgetRef ref) {
+    ref
+        .read(timelineViewModelProvider.notifier)
+        .deleteImageMarkerAt(playback?.currentTime ?? Duration.zero);
+  }
+
+  Future<void> _saveMarkerPreset(BuildContext context, WidgetRef ref) async {
+    final resolvedAudioData = audioData;
+    if (resolvedAudioData == null) {
+      return;
+    }
+
+    final savedCount = await ref
+        .read(timelineViewModelProvider.notifier)
+        .saveMarkerPreset(
+          audioData: resolvedAudioData,
+          sourceName: audioSource?.fileName ?? 'Selected audio',
+          sourcePath: audioSourcePath,
+          sourceExtension: audioSource?.fileExtension ?? '',
+          byteLength: audioSource?.byteLength ?? 0,
+        );
+    if (!context.mounted) {
+      return;
+    }
+
+    final message = savedCount == 0
+        ? 'Add at least one marker before saving.'
+        : 'Saved $savedCount marker${savedCount == 1 ? '' : 's'} as an audio preset.';
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

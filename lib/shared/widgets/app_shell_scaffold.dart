@@ -20,6 +20,12 @@ class AppShellScaffold extends StatelessWidget {
 
   static const _destinations = <_ShellDestination>[
     _ShellDestination(
+      route: AppRoutes.home,
+      label: 'Home',
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home,
+    ),
+    _ShellDestination(
       route: AppRoutes.importAudio,
       label: 'Import',
       icon: Icons.audio_file_outlined,
@@ -123,6 +129,9 @@ class AppShellScaffold extends StatelessWidget {
     }
 
     switch (route) {
+      case AppRoutes.home:
+        context.appNavigator.goToHome(replace: true);
+        return;
       case AppRoutes.importAudio:
         context.appNavigator.goToImportAudio(replace: true);
         return;

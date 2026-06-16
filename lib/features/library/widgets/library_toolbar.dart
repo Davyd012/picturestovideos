@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
@@ -98,6 +99,20 @@ class LibraryToolbar extends ConsumerWidget {
                       : viewModel.importImagesFromFolderPath,
                   icon: const Icon(Icons.drive_folder_upload_outlined),
                   label: const Text('Import folder'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed:
+                      state.isImporting ||
+                          state.items.isEmpty ||
+                          stagedCount == state.totalCount
+                      ? null
+                      : () => ref
+                            .read(
+                              editorMediaSelectionViewModelProvider.notifier,
+                            )
+                            .addAllMedia(state.items),
+                  icon: const Icon(Icons.playlist_add_check),
+                  label: const Text('Stage all imported'),
                 ),
               ],
             ),

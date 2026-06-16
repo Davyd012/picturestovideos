@@ -11,7 +11,10 @@ class AudioCacheSignatureBuilder {
   String build(AudioData audioData) {
     final samples = audioData.samples;
     final head = samples.take(8).map(_formatSample).join(',');
-    final tail = samples.skip(samples.length > 8 ? samples.length - 8 : 0).map(_formatSample).join(',');
+    final tail = samples
+        .skip(samples.length > 8 ? samples.length - 8 : 0)
+        .map(_formatSample)
+        .join(',');
 
     return [
       audioData.sampleRate,

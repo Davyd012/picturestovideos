@@ -17,11 +17,17 @@ final audioPlayerRepositoryProvider = Provider<AudioPlayerRepository>((ref) {
 abstract interface class AudioPlayerRepository {
   Stream<Duration> get positionStream;
 
+  Stream<void> get completeStream;
+
   Duration get currentPosition;
 
   bool get hasLoadedSource;
 
+  bool get isCompleted;
+
   Future<void> load(String? audioSourcePath);
+
+  Future<void> reload();
 
   Future<void> play();
 
@@ -44,6 +50,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
     });
     _completeSubscription = _player.onPlayerComplete.listen((_) {
       _currentPosition = Duration.zero;
+      _isCompleted = true;
       _controller.add(_currentPosition);
     });
   }
@@ -57,6 +64,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   StreamSubscription<void>? _completeSubscription;
   Duration _currentPosition = Duration.zero;
   String? _loadedSourcePath;
+  bool _isCompleted = false;
 
   @override
   Duration get currentPosition => _currentPosition;
@@ -66,7 +74,13 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
       _loadedSourcePath != null && _loadedSourcePath!.isNotEmpty;
 
   @override
+  bool get isCompleted => _isCompleted;
+
+  @override
   Stream<Duration> get positionStream => _controller.stream;
+
+  @override
+  Stream<void> get completeStream => _player.onPlayerComplete;
 
   @override
   Future<void> load(String? audioSourcePath) async {
@@ -88,31 +102,29 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
     }
 
     await _player.stop();
-    try {
-      await _player
-          .setSource(DeviceFileSource(audioSourcePath))
-          .timeout(_loadTimeout);
-    } on TimeoutException catch (error, stackTrace) {
-      _loadedSourcePath = null;
-      _logger.error(
-        'AudioPlayerRepository',
-        error,
-        stackTrace,
-        message:
-            'Audio player timed out while loading source $audioSourcePath',
-      );
-      throw TimeoutException(
-        'Audio playback could not be prepared from this file path. You can still edit the timeline, but playback controls may stay unavailable until audio loading succeeds.',
-        _loadTimeout,
-      );
-    }
+    await _setSource(audioSourcePath);
     _loadedSourcePath = audioSourcePath;
     _currentPosition = Duration.zero;
+    _isCompleted = false;
     _controller.add(_currentPosition);
     _logger.info(
       'AudioPlayerRepository',
       'Loaded audio source $audioSourcePath',
     );
+  }
+
+  @override
+  Future<void> reload() async {
+    final loadedSourcePath = _loadedSourcePath;
+    if (loadedSourcePath == null || loadedSourcePath.isEmpty) {
+      return;
+    }
+
+    await _player.stop();
+    await _setSource(loadedSourcePath);
+    _currentPosition = Duration.zero;
+    _isCompleted = false;
+    _controller.add(_currentPosition);
   }
 
   @override
@@ -131,6 +143,9 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
       return;
     }
 
+    if (_isCompleted) {
+      await seek(Duration.zero);
+    }
     _logger.info('AudioPlayerRepository', 'Starting audio playback');
     await _player.resume();
   }
@@ -142,6 +157,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
       'Seeking to ${position.inMilliseconds} ms',
     );
     _currentPosition = position;
+    _isCompleted = false;
     await _player.seek(position);
     _controller.add(_currentPosition);
   }
@@ -162,15 +178,40 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
     await _controller.close();
     await _player.dispose();
   }
+
+  Future<void> _setSource(String audioSourcePath) async {
+    try {
+      await _player
+          .setSource(DeviceFileSource(audioSourcePath))
+          .timeout(_loadTimeout);
+    } on TimeoutException catch (error, stackTrace) {
+      _loadedSourcePath = null;
+      _logger.error(
+        'AudioPlayerRepository',
+        error,
+        stackTrace,
+        message: 'Audio player timed out while loading source $audioSourcePath',
+      );
+      throw TimeoutException(
+        'Audio playback could not be prepared from this file path. You can still edit the timeline, but playback controls may stay unavailable until audio loading succeeds.',
+        _loadTimeout,
+      );
+    }
+  }
 }
 
 class ManualAudioPlayerRepository implements AudioPlayerRepository {
   ManualAudioPlayerRepository()
-    : _controller = StreamController<Duration>.broadcast();
+    : _controller = StreamController<Duration>.broadcast(),
+      _completeController = StreamController<void>.broadcast();
 
   final StreamController<Duration> _controller;
+  final StreamController<void> _completeController;
   Duration _currentPosition = Duration.zero;
   String? _loadedSourcePath;
+  bool _isPlaying = false;
+  bool _isCompleted = false;
+  int _loadCount = 0;
 
   @override
   Duration get currentPosition => _currentPosition;
@@ -180,22 +221,49 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
       _loadedSourcePath != null && _loadedSourcePath!.isNotEmpty;
 
   @override
+  bool get isCompleted => _isCompleted;
+
+  @override
   Stream<Duration> get positionStream => _controller.stream;
+
+  @override
+  Stream<void> get completeStream => _completeController.stream;
 
   @override
   Future<void> load(String? audioSourcePath) async {
     _loadedSourcePath = audioSourcePath;
+    _isCompleted = false;
+    _loadCount += audioSourcePath == null || audioSourcePath.isEmpty ? 0 : 1;
   }
 
   @override
-  Future<void> pause() async {}
+  Future<void> reload() async {
+    if (!hasLoadedSource) {
+      return;
+    }
+    _currentPosition = Duration.zero;
+    _isCompleted = false;
+    _loadCount += 1;
+    _controller.add(_currentPosition);
+  }
 
   @override
-  Future<void> play() async {}
+  Future<void> pause() async {
+    _isPlaying = false;
+  }
+
+  @override
+  Future<void> play() async {
+    if (_isCompleted) {
+      await reload();
+    }
+    _isPlaying = true;
+  }
 
   @override
   Future<void> seek(Duration position) async {
     _currentPosition = position;
+    _isCompleted = false;
     _controller.add(_currentPosition);
   }
 
@@ -209,5 +277,18 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
   @override
   Future<void> dispose() async {
     await _controller.close();
+    await _completeController.close();
   }
+
+  void complete() {
+    _isPlaying = false;
+    _currentPosition = Duration.zero;
+    _isCompleted = true;
+    _controller.add(_currentPosition);
+    _completeController.add(null);
+  }
+
+  bool get isPlaying => _isPlaying;
+
+  int get loadCount => _loadCount;
 }

@@ -51,6 +51,6 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 ffmpeg_kit_extended_config:
-  type: "full"
+  type: "video"
   gpl: false
   small: true

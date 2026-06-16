@@ -10,6 +10,7 @@ class TimelineState {
     required this.selectedMarker,
     required this.nextQueuedMediaIndex,
     required this.selectedTemplate,
+    required this.timelineScale,
   });
 
   const TimelineState.initial()
@@ -17,13 +18,15 @@ class TimelineState {
       serializedProject = null,
       selectedMarker = null,
       nextQueuedMediaIndex = 0,
-      selectedTemplate = VideoTemplates.cleanMemories;
+      selectedTemplate = VideoTemplates.cleanMemories,
+      timelineScale = 1.0;
 
   final ProjectTimeline? project;
   final Map<String, Object?>? serializedProject;
   final TimelineMarkerSelection? selectedMarker;
   final int nextQueuedMediaIndex;
   final VideoTemplate selectedTemplate;
+  final double timelineScale;
 
   bool get hasProject => project != null;
   bool get hasSelectedMarker => selectedMarker != null;
@@ -34,6 +37,7 @@ class TimelineState {
     TimelineMarkerSelection? selectedMarker,
     int? nextQueuedMediaIndex,
     VideoTemplate? selectedTemplate,
+    double? timelineScale,
     bool clearSelectedMarker = false,
   }) {
     return TimelineState(
@@ -44,6 +48,7 @@ class TimelineState {
           : selectedMarker ?? this.selectedMarker,
       nextQueuedMediaIndex: nextQueuedMediaIndex ?? this.nextQueuedMediaIndex,
       selectedTemplate: selectedTemplate ?? this.selectedTemplate,
+      timelineScale: timelineScale ?? this.timelineScale,
     );
   }
 }

@@ -16,18 +16,23 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
   static const _tag = 'PlaybackViewModel';
 
   StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<void>? _completeSubscription;
 
   @override
   Future<PlaybackState> build() async {
     ref.read(appLoggerProvider).info(_tag, 'Initializing playback state');
     ref.onDispose(() {
       _positionSubscription?.cancel();
+      _completeSubscription?.cancel();
     });
 
-    _positionSubscription ??= ref
-        .read(audioPlayerRepositoryProvider)
-        .positionStream
-        .listen(_handlePositionChanged);
+    final repository = ref.read(audioPlayerRepositoryProvider);
+    _positionSubscription ??= repository.positionStream.listen(
+      _handlePositionChanged,
+    );
+    _completeSubscription ??= repository.completeStream.listen(
+      (_) => _handlePlaybackCompleted(),
+    );
 
     return const PlaybackState.initial();
   }
@@ -46,6 +51,8 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
     final shouldReloadSession =
         !previousState.hasBeatMap ||
         !previousState.hasLoadedAudioSource ||
+        previousState.isCompleted ||
+        repository.isCompleted ||
         previousState.audioSourcePath != audioSourcePath ||
         previousState.beatMap.beats.length != beatMap.beats.length ||
         previousState.beatMap.bpm != beatMap.bpm ||
@@ -68,6 +75,7 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
         nextBeatIndex: 0,
         triggeredBeats: const [],
         isPlaying: false,
+        isCompleted: false,
         audioSourcePath: audioSourcePath,
       ),
     );
@@ -81,9 +89,14 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
       return;
     }
 
+    if (previousState.isCompleted ||
+        ref.read(audioPlayerRepositoryProvider).isCompleted) {
+      await _recoverCompletedSession(previousState);
+    }
+    final nextState = state.value ?? previousState;
     await ref.read(audioPlayerRepositoryProvider).play();
     logger.info(_tag, 'Playback started');
-    state = AsyncData(previousState.copyWith(isPlaying: true));
+    state = AsyncData(nextState.copyWith(isPlaying: true, isCompleted: false));
   }
 
   Future<void> pause() async {
@@ -97,14 +110,51 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
     ref
         .read(appLoggerProvider)
         .debug(_tag, 'Seeking to ${position.inMilliseconds} ms');
+    final previousState = state.value ?? const PlaybackState.initial();
     await ref.read(audioPlayerRepositoryProvider).seek(position);
+    state = AsyncData(
+      previousState.copyWith(
+        currentTime: position,
+        isPlaying: false,
+        isCompleted: false,
+      ),
+    );
+  }
+
+  Future<void> restart() async {
+    final previousState = state.value ?? const PlaybackState.initial();
+    final repository = ref.read(audioPlayerRepositoryProvider);
+    if (!repository.hasLoadedSource) {
+      return;
+    }
+
+    await repository.pause();
+    if (previousState.isCompleted || repository.isCompleted) {
+      await repository.reload();
+    } else {
+      await repository.seek(Duration.zero);
+    }
+    state = AsyncData(
+      previousState.copyWith(
+        currentTime: Duration.zero,
+        nextBeatIndex: 0,
+        triggeredBeats: const [],
+        isPlaying: false,
+        isCompleted: false,
+      ),
+    );
   }
 
   Future<void> step(Duration delta) async {
     ref
         .read(appLoggerProvider)
         .debug(_tag, 'Stepping by ${delta.inMilliseconds} ms');
-    await ref.read(audioPlayerRepositoryProvider).step(delta);
+    final previousState = state.value ?? const PlaybackState.initial();
+    final repository = ref.read(audioPlayerRepositoryProvider);
+    if (previousState.isCompleted || repository.isCompleted) {
+      await _recoverCompletedSession(previousState);
+    }
+    await repository.step(delta);
   }
 
   Future<void> reset() async {
@@ -140,6 +190,38 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
         currentTime: currentTime,
         nextBeatIndex: syncResult.nextBeatIndex,
         triggeredBeats: List.unmodifiable(triggeredBeats),
+        isCompleted: false,
+      ),
+    );
+  }
+
+  void _handlePlaybackCompleted() {
+    final previousState = state.value ?? const PlaybackState.initial();
+    state = AsyncData(
+      previousState.copyWith(
+        currentTime: Duration.zero,
+        nextBeatIndex: 0,
+        triggeredBeats: const [],
+        isPlaying: false,
+        isCompleted: true,
+      ),
+    );
+  }
+
+  Future<void> _recoverCompletedSession(PlaybackState previousState) async {
+    final repository = ref.read(audioPlayerRepositoryProvider);
+    if (!repository.hasLoadedSource) {
+      return;
+    }
+
+    await repository.reload();
+    state = AsyncData(
+      previousState.copyWith(
+        currentTime: Duration.zero,
+        nextBeatIndex: 0,
+        triggeredBeats: const [],
+        isPlaying: false,
+        isCompleted: false,
       ),
     );
   }

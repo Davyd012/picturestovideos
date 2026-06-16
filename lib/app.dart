@@ -14,7 +14,7 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       navigatorKey: AppNavigator.instance.navigatorKey,
       navigatorObservers: [appTalkerRouteObserver],
-      initialRoute: AppRoutes.importAudio,
+      initialRoute: AppRoutes.home,
       onGenerateRoute: ScreenFactory.onGenerateRoute,
       theme: AppTheme.dark(),
     );

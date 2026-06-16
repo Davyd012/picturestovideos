@@ -7,15 +7,12 @@ import 'package:picturestovideos/core/audio/domain/beat_detection_config.dart';
 import 'package:picturestovideos/core/audio/domain/audio_processing_task.dart';
 
 final detectBeatsUseCaseProvider = Provider<DetectBeatsUseCase>(
-  (ref) => DetectBeatsUseCase(
-    beatDetector: ref.watch(beatDetectorProvider),
-  ),
+  (ref) => DetectBeatsUseCase(beatDetector: ref.watch(beatDetectorProvider)),
 );
 
 class DetectBeatsUseCase {
-  const DetectBeatsUseCase({
-    required BeatDetector beatDetector,
-  }) : this._(beatDetector);
+  const DetectBeatsUseCase({required BeatDetector beatDetector})
+    : this._(beatDetector);
 
   const DetectBeatsUseCase._(this._beatDetector);
 
@@ -27,10 +24,7 @@ class DetectBeatsUseCase {
   }) async {
     final result = await compute(
       _detectBeatsOnIsolate,
-      DetectBeatsRequest(
-        frames: frames,
-        config: config,
-      ),
+      DetectBeatsRequest(frames: frames, config: config),
     );
 
     return result.beats;

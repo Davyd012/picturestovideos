@@ -15,10 +15,6 @@ final editorPreviewViewModelProvider =
 
 class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
   static const _tag = 'EditorPreviewViewModel';
-  static const _previewLandscapeWidth = 1280;
-  static const _previewLandscapeHeight = 720;
-  static const _previewPortraitWidth = 720;
-  static const _previewPortraitHeight = 1280;
   static const _previewFrameRate = 12;
   int _renderGeneration = 0;
 
@@ -233,15 +229,9 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
   }
 
   _RenderSize _renderSizeFor(VideoTemplate template) {
-    if (template.aspectRatio == VideoTemplateAspectRatio.portrait) {
-      return const _RenderSize(
-        width: _previewPortraitWidth,
-        height: _previewPortraitHeight,
-      );
-    }
-    return const _RenderSize(
-      width: _previewLandscapeWidth,
-      height: _previewLandscapeHeight,
+    return _RenderSize(
+      width: template.aspectRatio.previewWidth,
+      height: template.aspectRatio.previewHeight,
     );
   }
 }

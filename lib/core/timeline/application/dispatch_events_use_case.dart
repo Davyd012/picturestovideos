@@ -10,9 +10,8 @@ final dispatchEventsUseCaseProvider = Provider<DispatchEventsUseCase>(
 );
 
 class DispatchEventsUseCase {
-  const DispatchEventsUseCase({
-    required EventDispatcher eventDispatcher,
-  }) : this._(eventDispatcher);
+  const DispatchEventsUseCase({required EventDispatcher eventDispatcher})
+    : this._(eventDispatcher);
 
   const DispatchEventsUseCase._(this._eventDispatcher);
 

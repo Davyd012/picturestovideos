@@ -34,6 +34,10 @@ class EventSystemViewModel extends AsyncNotifier<EventSystemState> {
         ),
     ];
 
+    loadMarkerEvents(markerEvents);
+  }
+
+  void loadMarkerEvents(List<BeatEvent> markerEvents) {
     state = AsyncData(
       EventSystemState(
         events: List.unmodifiable(markerEvents),

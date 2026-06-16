@@ -1,15 +1,102 @@
 enum VideoTemplateAspectRatio {
-  landscape('16:9', 16 / 9),
-  portrait('9:16', 9 / 16);
+  landscape(
+    label: '16:9',
+    description: 'Wide',
+    numerator: 16,
+    denominator: 9,
+    exportWidth: 1920,
+    exportHeight: 1080,
+    previewWidth: 1280,
+    previewHeight: 720,
+  ),
+  portrait(
+    label: '9:16',
+    description: 'Vertical',
+    numerator: 9,
+    denominator: 16,
+    exportWidth: 1080,
+    exportHeight: 1920,
+    previewWidth: 720,
+    previewHeight: 1280,
+  ),
+  square(
+    label: '1:1',
+    description: 'Square',
+    numerator: 1,
+    denominator: 1,
+    exportWidth: 1080,
+    exportHeight: 1080,
+    previewWidth: 960,
+    previewHeight: 960,
+  ),
+  socialPortrait(
+    label: '4:5',
+    description: 'Social portrait',
+    numerator: 4,
+    denominator: 5,
+    exportWidth: 1080,
+    exportHeight: 1350,
+    previewWidth: 720,
+    previewHeight: 900,
+  ),
+  classic(
+    label: '4:3',
+    description: 'Classic',
+    numerator: 4,
+    denominator: 3,
+    exportWidth: 1440,
+    exportHeight: 1080,
+    previewWidth: 960,
+    previewHeight: 720,
+  ),
+  classicPortrait(
+    label: '3:4',
+    description: 'Classic portrait',
+    numerator: 3,
+    denominator: 4,
+    exportWidth: 1080,
+    exportHeight: 1440,
+    previewWidth: 720,
+    previewHeight: 960,
+  );
 
-  const VideoTemplateAspectRatio(this.label, this.value);
+  const VideoTemplateAspectRatio({
+    required this.label,
+    required this.description,
+    required this.numerator,
+    required this.denominator,
+    required this.exportWidth,
+    required this.exportHeight,
+    required this.previewWidth,
+    required this.previewHeight,
+  });
 
   final String label;
-  final double value;
+  final String description;
+  final int numerator;
+  final int denominator;
+  final int exportWidth;
+  final int exportHeight;
+  final int previewWidth;
+  final int previewHeight;
+
+  double get value => numerator / denominator;
+  String get menuLabel => '$label $description';
+  String get exportResolutionLabel => '$exportWidth x $exportHeight';
 
   static VideoTemplateAspectRatio fromJson(String? value) {
-    return switch (value) {
+    final normalizedValue = value?.trim().toLowerCase().replaceAll('/', ':');
+    return switch (normalizedValue) {
+      '16:9' || 'landscape' || 'wide' => VideoTemplateAspectRatio.landscape,
       '9:16' || 'portrait' => VideoTemplateAspectRatio.portrait,
+      '1:1' || 'square' => VideoTemplateAspectRatio.square,
+      '4:5' ||
+      'social_portrait' ||
+      'social-portrait' => VideoTemplateAspectRatio.socialPortrait,
+      '4:3' || 'classic' => VideoTemplateAspectRatio.classic,
+      '3:4' ||
+      'classic_portrait' ||
+      'classic-portrait' => VideoTemplateAspectRatio.classicPortrait,
       _ => VideoTemplateAspectRatio.landscape,
     };
   }

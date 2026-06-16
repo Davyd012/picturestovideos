@@ -7,8 +7,8 @@ class PreprocessingState {
   });
 
   const PreprocessingState.initial()
-      : cachedBeatMap = null,
-        lastAction = 'Idle';
+    : cachedBeatMap = null,
+      lastAction = 'Idle';
 
   final BeatMap? cachedBeatMap;
   final String lastAction;

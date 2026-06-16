@@ -9,14 +9,8 @@ void main() {
       const coordinator = PlaybackCoordinator();
       const beatMap = BeatMap(
         beats: [
-          Beat(
-            time: Duration(milliseconds: 200),
-            strength: 1.4,
-          ),
-          Beat(
-            time: Duration(milliseconds: 500),
-            strength: 1.6,
-          ),
+          Beat(time: Duration(milliseconds: 200), strength: 1.4),
+          Beat(time: Duration(milliseconds: 500), strength: 1.6),
         ],
         bpm: 120,
         averageBeatInterval: Duration(milliseconds: 500),
@@ -34,22 +28,23 @@ void main() {
       );
 
       expect(firstSync.triggeredBeats.length, 1);
-      expect(firstSync.triggeredBeats.first.time, const Duration(milliseconds: 200));
+      expect(
+        firstSync.triggeredBeats.first.time,
+        const Duration(milliseconds: 200),
+      );
       expect(firstSync.nextBeatIndex, 1);
       expect(secondSync.triggeredBeats.length, 1);
-      expect(secondSync.triggeredBeats.first.time, const Duration(milliseconds: 500));
+      expect(
+        secondSync.triggeredBeats.first.time,
+        const Duration(milliseconds: 500),
+      );
       expect(secondSync.nextBeatIndex, 2);
     });
 
     test('respects tolerance boundary when deciding beat trigger', () {
       const coordinator = PlaybackCoordinator();
       const beatMap = BeatMap(
-        beats: [
-          Beat(
-            time: Duration(milliseconds: 200),
-            strength: 1.4,
-          ),
-        ],
+        beats: [Beat(time: Duration(milliseconds: 200), strength: 1.4)],
         bpm: 120,
         averageBeatInterval: Duration(milliseconds: 500),
       );

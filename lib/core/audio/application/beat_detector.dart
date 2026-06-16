@@ -47,11 +47,13 @@ class BeatDetector {
       );
       final threshold = averageEnergy * config.sensitivity;
 
-      final isLocalPeak = frame.energy > previousEnergy &&
+      final isLocalPeak =
+          frame.energy > previousEnergy &&
           (index == frames.length - 1 ||
               frame.energy >= frames[index + 1].energy);
       final clearsThreshold = frame.energy > threshold;
-      final respectsDebounce = lastBeatTime == null ||
+      final respectsDebounce =
+          lastBeatTime == null ||
           frame.time - lastBeatTime >= config.minBeatInterval;
 
       if (!isLocalPeak || !clearsThreshold || !respectsDebounce) {
@@ -59,14 +61,10 @@ class BeatDetector {
       }
 
       lastBeatTime = frame.time;
-      final strength =
-          averageEnergy == 0 ? frame.energy : frame.energy / averageEnergy;
-      beats.add(
-        Beat(
-          time: frame.time,
-          strength: strength,
-        ),
-      );
+      final strength = averageEnergy == 0
+          ? frame.energy
+          : frame.energy / averageEnergy;
+      beats.add(Beat(time: frame.time, strength: strength));
     }
 
     return List.unmodifiable(beats);

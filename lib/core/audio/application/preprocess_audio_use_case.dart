@@ -17,15 +17,9 @@ class PreprocessAudioUseCase {
   const PreprocessAudioUseCase({
     required BeatMapCacheRepository cacheRepository,
     required AudioCacheSignatureBuilder signatureBuilder,
-  }) : this._(
-          cacheRepository,
-          signatureBuilder,
-        );
+  }) : this._(cacheRepository, signatureBuilder);
 
-  const PreprocessAudioUseCase._(
-    this._cacheRepository,
-    this._signatureBuilder,
-  );
+  const PreprocessAudioUseCase._(this._cacheRepository, this._signatureBuilder);
 
   final BeatMapCacheRepository _cacheRepository;
   final AudioCacheSignatureBuilder _signatureBuilder;

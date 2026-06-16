@@ -1,9 +1,5 @@
 class BeatEvent {
-  const BeatEvent({
-    required this.time,
-    required this.type,
-    this.payload,
-  });
+  const BeatEvent({required this.time, required this.type, this.payload});
 
   final Duration time;
   final String type;

@@ -44,9 +44,8 @@ class AudioAnalysisDebugChart extends StatelessWidget {
         ? audioData!.duration
         : Duration(
             microseconds:
-                (audioData!.samples.length *
-                        Duration.microsecondsPerSecond) ~/
-                    audioData!.sampleRate,
+                (audioData!.samples.length * Duration.microsecondsPerSecond) ~/
+                audioData!.sampleRate,
           );
     final waveformBuckets = _buildWaveformBuckets(audioData!.samples);
     final envelopePoints = _buildEnvelopePoints(frames, duration);
@@ -151,7 +150,10 @@ class AudioAnalysisDebugChart extends StatelessWidget {
     }
 
     final smoothed = _smoothFrames(frames);
-    final downsampleFactor = math.max(1, smoothed.length ~/ _envelopePointCount);
+    final downsampleFactor = math.max(
+      1,
+      smoothed.length ~/ _envelopePointCount,
+    );
     final durationMicros = math.max(1, duration.inMicroseconds);
     final maxEnergy = smoothed.fold<double>(
       0,
@@ -274,11 +276,7 @@ class _AudioAnalysisDebugPainter extends CustomPainter {
     if (duration > Duration.zero) {
       for (final beat in beats) {
         final dx = _resolveX(beat.time, size.width);
-        canvas.drawLine(
-          Offset(dx, 0),
-          Offset(dx, size.height),
-          beatPaint,
-        );
+        canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), beatPaint);
       }
     }
 
@@ -289,11 +287,7 @@ class _AudioAnalysisDebugPainter extends CustomPainter {
         final dx = (index + 0.5) * step;
         final top = centerY - (bucket.max * size.height * 0.32);
         final bottom = centerY - (bucket.min * size.height * 0.32);
-        canvas.drawLine(
-          Offset(dx, top),
-          Offset(dx, bottom),
-          waveformPaint,
-        );
+        canvas.drawLine(Offset(dx, top), Offset(dx, bottom), waveformPaint);
       }
     }
 
@@ -313,7 +307,10 @@ class _AudioAnalysisDebugPainter extends CustomPainter {
     }
 
     if (duration > Duration.zero) {
-      final playheadX = _resolveX(currentTime, size.width).clamp(0.0, size.width);
+      final playheadX = _resolveX(
+        currentTime,
+        size.width,
+      ).clamp(0.0, size.width);
       final resolvedPlayheadX = playheadX.toDouble();
       canvas.drawLine(
         Offset(resolvedPlayheadX, 0),
@@ -344,20 +341,14 @@ class _AudioAnalysisDebugPainter extends CustomPainter {
 }
 
 class _WaveformBucket {
-  const _WaveformBucket({
-    required this.min,
-    required this.max,
-  });
+  const _WaveformBucket({required this.min, required this.max});
 
   final double min;
   final double max;
 }
 
 class _EnvelopePoint {
-  const _EnvelopePoint({
-    required this.progress,
-    required this.value,
-  });
+  const _EnvelopePoint({required this.progress, required this.value});
 
   final double progress;
   final double value;

@@ -34,6 +34,12 @@ class AppNavigator {
     return navigatorKey.currentState!.maybePop<T>(result);
   }
 
+  Future<T?> goToHome<T extends Object?>({bool replace = false}) {
+    return replace
+        ? replaceNamed<T, Object?>(AppRoutes.home)
+        : pushNamed<T>(AppRoutes.home);
+  }
+
   Future<T?> goToImportAudio<T extends Object?>({bool replace = false}) {
     return replace
         ? replaceNamed<T, Object?>(AppRoutes.importAudio)

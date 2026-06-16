@@ -13,6 +13,10 @@ class MarkersTabView extends StatelessWidget {
     required this.selectedMarker,
     required this.onAddMarker,
     required this.onDeleteMarker,
+    required this.onDeleteMarkerAtCurrentPoint,
+    required this.onClearMarkers,
+    required this.canSaveMarkerPreset,
+    required this.onSaveMarkerPreset,
     required this.onMarkerSelected,
     super.key,
   });
@@ -23,11 +27,16 @@ class MarkersTabView extends StatelessWidget {
   final TimelineMarkerSelection? selectedMarker;
   final VoidCallback onAddMarker;
   final VoidCallback onDeleteMarker;
+  final VoidCallback onDeleteMarkerAtCurrentPoint;
+  final VoidCallback onClearMarkers;
+  final bool canSaveMarkerPreset;
+  final VoidCallback onSaveMarkerPreset;
   final ValueChanged<Duration> onMarkerSelected;
 
   @override
   Widget build(BuildContext context) {
     final markers = _markers;
+    final canEditMarkers = project != null && markers.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,21 +67,45 @@ class MarkersTabView extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: selectedMarker == null ? null : onDeleteMarker,
-          icon: const Icon(Icons.delete_outline),
-          label: const Text('Delete marker'),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            OutlinedButton.icon(
+              onPressed: selectedMarker == null ? null : onDeleteMarker,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete selected'),
+            ),
+            OutlinedButton.icon(
+              onPressed: canEditMarkers ? onDeleteMarkerAtCurrentPoint : null,
+              icon: const Icon(Icons.remove_circle_outline),
+              label: const Text('Delete at playhead'),
+            ),
+            OutlinedButton.icon(
+              onPressed: canEditMarkers ? onClearMarkers : null,
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('Clear markers'),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: canSaveMarkerPreset ? onSaveMarkerPreset : null,
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Save marker preset'),
+            ),
+          ],
         ),
       ],
     );
   }
 
   List<BeatEvent> get _markers {
-    final tracks = project?.tracks ?? const [];
-    for (final track in tracks) {
-      if (track.id == 'track-markers' && track.events.isNotEmpty) {
-        return track.events;
+    final resolvedProject = project;
+    if (resolvedProject != null) {
+      for (final track in resolvedProject.tracks) {
+        if (track.id == 'track-markers') {
+          return track.events;
+        }
       }
+      return const [];
     }
     if (events.isNotEmpty) {
       return events;

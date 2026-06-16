@@ -14,8 +14,10 @@ class TimelineTabView extends StatelessWidget {
     required this.beatMap,
     required this.project,
     required this.playback,
+    required this.timelineScale,
     required this.selectedMedia,
     required this.events,
+    required this.onTimelineScaleChanged,
     required this.onCurrentPointChanged,
     super.key,
   });
@@ -23,8 +25,10 @@ class TimelineTabView extends StatelessWidget {
   final BeatMap? beatMap;
   final ProjectTimeline? project;
   final PlaybackState? playback;
+  final double timelineScale;
   final List<LibraryMediaItem> selectedMedia;
   final List<BeatEvent> events;
+  final ValueChanged<double> onTimelineScaleChanged;
   final ValueChanged<Duration> onCurrentPointChanged;
 
   @override
@@ -33,6 +37,11 @@ class TimelineTabView extends StatelessWidget {
     final clips = _clips;
     final duration = _duration(markers, clips);
     final nextIndex = playback?.nextBeatIndex ?? 0;
+    final scale = timelineScale
+        .clamp(_minTimelineScale, _maxTimelineScale)
+        .toDouble();
+    final trackWidth = _baseTrackWidth * scale;
+    final timelineWidth = _trackStartOffset + trackWidth;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,6 +54,7 @@ class TimelineTabView extends StatelessWidget {
             Chip(label: Text('${selectedMedia.length} queued')),
             Chip(label: Text(_bpmLabel)),
             Chip(label: Text('Next $nextIndex')),
+            Chip(label: Text('${scale.toStringAsFixed(1)}x timeline')),
           ],
         ),
         const SizedBox(height: 16),
@@ -54,7 +64,15 @@ class TimelineTabView extends StatelessWidget {
             const Spacer(),
             Icon(Icons.zoom_out, color: context.colors.onSurfaceVariant),
             const SizedBox(width: 8),
-            Expanded(child: Slider(value: 0.5, onChanged: null)),
+            Expanded(
+              child: Slider(
+                value: scale,
+                min: _minTimelineScale,
+                max: _maxTimelineScale,
+                divisions: 9,
+                onChanged: onTimelineScaleChanged,
+              ),
+            ),
             const SizedBox(width: 8),
             Icon(Icons.zoom_in, color: context.colors.onSurfaceVariant),
           ],
@@ -70,27 +88,40 @@ class TimelineTabView extends StatelessWidget {
                 onTapUp: (details) {
                   onCurrentPointChanged(
                     _timeForPosition(
-                      position: details.localPosition.dx,
+                      position: details.localPosition.dx - _trackStartOffset,
                       duration: duration,
-                      width: _timelineWidth,
+                      width: trackWidth,
                     ),
                   );
                 },
                 child: SizedBox(
-                  width: _timelineWidth,
+                  width: timelineWidth,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _TrackHeader(label: _formatDuration(duration)),
                       const SizedBox(height: 8),
-                      _ImageTrack(clips: clips, duration: duration),
+                      _ImageTrack(
+                        clips: clips,
+                        duration: duration,
+                        trackWidth: trackWidth,
+                      ),
                       const SizedBox(height: 12),
-                      _AudioTrack(markers: markers, duration: duration),
+                      _AudioTrack(
+                        markers: markers,
+                        duration: duration,
+                        trackWidth: trackWidth,
+                      ),
                       const SizedBox(height: 12),
-                      _MarkerTrack(markers: markers, duration: duration),
+                      _MarkerTrack(
+                        markers: markers,
+                        duration: duration,
+                        trackWidth: trackWidth,
+                      ),
                       PositionedPlayhead(
                         currentTime: playback?.currentTime ?? Duration.zero,
                         duration: duration,
+                        trackWidth: trackWidth,
                       ),
                     ],
                   ),
@@ -103,14 +134,23 @@ class TimelineTabView extends StatelessWidget {
     );
   }
 
-  static const double _timelineWidth = 720;
+  static const double _minTimelineScale = 0.75;
+  static const double _maxTimelineScale = 3;
+  static const double _baseTrackWidth = 600;
+  static const double _trackLabelWidth = 96;
+  static const double _trackGap = 12;
+  static const double _trackStartOffset = _trackLabelWidth + _trackGap;
 
   List<Beat> get _markers {
-    final projectMarkers = _projectMarkerEvents;
-    if (projectMarkers.isNotEmpty) {
+    final resolvedProject = project;
+    if (resolvedProject != null) {
+      final projectMarkers = _projectMarkerEvents(resolvedProject);
       return [
         for (final event in projectMarkers) Beat(time: event.time, strength: 1),
       ];
+    }
+    if (events.isNotEmpty) {
+      return [for (final event in events) Beat(time: event.time, strength: 1)];
     }
     if (beatMap?.beats.isNotEmpty ?? false) {
       return beatMap!.beats;
@@ -124,14 +164,13 @@ class TimelineTabView extends StatelessWidget {
     ];
   }
 
-  List<BeatEvent> get _projectMarkerEvents {
-    final tracks = project?.tracks ?? const [];
-    for (final track in tracks) {
+  List<BeatEvent> _projectMarkerEvents(ProjectTimeline project) {
+    for (final track in project.tracks) {
       if (track.id == 'track-markers') {
         return track.events;
       }
     }
-    return events;
+    return const [];
   }
 
   List<MediaTrackClipPayload> get _clips {
@@ -145,6 +184,9 @@ class TimelineTabView extends StatelessWidget {
       if (clips.isNotEmpty) {
         return clips;
       }
+    }
+    if (resolvedProject != null) {
+      return const [];
     }
     return const [
       MediaTrackClipPayload(
@@ -201,22 +243,28 @@ class _TrackHeader extends StatelessWidget {
 }
 
 class _ImageTrack extends StatelessWidget {
-  const _ImageTrack({required this.clips, required this.duration});
+  const _ImageTrack({
+    required this.clips,
+    required this.duration,
+    required this.trackWidth,
+  });
 
   final List<MediaTrackClipPayload> clips;
   final Duration duration;
+  final double trackWidth;
 
   @override
   Widget build(BuildContext context) {
     return _TrackShell(
       label: 'Images',
       icon: Icons.photo_library_outlined,
+      trackWidth: trackWidth,
       child: Stack(
         children: [
           for (final clip in clips)
             Positioned(
-              left: _positionForTime(clip.start, duration),
-              width: _widthForClip(clip, duration),
+              left: _positionForTime(clip.start, duration, trackWidth),
+              width: _widthForClip(clip, duration, trackWidth),
               top: 8,
               bottom: 8,
               child: Container(
@@ -240,16 +288,22 @@ class _ImageTrack extends StatelessWidget {
 }
 
 class _AudioTrack extends StatelessWidget {
-  const _AudioTrack({required this.markers, required this.duration});
+  const _AudioTrack({
+    required this.markers,
+    required this.duration,
+    required this.trackWidth,
+  });
 
   final List<Beat> markers;
   final Duration duration;
+  final double trackWidth;
 
   @override
   Widget build(BuildContext context) {
     return _TrackShell(
       label: 'Audio',
       icon: Icons.graphic_eq_outlined,
+      trackWidth: trackWidth,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -273,21 +327,27 @@ class _AudioTrack extends StatelessWidget {
 }
 
 class _MarkerTrack extends StatelessWidget {
-  const _MarkerTrack({required this.markers, required this.duration});
+  const _MarkerTrack({
+    required this.markers,
+    required this.duration,
+    required this.trackWidth,
+  });
 
   final List<Beat> markers;
   final Duration duration;
+  final double trackWidth;
 
   @override
   Widget build(BuildContext context) {
     return _TrackShell(
       label: 'Markers',
       icon: Icons.location_on_outlined,
+      trackWidth: trackWidth,
       child: Stack(
         children: [
           for (var index = 0; index < markers.length; index++)
             Positioned(
-              left: _positionForTime(markers[index].time, duration),
+              left: _positionForTime(markers[index].time, duration, trackWidth),
               top: 10,
               bottom: 10,
               child: Column(
@@ -310,11 +370,13 @@ class _TrackShell extends StatelessWidget {
   const _TrackShell({
     required this.label,
     required this.icon,
+    required this.trackWidth,
     required this.child,
   });
 
   final String label;
   final IconData icon;
+  final double trackWidth;
   final Widget child;
 
   @override
@@ -324,7 +386,7 @@ class _TrackShell extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 96,
+            width: TimelineTabView._trackLabelWidth,
             child: Row(
               children: [
                 Icon(icon, color: context.colors.onSurfaceVariant),
@@ -335,8 +397,9 @@ class _TrackShell extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          const SizedBox(width: TimelineTabView._trackGap),
+          SizedBox(
+            width: trackWidth,
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -357,11 +420,13 @@ class PositionedPlayhead extends StatelessWidget {
   const PositionedPlayhead({
     required this.currentTime,
     required this.duration,
+    required this.trackWidth,
     super.key,
   });
 
   final Duration currentTime;
   final Duration duration;
+  final double trackWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +436,9 @@ class PositionedPlayhead extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            left: 108 + _positionForTime(currentTime, duration),
+            left:
+                TimelineTabView._trackStartOffset +
+                _positionForTime(currentTime, duration, trackWidth),
             bottom: 0,
             child: Container(
               width: 2,
@@ -405,25 +472,30 @@ Duration _timeForPosition({
   required Duration duration,
   required double width,
 }) {
-  final clampedPosition = position.clamp(0, width) as double;
+  final clampedPosition = position.clamp(0, width).toDouble();
   return Duration(
     milliseconds: (duration.inMilliseconds * clampedPosition / width).round(),
   );
 }
 
-double _positionForTime(Duration time, Duration duration) {
+double _positionForTime(Duration time, Duration duration, double trackWidth) {
   if (duration <= Duration.zero) {
     return 0;
   }
   final ratio = time.inMilliseconds / duration.inMilliseconds;
-  return 600 * ratio.clamp(0, 1);
+  final clampedRatio = ratio.clamp(0, 1).toDouble();
+  return trackWidth * clampedRatio;
 }
 
-double _widthForClip(MediaTrackClipPayload clip, Duration duration) {
+double _widthForClip(
+  MediaTrackClipPayload clip,
+  Duration duration,
+  double trackWidth,
+) {
   final width =
-      _positionForTime(clip.end, duration) -
-      _positionForTime(clip.start, duration);
-  return width.clamp(88, 220);
+      _positionForTime(clip.end, duration, trackWidth) -
+      _positionForTime(clip.start, duration, trackWidth);
+  return width.clamp(48, 260).toDouble();
 }
 
 String _formatDuration(Duration duration) {

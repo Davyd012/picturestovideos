@@ -61,9 +61,7 @@ class PlaybackControls extends ConsumerWidget {
           onPressed: canControl
               ? () async {
                   await _preparePlayback(ref);
-                  await ref
-                      .read(playbackViewModelProvider.notifier)
-                      .seek(Duration.zero);
+                  await ref.read(playbackViewModelProvider.notifier).restart();
                 }
               : null,
           icon: const Icon(Icons.restart_alt),

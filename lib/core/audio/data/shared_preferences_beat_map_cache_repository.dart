@@ -11,7 +11,8 @@ final beatMapCacheRepositoryProvider = Provider<BeatMapCacheRepository>(
   (ref) => const SharedPreferencesBeatMapCacheRepository(),
 );
 
-class SharedPreferencesBeatMapCacheRepository implements BeatMapCacheRepository {
+class SharedPreferencesBeatMapCacheRepository
+    implements BeatMapCacheRepository {
   const SharedPreferencesBeatMapCacheRepository();
 
   static const _storageKey = 'beat_map_cache_entry';
@@ -23,9 +24,7 @@ class SharedPreferencesBeatMapCacheRepository implements BeatMapCacheRepository 
   }
 
   @override
-  Future<BeatMapCacheEntry?> load({
-    required String audioSignature,
-  }) async {
+  Future<BeatMapCacheEntry?> load({required String audioSignature}) async {
     final preferences = await SharedPreferences.getInstance();
     final jsonString = preferences.getString(_storageKey);
     if (jsonString == null) {
@@ -44,10 +43,7 @@ class SharedPreferencesBeatMapCacheRepository implements BeatMapCacheRepository 
   @override
   Future<void> save(BeatMapCacheEntry entry) async {
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(
-      _storageKey,
-      jsonEncode(_serialize(entry)),
-    );
+    await preferences.setString(_storageKey, jsonEncode(_serialize(entry)));
   }
 
   Map<String, Object?> _serialize(BeatMapCacheEntry entry) {
@@ -58,10 +54,7 @@ class SharedPreferencesBeatMapCacheRepository implements BeatMapCacheRepository 
       'averageBeatIntervalMs': entry.beatMap.averageBeatInterval.inMilliseconds,
       'beats': [
         for (final beat in entry.beatMap.beats)
-          {
-            'timeMs': beat.time.inMilliseconds,
-            'strength': beat.strength,
-          },
+          {'timeMs': beat.time.inMilliseconds, 'strength': beat.strength},
       ],
     };
   }

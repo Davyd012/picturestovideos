@@ -7,10 +7,7 @@ enum AudioImportFailureType {
 }
 
 class AudioImportFailure {
-  const AudioImportFailure({
-    required this.type,
-    required this.message,
-  });
+  const AudioImportFailure({required this.type, required this.message});
 
   final AudioImportFailureType type;
   final String message;

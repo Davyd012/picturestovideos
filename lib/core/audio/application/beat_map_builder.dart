@@ -9,9 +9,7 @@ final beatMapBuilderProvider = Provider<BeatMapBuilder>(
 class BeatMapBuilder {
   const BeatMapBuilder();
 
-  BeatMap build({
-    required List<Beat> beats,
-  }) {
+  BeatMap build({required List<Beat> beats}) {
     if (beats.isEmpty) {
       return const BeatMap(
         beats: [],
@@ -33,13 +31,15 @@ class BeatMapBuilder {
       intervals.add(beats[index].time - beats[index - 1].time);
     }
 
-    final averageIntervalMicros = intervals
+    final averageIntervalMicros =
+        intervals
             .map((interval) => interval.inMicroseconds)
             .reduce((sum, value) => sum + value) ~/
         intervals.length;
     final averageInterval = Duration(microseconds: averageIntervalMicros);
-    final bpm =
-        averageIntervalMicros == 0 ? 0.0 : 60000000 / averageIntervalMicros;
+    final bpm = averageIntervalMicros == 0
+        ? 0.0
+        : 60000000 / averageIntervalMicros;
 
     return BeatMap(
       beats: List.unmodifiable(beats),

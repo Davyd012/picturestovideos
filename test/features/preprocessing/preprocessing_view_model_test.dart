@@ -32,24 +32,18 @@ void main() {
       channelCount: 1,
     );
     const beatMap = BeatMap(
-      beats: [
-        Beat(
-          time: Duration(milliseconds: 500),
-          strength: 1.5,
-        ),
-      ],
+      beats: [Beat(time: Duration(milliseconds: 500), strength: 1.5)],
       bpm: 120,
       averageBeatInterval: Duration(milliseconds: 500),
     );
 
     await container.read(preprocessingViewModelProvider.future);
-    await container.read(preprocessingViewModelProvider.notifier).saveBeatMap(
-          audioData: audioData,
-          beatMap: beatMap,
-        );
-    await container.read(preprocessingViewModelProvider.notifier).loadCachedBeatMap(
-          audioData,
-        );
+    await container
+        .read(preprocessingViewModelProvider.notifier)
+        .saveBeatMap(audioData: audioData, beatMap: beatMap);
+    await container
+        .read(preprocessingViewModelProvider.notifier)
+        .loadCachedBeatMap(audioData);
 
     final state = container.read(preprocessingViewModelProvider);
 
@@ -69,9 +63,7 @@ class _MemoryBeatMapCacheRepository implements BeatMapCacheRepository {
   }
 
   @override
-  Future<BeatMapCacheEntry?> load({
-    required String audioSignature,
-  }) async {
+  Future<BeatMapCacheEntry?> load({required String audioSignature}) async {
     if (_entry?.audioSignature != audioSignature) {
       return null;
     }

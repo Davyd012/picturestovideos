@@ -8,18 +8,9 @@ void main() {
       const builder = BeatMapBuilder();
       final beatMap = builder.build(
         beats: const [
-          Beat(
-            time: Duration(milliseconds: 0),
-            strength: 1.2,
-          ),
-          Beat(
-            time: Duration(milliseconds: 500),
-            strength: 1.4,
-          ),
-          Beat(
-            time: Duration(milliseconds: 1000),
-            strength: 1.3,
-          ),
+          Beat(time: Duration(milliseconds: 0), strength: 1.2),
+          Beat(time: Duration(milliseconds: 500), strength: 1.4),
+          Beat(time: Duration(milliseconds: 1000), strength: 1.3),
         ],
       );
 
@@ -31,12 +22,7 @@ void main() {
     test('returns zero bpm for fewer than two beats', () {
       const builder = BeatMapBuilder();
       final beatMap = builder.build(
-        beats: const [
-          Beat(
-            time: Duration(milliseconds: 250),
-            strength: 1.0,
-          ),
-        ],
+        beats: const [Beat(time: Duration(milliseconds: 250), strength: 1.0)],
       );
 
       expect(beatMap.bpm, 0);

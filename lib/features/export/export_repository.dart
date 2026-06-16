@@ -43,9 +43,7 @@ class DeviceExportRepository implements ExportRepository {
       ShareParams(
         title: projectName,
         text: projectName,
-        files: [
-          XFile(outputPath, mimeType: 'video/mp4'),
-        ],
+        files: [XFile(outputPath, mimeType: 'video/mp4')],
       ),
     );
   }

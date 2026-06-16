@@ -6,9 +6,7 @@ import 'package:picturestovideos/core/audio/domain/audio_import_failure.dart';
 class WavFileDecoder {
   const WavFileDecoder();
 
-  AudioData decode({
-    required Uint8List bytes,
-  }) {
+  AudioData decode({required Uint8List bytes}) {
     if (bytes.length < 44) {
       throw const AudioImportException(
         AudioImportFailure(
@@ -64,8 +62,7 @@ class WavFileDecoder {
         audioFormat = byteData.getUint16(chunkDataOffset, Endian.little);
         channelCount = byteData.getUint16(chunkDataOffset + 2, Endian.little);
         sampleRate = byteData.getUint32(chunkDataOffset + 4, Endian.little);
-        bitsPerSample =
-            byteData.getUint16(chunkDataOffset + 14, Endian.little);
+        bitsPerSample = byteData.getUint16(chunkDataOffset + 14, Endian.little);
       } else if (chunkId == 'data') {
         sampleBytes = Uint8List.sublistView(
           bytes,
@@ -201,7 +198,8 @@ class WavFileDecoder {
   }
 
   int _readSigned24(ByteData sampleData, int offset) {
-    final value = sampleData.getUint8(offset) |
+    final value =
+        sampleData.getUint8(offset) |
         (sampleData.getUint8(offset + 1) << 8) |
         (sampleData.getUint8(offset + 2) << 16);
 

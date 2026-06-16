@@ -27,10 +27,7 @@ class AnalyzeAudioFramesUseCase {
   }) async {
     final result = await compute(
       _analyzeAudioFramesOnIsolate,
-      AnalyzeAudioFramesRequest(
-        audioData: audioData,
-        config: config,
-      ),
+      AnalyzeAudioFramesRequest(audioData: audioData, config: config),
     );
 
     return result.frames;

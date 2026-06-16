@@ -15,14 +15,8 @@ void main() {
           _FakeBuildBeatMapUseCase(
             beatMap: const BeatMap(
               beats: [
-                Beat(
-                  time: Duration(milliseconds: 200),
-                  strength: 1.6,
-                ),
-                Beat(
-                  time: Duration(milliseconds: 700),
-                  strength: 1.5,
-                ),
+                Beat(time: Duration(milliseconds: 200), strength: 1.6),
+                Beat(time: Duration(milliseconds: 700), strength: 1.5),
               ],
               bpm: 120,
               averageBeatInterval: Duration(milliseconds: 500),
@@ -34,14 +28,9 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(beatMapViewModelProvider.future);
-    await container.read(beatMapViewModelProvider.notifier).buildBeatMap(
-          const [
-            Beat(
-              time: Duration(milliseconds: 200),
-              strength: 1.6,
-            ),
-          ],
-        );
+    await container.read(beatMapViewModelProvider.notifier).buildBeatMap(const [
+      Beat(time: Duration(milliseconds: 200), strength: 1.6),
+    ]);
 
     final state = container.read(beatMapViewModelProvider);
 
@@ -55,16 +44,13 @@ void main() {
 }
 
 class _FakeBuildBeatMapUseCase extends BuildBeatMapUseCase {
-  _FakeBuildBeatMapUseCase({
-    required this.beatMap,
-  }) : super(beatMapBuilder: const BeatMapBuilder());
+  _FakeBuildBeatMapUseCase({required this.beatMap})
+    : super(beatMapBuilder: const BeatMapBuilder());
 
   final BeatMap beatMap;
 
   @override
-  BeatMap call({
-    required List<Beat> beats,
-  }) {
+  BeatMap call({required List<Beat> beats}) {
     return beatMap;
   }
 }

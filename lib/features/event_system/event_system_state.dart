@@ -9,9 +9,9 @@ class EventSystemState {
   });
 
   const EventSystemState.initial()
-      : events = const [],
-        nextEventIndex = 0,
-        executions = const [];
+    : events = const [],
+      nextEventIndex = 0,
+      executions = const [];
 
   final List<BeatEvent> events;
   final int nextEventIndex;

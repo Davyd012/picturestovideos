@@ -12,6 +12,7 @@ class BuildPreviewVideoRequest {
     required this.frameRate,
     this.template = VideoTemplates.cleanMemories,
     this.outputFileName = 'preview.mp4',
+    this.includeThumbnails = false,
   });
 
   final String projectId;
@@ -22,4 +23,5 @@ class BuildPreviewVideoRequest {
   final int frameRate;
   final VideoTemplate template;
   final String outputFileName;
+  final bool includeThumbnails;
 }

@@ -11,25 +11,21 @@ void main() {
     addTearDown(container.dispose);
 
     await container.read(eventSystemViewModelProvider.future);
-    await container.read(eventSystemViewModelProvider.notifier).loadMarkerEventsFromBeatMap(
+    await container
+        .read(eventSystemViewModelProvider.notifier)
+        .loadMarkerEventsFromBeatMap(
           const BeatMap(
             beats: [
-              Beat(
-                time: Duration(milliseconds: 200),
-                strength: 1.5,
-              ),
-              Beat(
-                time: Duration(milliseconds: 500),
-                strength: 1.7,
-              ),
+              Beat(time: Duration(milliseconds: 200), strength: 1.5),
+              Beat(time: Duration(milliseconds: 500), strength: 1.7),
             ],
             bpm: 120,
             averageBeatInterval: Duration(milliseconds: 500),
           ),
         );
-    await container.read(eventSystemViewModelProvider.notifier).dispatchForPlaybackTime(
-          const Duration(milliseconds: 220),
-        );
+    await container
+        .read(eventSystemViewModelProvider.notifier)
+        .dispatchForPlaybackTime(const Duration(milliseconds: 220));
 
     final state = container.read(eventSystemViewModelProvider);
 

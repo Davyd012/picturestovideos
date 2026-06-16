@@ -1,9 +1,7 @@
 import 'package:picturestovideos/features/library/library_media_item.dart';
 
 class EditorMediaSelectionState {
-  const EditorMediaSelectionState({
-    required this.selectedMedia,
-  });
+  const EditorMediaSelectionState({required this.selectedMedia});
 
   const EditorMediaSelectionState.initial() : selectedMedia = const [];
 
@@ -16,9 +14,7 @@ class EditorMediaSelectionState {
     return selectedMedia.any((item) => item.id == mediaId);
   }
 
-  EditorMediaSelectionState copyWith({
-    List<LibraryMediaItem>? selectedMedia,
-  }) {
+  EditorMediaSelectionState copyWith({List<LibraryMediaItem>? selectedMedia}) {
     return EditorMediaSelectionState(
       selectedMedia: selectedMedia ?? this.selectedMedia,
     );

@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
+import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
@@ -102,6 +104,9 @@ class LibraryViewModel extends Notifier<LibraryState> {
 
     try {
       final importedAssets = await importCall();
+      await ref
+          .read(savedImageAssetRepositoryProvider)
+          .upsertAll(_savedAssetsFromImportedAssets(importedAssets));
       final mergedItems = _mergeItems(importedAssets);
       final addedCount = mergedItems.length - state.items.length;
 
@@ -145,5 +150,20 @@ class LibraryViewModel extends Notifier<LibraryState> {
     }
 
     return merged;
+  }
+
+  List<SavedImageAsset> _savedAssetsFromImportedAssets(
+    List<ImportedImageAsset> importedAssets,
+  ) {
+    return [
+      for (final asset in importedAssets)
+        SavedImageAsset(
+          id: asset.id,
+          fileName: asset.fileName,
+          sourcePath: asset.sourcePath,
+          byteLength: asset.byteLength,
+          importedOn: asset.importedOn,
+        ),
+    ];
   }
 }

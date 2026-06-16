@@ -643,9 +643,8 @@ class _ExportDetails {
         96 + (beatMap.beats.length * 3) + ((project?.tracks.length ?? 1) * 8);
 
     return _ExportDetails(
-      resolutionLabel: project?.template.aspectRatio.value == 9 / 16
-          ? '1080 x 1920'
-          : '1920 x 1080',
+      resolutionLabel:
+          project?.template.aspectRatio.exportResolutionLabel ?? '1080 x 1920',
       frameRateLabel: '30 fps',
       codecLabel: 'MP4 video',
       fileSizeLabel: '$sizeEstimate MB',

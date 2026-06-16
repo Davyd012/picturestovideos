@@ -6,9 +6,10 @@ import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/features/preprocessing/preprocessing_state.dart';
 
 final preprocessingViewModelProvider =
-    AsyncNotifierProvider.autoDispose<PreprocessingViewModel, PreprocessingState>(
-  PreprocessingViewModel.new,
-);
+    AsyncNotifierProvider.autoDispose<
+      PreprocessingViewModel,
+      PreprocessingState
+    >(PreprocessingViewModel.new);
 
 class PreprocessingViewModel extends AsyncNotifier<PreprocessingState> {
   static const _tag = 'PreprocessingViewModel';
@@ -24,8 +25,9 @@ class PreprocessingViewModel extends AsyncNotifier<PreprocessingState> {
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(() async {
-      final cachedBeatMap =
-          await ref.read(preprocessAudioUseCaseProvider).loadCachedBeatMap(audioData);
+      final cachedBeatMap = await ref
+          .read(preprocessAudioUseCaseProvider)
+          .loadCachedBeatMap(audioData);
 
       return PreprocessingState(
         cachedBeatMap: cachedBeatMap,
@@ -42,10 +44,9 @@ class PreprocessingViewModel extends AsyncNotifier<PreprocessingState> {
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(() async {
-      await ref.read(preprocessAudioUseCaseProvider).saveBeatMap(
-            audioData: audioData,
-            beatMap: beatMap,
-          );
+      await ref
+          .read(preprocessAudioUseCaseProvider)
+          .saveBeatMap(audioData: audioData, beatMap: beatMap);
 
       return PreprocessingState(
         cachedBeatMap: beatMap,

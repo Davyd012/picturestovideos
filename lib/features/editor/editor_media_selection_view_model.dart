@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_state.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
+import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 final editorMediaSelectionViewModelProvider =
     NotifierProvider<EditorMediaSelectionViewModel, EditorMediaSelectionState>(
@@ -40,6 +41,7 @@ class EditorMediaSelectionViewModel
     state = state.copyWith(
       selectedMedia: List.unmodifiable([...state.selectedMedia, item]),
     );
+    _syncTimelineMedia();
   }
 
   void addAllMedia(List<LibraryMediaItem> items) {
@@ -62,6 +64,7 @@ class EditorMediaSelectionViewModel
           'Added ${merged.length - state.selectedMedia.length} media items to editor selection',
         );
     state = state.copyWith(selectedMedia: List.unmodifiable(merged));
+    _syncTimelineMedia();
   }
 
   void removeMedia(String mediaId) {
@@ -73,6 +76,7 @@ class EditorMediaSelectionViewModel
         state.selectedMedia.where((item) => item.id != mediaId),
       ),
     );
+    _syncTimelineMedia();
   }
 
   void reorderMedia({required int oldIndex, required int newIndex}) {
@@ -91,10 +95,18 @@ class EditorMediaSelectionViewModel
         .read(appLoggerProvider)
         .info(_tag, 'Reordered media ${item.id} from $oldIndex to $newIndex');
     state = state.copyWith(selectedMedia: List.unmodifiable(selectedMedia));
+    _syncTimelineMedia();
   }
 
   void clearSelection() {
     ref.read(appLoggerProvider).info(_tag, 'Clearing editor media selection');
     state = const EditorMediaSelectionState.initial();
+    _syncTimelineMedia();
+  }
+
+  void _syncTimelineMedia() {
+    ref
+        .read(timelineViewModelProvider.notifier)
+        .syncSelectedMediaToMarkers(state.selectedMedia);
   }
 }

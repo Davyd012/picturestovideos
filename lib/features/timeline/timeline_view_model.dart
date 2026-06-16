@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/core/audio/application/audio_marker_preset_use_case.dart';
+import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
@@ -19,6 +21,9 @@ final timelineViewModelProvider =
 
 class TimelineViewModel extends AsyncNotifier<TimelineState> {
   static const _tag = 'TimelineViewModel';
+  static const _minTimelineScale = 0.75;
+  static const _maxTimelineScale = 3.0;
+  static const _currentPointDeleteTolerance = Duration(milliseconds: 250);
 
   @override
   Future<TimelineState> build() async {
@@ -67,14 +72,26 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         selectedMarker: null,
         nextQueuedMediaIndex: 0,
         selectedTemplate: currentState.selectedTemplate,
+        timelineScale: currentState.timelineScale,
       );
     });
+  }
+
+  void timelineScaleChanged(double scale) {
+    final currentState = _currentState;
+    final clampedScale = scale
+        .clamp(_minTimelineScale, _maxTimelineScale)
+        .toDouble();
+    _emit(currentState.copyWith(timelineScale: clampedScale));
   }
 
   void templateSelected(VideoTemplate template) {
     final currentState = _currentState;
     final currentProject = currentState.project;
-    final updatedProject = currentProject?.copyWith(template: template);
+    final updatedTemplate = template.copyWith(
+      aspectRatio: currentState.selectedTemplate.aspectRatio,
+    );
+    final updatedProject = currentProject?.copyWith(template: updatedTemplate);
 
     _emit(
       currentState.copyWith(
@@ -82,7 +99,81 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         serializedProject: updatedProject == null
             ? currentState.serializedProject
             : _serialize(updatedProject),
-        selectedTemplate: template,
+        selectedTemplate: updatedTemplate,
+      ),
+    );
+  }
+
+  void aspectRatioSelected(VideoTemplateAspectRatio aspectRatio) {
+    final currentState = _currentState;
+    final updatedTemplate = currentState.selectedTemplate.copyWith(
+      aspectRatio: aspectRatio,
+    );
+    final updatedProject = currentState.project?.copyWith(
+      template: updatedTemplate,
+    );
+
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: updatedProject == null
+            ? currentState.serializedProject
+            : _serialize(updatedProject),
+        selectedTemplate: updatedTemplate,
+      ),
+    );
+  }
+
+  Future<int> saveMarkerPreset({
+    required AudioData audioData,
+    required String sourceName,
+    String? sourcePath,
+    String sourceExtension = '',
+    int byteLength = 0,
+  }) async {
+    final markers = _markerEventsFromProject(_currentState.project);
+    if (markers.isEmpty) {
+      return 0;
+    }
+
+    await ref
+        .read(audioMarkerPresetUseCaseProvider)
+        .savePreset(
+          audioData: audioData,
+          sourceName: sourceName,
+          sourcePath: sourcePath,
+          sourceExtension: sourceExtension,
+          byteLength: byteLength,
+          markers: markers,
+        );
+    return markers.length;
+  }
+
+  void syncSelectedMediaToMarkers(List<LibraryMediaItem> selectedMedia) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) {
+      return;
+    }
+
+    final markers = _markerEventsFromProject(project);
+    if (markers.isEmpty) {
+      return;
+    }
+
+    final updatedProject = ref
+        .read(buildProjectTimelineUseCaseProvider)
+        .call(
+          beatMap: project.beatMap,
+          events: markers,
+          selectedMedia: selectedMedia,
+          template: currentState.selectedTemplate,
+        );
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
+        nextQueuedMediaIndex: 0,
       ),
     );
   }
@@ -229,6 +320,50 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     );
   }
 
+  void deleteImageMarkerAt(Duration time) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) {
+      return;
+    }
+
+    final markerTime = _markerTimeNear(project: project, time: time);
+    if (markerTime == null) {
+      return;
+    }
+
+    final updatedProject = project.copyWith(
+      tracks: _deleteMarkerAtTime(tracks: project.tracks, time: markerTime),
+    );
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
+        clearSelectedMarker: true,
+      ),
+    );
+  }
+
+  void clearImageMarkers() {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) {
+      return;
+    }
+
+    final updatedProject = project.copyWith(
+      tracks: _clearMarkerTracks(project.tracks),
+    );
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
+        nextQueuedMediaIndex: 0,
+        clearSelectedMarker: true,
+      ),
+    );
+  }
+
   void reset() {
     state = const AsyncData(TimelineState.initial());
   }
@@ -272,17 +407,57 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required List<TimelineTrack> tracks,
     required TimelineMarkerSelection selection,
   }) {
+    return _deleteMarkerAtTime(tracks: tracks, time: selection.time);
+  }
+
+  List<TimelineTrack> _deleteMarkerAtTime({
+    required List<TimelineTrack> tracks,
+    required Duration time,
+  }) {
     return List.unmodifiable([
       for (final track in tracks)
         track.copyWith(
           events: track.id == 'track-markers' || track.id == 'track-media'
               ? List.unmodifiable([
                   for (final event in track.events)
-                    if (event.time != selection.time) event,
+                    if (event.time != time) event,
                 ])
               : track.events,
         ),
     ]);
+  }
+
+  List<TimelineTrack> _clearMarkerTracks(List<TimelineTrack> tracks) {
+    return List.unmodifiable([
+      for (final track in tracks)
+        track.id == 'track-markers' || track.id == 'track-media'
+            ? track.copyWith(events: const [])
+            : track,
+    ]);
+  }
+
+  Duration? _markerTimeNear({
+    required ProjectTimeline project,
+    required Duration time,
+  }) {
+    final markers = _markerEventsFromProject(project);
+    Duration? closestTime;
+    var closestDistance = _currentPointDeleteTolerance;
+
+    for (final marker in markers) {
+      final distance = _durationDistance(marker.time, time);
+      if (distance <= closestDistance) {
+        closestDistance = distance;
+        closestTime = marker.time;
+      }
+    }
+
+    return closestTime;
+  }
+
+  Duration _durationDistance(Duration first, Duration second) {
+    final distance = first - second;
+    return distance.isNegative ? -distance : distance;
   }
 
   List<TimelineTrack> _upsertManualMediaTrack({
@@ -335,14 +510,18 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required ProjectTimeline? currentProject,
     required List<BeatEvent> fallbackEvents,
   }) {
-    final currentMarkers = _trackById(
-      currentProject?.tracks ?? const [],
-      'track-markers',
-    )?.events;
+    final currentMarkers = _markerEventsFromProject(currentProject);
     if (currentProject != null) {
-      return _sortedEvents(currentMarkers ?? const []);
+      return currentMarkers;
     }
     return _sortedEvents(fallbackEvents);
+  }
+
+  List<BeatEvent> _markerEventsFromProject(ProjectTimeline? project) {
+    return _sortedEvents(
+      _trackById(project?.tracks ?? const [], 'track-markers')?.events ??
+          const [],
+    );
   }
 
   int _markerCount(List<TimelineTrack> tracks) {

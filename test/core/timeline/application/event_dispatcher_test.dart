@@ -9,14 +9,8 @@ void main() {
       const dispatcher = timeline.EventDispatcher();
       final result = dispatcher.dispatch(
         events: const [
-          BeatEvent(
-            time: Duration(milliseconds: 200),
-            type: 'marker',
-          ),
-          BeatEvent(
-            time: Duration(milliseconds: 500),
-            type: 'marker',
-          ),
+          BeatEvent(time: Duration(milliseconds: 200), type: 'marker'),
+          BeatEvent(time: Duration(milliseconds: 500), type: 'marker'),
         ],
         currentTime: const Duration(milliseconds: 210),
         nextEventIndex: 0,
@@ -34,14 +28,8 @@ void main() {
       const dispatcher = timeline.EventDispatcher();
       final result = dispatcher.dispatch(
         events: const [
-          BeatEvent(
-            time: Duration(milliseconds: 200),
-            type: 'marker',
-          ),
-          BeatEvent(
-            time: Duration(milliseconds: 500),
-            type: 'marker',
-          ),
+          BeatEvent(time: Duration(milliseconds: 200), type: 'marker'),
+          BeatEvent(time: Duration(milliseconds: 500), type: 'marker'),
         ],
         currentTime: const Duration(milliseconds: 520),
         nextEventIndex: 1,

@@ -22,17 +22,21 @@ import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_detection_config.dart';
 import 'package:picturestovideos/core/audio/domain/selected_audio_file.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('app starts on the empty import audio screen', (tester) async {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets('app starts on the home saved media dashboard', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Import audio'), findsAtLeastNWidgets(1));
-    expect(find.text('Drop a WAV file here'), findsOneWidget);
-    expect(find.text('Choose file'), findsOneWidget);
-    expect(find.text('Current process'), findsNothing);
-    expect(find.text('Recent tracks'), findsNothing);
+    expect(find.text('Home'), findsAtLeastNWidgets(1));
+    expect(find.text('Saved media'), findsOneWidget);
+    expect(find.text('Saved audio'), findsOneWidget);
+    expect(find.text('Saved assets'), findsOneWidget);
   });
 
   testWidgets('import flow renders completed state and pipeline sheet', (
@@ -44,6 +48,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(overrides: _audioImportOverrides(), child: const App()),
     );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Import'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Choose file'));

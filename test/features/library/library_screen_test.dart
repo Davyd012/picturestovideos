@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/core/media/data/saved_image_asset_repository.dart';
+import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
+import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
 import 'package:picturestovideos/features/library/library_screen.dart';
 
@@ -47,6 +50,7 @@ void main() {
     expect(find.text('Favorites'), findsOneWidget);
     expect(find.text('Neon_City_D04.png'), findsOneWidget);
     expect(find.text('Obsidian_Range_A01.jpg'), findsOneWidget);
+    expect(find.text('Stage all imported'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField).first, 'neon');
     await tester.pumpAndSettle();
@@ -61,6 +65,30 @@ void main() {
     expect(find.text('Review staged'), findsOneWidget);
     expect(find.text('1 selected'), findsOneWidget);
     expect(find.text('Open editor (1)'), findsOneWidget);
+  });
+
+  testWidgets('library screen stages all imported images from toolbar', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(overrides: _overrides(), child: const _LibraryTestApp()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Pick images'));
+    await tester.tap(find.text('Pick images'));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Stage all imported'));
+    await tester.tap(find.text('Stage all imported'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ready for editor'), findsOneWidget);
+    expect(find.text('Staged: 2'), findsWidgets);
+    expect(find.text('Open editor (2)'), findsOneWidget);
   });
 }
 
@@ -95,6 +123,9 @@ dynamic _overrides() {
         ],
       ),
     ),
+    savedImageAssetRepositoryProvider.overrideWithValue(
+      _MemorySavedImageAssetRepository(),
+    ),
   ];
 }
 
@@ -113,5 +144,27 @@ class _FakeImageImportRepository implements ImageImportRepository {
     String folderPath,
   ) async {
     return assets;
+  }
+}
+
+class _MemorySavedImageAssetRepository implements SavedImageAssetRepository {
+  final List<SavedImageAsset> assets = [];
+
+  @override
+  Future<void> clear() async {
+    assets.clear();
+  }
+
+  @override
+  Future<List<SavedImageAsset>> loadAll() async {
+    return List.unmodifiable(assets);
+  }
+
+  @override
+  Future<void> upsertAll(List<SavedImageAsset> assets) async {
+    for (final asset in assets) {
+      this.assets.removeWhere((currentAsset) => currentAsset.id == asset.id);
+      this.assets.add(asset);
+    }
   }
 }

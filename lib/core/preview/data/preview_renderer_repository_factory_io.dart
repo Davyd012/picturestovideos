@@ -160,7 +160,7 @@ Future<BuildPreviewVideoResult> _renderPreviewVideoOnWorker(
   return _renderPreviewVideo(
     request,
     tempRoot: Directory.systemTemp,
-    segmentVideoArgs: const ['-c:v', 'libx264'],
+    segmentVideoArgs: const ['-c:v', 'libx264', '-preset', 'veryfast'],
     runFfmpeg: _runDesktopFfmpeg,
   );
 }
@@ -180,7 +180,10 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
   }
   final segmentPaths = <String>[];
   final thumbnails = <PreviewImageFrame>[];
-  final totalSteps = request.clips.length * 2 + 1;
+  final totalSteps =
+      request.clips.length +
+      (request.includeThumbnails ? request.clips.length : 0) +
+      1;
   var completedSteps = 0;
 
   void emitProgress(String label, {double stepProgress = 0}) {
@@ -243,26 +246,6 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
     final thumbnailPath = '${cacheDir.path}/$cacheKey.png';
     final segmentPath = '${cacheDir.path}/$cacheKey.mp4';
 
-    if (!File(thumbnailPath).existsSync()) {
-      final renderPath = '${tempDir.path}/thumbnail_$index.png';
-      await runStep('Rendering thumbnail ${index + 1}', [
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-y',
-        '-i',
-        clip.sourcePath,
-        '-vf',
-        filter,
-        '-frames:v',
-        '1',
-        renderPath,
-      ]);
-      await File(renderPath).copy(thumbnailPath);
-    } else {
-      completeCachedStep('Using cached thumbnail ${index + 1}');
-    }
-
     if (!File(segmentPath).existsSync()) {
       final renderPath = '${tempDir.path}/segment_$index.mp4';
       await runStep(
@@ -294,12 +277,34 @@ Future<BuildPreviewVideoResult> _renderPreviewVideo(
       completeCachedStep('Using cached clip ${index + 1}');
     }
 
-    thumbnails.add(
-      PreviewImageFrame(
-        clipId: clip.mediaId,
-        bytes: await File(thumbnailPath).readAsBytes(),
-      ),
-    );
+    if (request.includeThumbnails) {
+      if (!File(thumbnailPath).existsSync()) {
+        final renderPath = '${tempDir.path}/thumbnail_$index.png';
+        await runStep('Rendering thumbnail ${index + 1}', [
+          '-hide_banner',
+          '-loglevel',
+          'error',
+          '-y',
+          '-i',
+          clip.sourcePath,
+          '-vf',
+          filter,
+          '-frames:v',
+          '1',
+          renderPath,
+        ]);
+        await File(renderPath).copy(thumbnailPath);
+      } else {
+        completeCachedStep('Using cached thumbnail ${index + 1}');
+      }
+
+      thumbnails.add(
+        PreviewImageFrame(
+          clipId: clip.mediaId,
+          bytes: await File(thumbnailPath).readAsBytes(),
+        ),
+      );
+    }
     segmentPaths.add(segmentPath);
   }
 

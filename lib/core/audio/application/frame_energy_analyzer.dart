@@ -56,14 +56,14 @@ class FrameEnergyAnalyzer {
       }
 
       final sampleCount = end - start;
-      final energy =
-          sampleCount == 0 ? 0.0 : sqrt(sumSquares / sampleCount);
+      final energy = sampleCount == 0 ? 0.0 : sqrt(sumSquares / sampleCount);
 
       frames.add(
         AudioFrame(
           time: Duration(
             microseconds:
-                (start * Duration.microsecondsPerSecond) ~/ audioData.sampleRate,
+                (start * Duration.microsecondsPerSecond) ~/
+                audioData.sampleRate,
           ),
           energy: energy,
         ),
@@ -84,10 +84,7 @@ class FrameEnergyAnalyzer {
 
     return List.unmodifiable([
       for (final frame in frames)
-        AudioFrame(
-          time: frame.time,
-          energy: frame.energy / maxEnergy,
-        ),
+        AudioFrame(time: frame.time, energy: frame.energy / maxEnergy),
     ]);
   }
 }

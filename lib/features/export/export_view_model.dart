@@ -15,10 +15,6 @@ final exportViewModelProvider = NotifierProvider<ExportViewModel, ExportState>(
 
 class ExportViewModel extends Notifier<ExportState> {
   static const _tag = 'ExportViewModel';
-  static const _exportLandscapeWidth = 1920;
-  static const _exportLandscapeHeight = 1080;
-  static const _exportPortraitWidth = 1080;
-  static const _exportPortraitHeight = 1920;
   static const _exportFrameRate = 30;
   int _renderSession = 0;
 
@@ -220,15 +216,9 @@ class ExportViewModel extends Notifier<ExportState> {
   }
 
   _RenderSize _renderSizeFor(VideoTemplate template) {
-    if (template.aspectRatio == VideoTemplateAspectRatio.portrait) {
-      return const _RenderSize(
-        width: _exportPortraitWidth,
-        height: _exportPortraitHeight,
-      );
-    }
-    return const _RenderSize(
-      width: _exportLandscapeWidth,
-      height: _exportLandscapeHeight,
+    return _RenderSize(
+      width: template.aspectRatio.exportWidth,
+      height: template.aspectRatio.exportHeight,
     );
   }
 }

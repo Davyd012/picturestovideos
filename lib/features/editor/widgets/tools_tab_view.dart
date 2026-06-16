@@ -25,6 +25,8 @@ class ToolsTabView extends ConsumerWidget {
     required this.onAddMarker,
     required this.onAddImagePoint,
     required this.onDeleteMarker,
+    required this.onDeleteMarkerAtCurrentPoint,
+    required this.onClearMarkers,
     super.key,
   });
 
@@ -40,12 +42,19 @@ class ToolsTabView extends ConsumerWidget {
   final VoidCallback onAddMarker;
   final VoidCallback onAddImagePoint;
   final VoidCallback onDeleteMarker;
+  final VoidCallback onDeleteMarkerAtCurrentPoint;
+  final VoidCallback onClearMarkers;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final hasMediaTrack =
         project?.tracks.any((track) => track.id == 'track-media') ?? false;
     final canAutoSync = beatMap != null && selectedMedia.isNotEmpty;
+    final canEditMarkers =
+        project?.tracks.any(
+          (track) => track.id == 'track-markers' && track.events.isNotEmpty,
+        ) ??
+        false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,6 +85,29 @@ class ToolsTabView extends ConsumerWidget {
                     ref
                         .read(timelineViewModelProvider.notifier)
                         .templateSelected(VideoTemplates.byId(id));
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<VideoTemplateAspectRatio>(
+                  initialValue: selectedTemplate.aspectRatio,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.aspect_ratio_outlined),
+                    labelText: 'Aspect ratio',
+                  ),
+                  items: [
+                    for (final ratio in VideoTemplateAspectRatio.values)
+                      DropdownMenuItem(
+                        value: ratio,
+                        child: Text(ratio.menuLabel),
+                      ),
+                  ],
+                  onChanged: (ratio) {
+                    if (ratio == null) {
+                      return;
+                    }
+                    ref
+                        .read(timelineViewModelProvider.notifier)
+                        .aspectRatioSelected(ratio);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -147,7 +179,17 @@ class ToolsTabView extends ConsumerWidget {
             OutlinedButton.icon(
               onPressed: selectedMarker == null ? null : onDeleteMarker,
               icon: const Icon(Icons.delete_outline),
-              label: const Text('Delete marker'),
+              label: const Text('Delete selected'),
+            ),
+            OutlinedButton.icon(
+              onPressed: canEditMarkers ? onDeleteMarkerAtCurrentPoint : null,
+              icon: const Icon(Icons.remove_circle_outline),
+              label: const Text('Delete at playhead'),
+            ),
+            OutlinedButton.icon(
+              onPressed: canEditMarkers ? onClearMarkers : null,
+              icon: const Icon(Icons.delete_sweep_outlined),
+              label: const Text('Clear markers'),
             ),
           ],
         ),

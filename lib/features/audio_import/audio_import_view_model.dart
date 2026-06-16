@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/core/audio/application/audio_marker_preset_use_case.dart';
 import 'package:picturestovideos/core/audio/application/decode_wav_audio_use_case.dart';
 import 'package:picturestovideos/core/audio/application/import_audio_use_case.dart';
 import 'package:picturestovideos/core/audio/application/prepare_audio_for_analysis_use_case.dart';
 import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
+import 'package:picturestovideos/core/audio/domain/audio_marker_preset.dart';
 import 'package:picturestovideos/core/audio/domain/audio_processing_task.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/selected_audio_file.dart';
@@ -14,12 +16,14 @@ import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_mod
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
 import 'package:picturestovideos/features/beat_detection/beat_detection_view_model.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
+import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 final audioImportViewModelProvider =
-    AsyncNotifierProvider.autoDispose<AudioImportViewModel, AudioImportState>(
+    AsyncNotifierProvider<AudioImportViewModel, AudioImportState>(
       AudioImportViewModel.new,
     );
 
@@ -139,6 +143,22 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       );
       state = AsyncData(currentState);
 
+      final markerPreset = await ref
+          .read(audioMarkerPresetUseCaseProvider)
+          .loadPreset(audioData);
+      if (!_isCurrentSession(session)) {
+        return;
+      }
+      if (markerPreset != null && markerPreset.markers.isNotEmpty) {
+        await _completePipelineFromMarkerPreset(
+          currentState: currentState,
+          selectedFile: selectedFile,
+          markerPreset: markerPreset,
+          session: session,
+        );
+        return;
+      }
+
       await ref
           .read(audioAnalysisViewModelProvider.notifier)
           .analyzeAudio(audioData);
@@ -234,7 +254,11 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           const <BeatEvent>[];
       await ref
           .read(timelineViewModelProvider.notifier)
-          .buildProjectTimeline(beatMap: beatMap, events: events);
+          .buildProjectTimeline(
+            beatMap: beatMap,
+            events: events,
+            selectedMedia: _selectedMedia,
+          );
       if (!_isCurrentSession(session)) {
         return;
       }
@@ -273,6 +297,89 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
 
   bool _isCurrentSession(int session) {
     return session == _pipelineSession;
+  }
+
+  List<LibraryMediaItem> get _selectedMedia {
+    return ref.read(editorMediaSelectionViewModelProvider).selectedMedia;
+  }
+
+  Future<void> _completePipelineFromMarkerPreset({
+    required AudioImportState currentState,
+    required SelectedAudioFile selectedFile,
+    required AudioMarkerPreset markerPreset,
+    required int session,
+  }) async {
+    var nextState = currentState.copyWith(
+      activeStage: AudioImportPipelineStage.loadEvents,
+    );
+    state = AsyncData(nextState);
+
+    final beatMap = markerPreset.toBeatMap();
+    ref
+        .read(eventSystemViewModelProvider.notifier)
+        .loadMarkerEvents(markerPreset.markers);
+    if (!_isCurrentSession(session)) {
+      return;
+    }
+    nextState = _advanceState(
+      nextState,
+      completedStage: AudioImportPipelineStage.loadEvents,
+      nextStage: AudioImportPipelineStage.preparePlayback,
+    );
+    state = AsyncData(nextState);
+
+    try {
+      await ref
+          .read(playbackViewModelProvider.notifier)
+          .preparePlayback(
+            beatMap: beatMap,
+            audioSourcePath: selectedFile.source.path,
+          );
+      if (!_isCurrentSession(session)) {
+        return;
+      }
+    } catch (error, stackTrace) {
+      ref
+          .read(appLoggerProvider)
+          .warning(
+            _tag,
+            'Playback preparation failed for marker preset: ${_playbackPreparationMessage(error)}',
+          );
+      ref.read(appLoggerProvider).debug(_tag, stackTrace.toString());
+      nextState = nextState.copyWith(
+        warningMessage: _playbackPreparationMessage(error),
+      );
+    }
+    nextState = _advanceState(
+      nextState,
+      completedStage: AudioImportPipelineStage.preparePlayback,
+      nextStage: AudioImportPipelineStage.buildTimeline,
+    );
+    state = AsyncData(nextState);
+
+    final events =
+        ref.read(eventSystemViewModelProvider).asData?.value.events ??
+        const <BeatEvent>[];
+    await ref
+        .read(timelineViewModelProvider.notifier)
+        .buildProjectTimeline(
+          beatMap: beatMap,
+          events: events,
+          selectedMedia: _selectedMedia,
+        );
+    if (!_isCurrentSession(session)) {
+      return;
+    }
+
+    nextState =
+        _advanceState(
+          nextState,
+          completedStage: AudioImportPipelineStage.buildTimeline,
+        ).copyWith(
+          status: AudioImportPipelineStatus.success,
+          clearActiveStage: true,
+        );
+    state = AsyncData(nextState);
   }
 
   Future<void> _resetDownstreamState() async {

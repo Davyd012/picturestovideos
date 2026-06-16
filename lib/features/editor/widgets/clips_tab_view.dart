@@ -8,11 +8,13 @@ import 'package:picturestovideos/shared/extensions/build_context_theme_extension
 class ClipsTabView extends StatelessWidget {
   const ClipsTabView({
     required this.selectedMedia,
+    required this.onReorderMedia,
     required this.onOpenTimeline,
     super.key,
   });
 
   final List<LibraryMediaItem> selectedMedia;
+  final void Function(int oldIndex, int newIndex) onReorderMedia;
   final VoidCallback onOpenTimeline;
 
   @override
@@ -38,15 +40,36 @@ class ClipsTabView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        for (var index = 0; index < clips.length; index++) ...[
-          _ClipListItem(item: clips[index], index: index),
-          const SizedBox(height: 8),
-        ],
+        if (selectedMedia.isEmpty)
+          for (var index = 0; index < clips.length; index++) ...[
+            _ClipListItem(item: clips[index], index: index, canReorder: false),
+            const SizedBox(height: 8),
+          ]
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: selectedMedia.length,
+            onReorderItem: onReorderMedia,
+            itemBuilder: (context, index) {
+              final item = selectedMedia[index];
+              return Padding(
+                key: ValueKey(item.id),
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _ClipListItem(
+                  item: item,
+                  index: index,
+                  canReorder: selectedMedia.length > 1,
+                ),
+              );
+            },
+          ),
         const SizedBox(height: 8),
         Row(
           children: [
             OutlinedButton.icon(
-              onPressed: null,
+              onPressed: selectedMedia.isEmpty ? null : onOpenTimeline,
               icon: const Icon(Icons.fact_check_outlined),
               label: const Text('Review sequence'),
             ),
@@ -64,10 +87,15 @@ class ClipsTabView extends StatelessWidget {
 }
 
 class _ClipListItem extends StatelessWidget {
-  const _ClipListItem({required this.item, required this.index});
+  const _ClipListItem({
+    required this.item,
+    required this.index,
+    required this.canReorder,
+  });
 
   final LibraryMediaItem item;
   final int index;
+  final bool canReorder;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +110,16 @@ class _ClipListItem extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.drag_handle, color: context.colors.onSurfaceVariant),
+            if (canReorder)
+              ReorderableDragStartListener(
+                index: index,
+                child: Icon(
+                  Icons.drag_handle,
+                  color: context.colors.onSurfaceVariant,
+                ),
+              )
+            else
+              Icon(Icons.drag_handle, color: context.colors.onSurfaceVariant),
             IconButton(onPressed: null, icon: const Icon(Icons.more_vert)),
           ],
         ),

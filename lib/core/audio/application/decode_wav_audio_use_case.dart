@@ -11,9 +11,7 @@ final decodeWavAudioUseCaseProvider = Provider<DecodeWavAudioUseCase>(
 class DecodeWavAudioUseCase {
   const DecodeWavAudioUseCase();
 
-  Future<AudioData> call({
-    required DecodeWavAudioRequest request,
-  }) async {
+  Future<AudioData> call({required DecodeWavAudioRequest request}) async {
     final result = await compute(_decodeWavAudioOnIsolate, request);
     return result.audioData;
   }
