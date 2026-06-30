@@ -23,4 +23,12 @@ class ImportAudioUseCase {
   Future<SelectedAudioFile> fromPath(String path) {
     return _audioRepository.importAudioFromPath(path);
   }
+
+  Future<SelectedAudioFile?> selectSong() {
+    return _audioRepository.selectSong();
+  }
+
+  Future<SelectedAudioFile> selectSongFromPath(String path) {
+    return _audioRepository.selectSongFromPath(path);
+  }
 }

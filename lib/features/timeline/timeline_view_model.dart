@@ -35,6 +35,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required BeatMap beatMap,
     required List<BeatEvent> events,
     List<LibraryMediaItem> selectedMedia = const [],
+    Map<String, VideoTemplateImageFit> selectedImageFits = const {},
   }) async {
     final currentState = _currentState;
     final currentProject = currentState.project;
@@ -57,6 +58,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
             beatMap: beatMap,
             events: markerEvents,
             selectedMedia: selectedMedia,
+            selectedImageFits: selectedImageFits,
             template: currentState.selectedTemplate,
           );
       final serializedProject = ref
@@ -149,7 +151,10 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     return markers.length;
   }
 
-  void syncSelectedMediaToMarkers(List<LibraryMediaItem> selectedMedia) {
+  void syncSelectedMediaToMarkers({
+    required List<LibraryMediaItem> selectedMedia,
+    Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+  }) {
     final currentState = _currentState;
     final project = currentState.project;
     if (project == null) {
@@ -167,6 +172,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
           beatMap: project.beatMap,
           events: markers,
           selectedMedia: selectedMedia,
+          selectedImageFits: selectedImageFits,
           template: currentState.selectedTemplate,
         );
     _emit(
@@ -219,6 +225,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required Duration time,
     required BeatMap? beatMap,
     required List<LibraryMediaItem> selectedMedia,
+    Map<String, VideoTemplateImageFit> selectedImageFits = const {},
     required Duration? audioDuration,
   }) {
     if (selectedMedia.isEmpty) {
@@ -254,6 +261,9 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         start: time,
         end: time + _manualClipSpan(project.beatMap),
         sourcePath: item.sourcePath,
+        imageFit:
+            selectedImageFits[item.id] ??
+            currentState.selectedTemplate.imageFit,
       ),
     );
     final tracksWithMarker = _upsertMarkerTrack(
@@ -284,6 +294,49 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     _emit(
       currentState.copyWith(
         selectedMarker: TimelineMarkerSelection(time: time, mediaId: mediaId),
+      ),
+    );
+  }
+
+  void updateMediaImageFit({
+    required String mediaId,
+    required VideoTemplateImageFit imageFit,
+  }) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) {
+      return;
+    }
+
+    var didUpdate = false;
+    final updatedTracks = [
+      for (final track in project.tracks)
+        track.id == 'track-media'
+            ? track.copyWith(
+                events: List.unmodifiable([
+                  for (final event in track.events)
+                    _updateMediaEventImageFit(
+                      event: event,
+                      mediaId: mediaId,
+                      imageFit: imageFit,
+                      didUpdate: () => didUpdate = true,
+                    ),
+                ]),
+              )
+            : track,
+    ];
+
+    if (!didUpdate) {
+      return;
+    }
+
+    final updatedProject = project.copyWith(
+      tracks: List.unmodifiable(updatedTracks),
+    );
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
       ),
     );
   }
@@ -504,6 +557,25 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         if (track.id != 'track-media') track,
       updatedMediaTrack,
     ]);
+  }
+
+  BeatEvent _updateMediaEventImageFit({
+    required BeatEvent event,
+    required String mediaId,
+    required VideoTemplateImageFit imageFit,
+    required void Function() didUpdate,
+  }) {
+    final payload = event.payload;
+    if (payload is! MediaTrackClipPayload || payload.mediaId != mediaId) {
+      return event;
+    }
+
+    didUpdate();
+    return BeatEvent(
+      time: event.time,
+      type: event.type,
+      payload: payload.copyWith(imageFit: imageFit),
+    );
   }
 
   List<BeatEvent> _resolveMarkerEvents({

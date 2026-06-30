@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_state.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
@@ -71,10 +72,14 @@ class EditorMediaSelectionViewModel
     ref
         .read(appLoggerProvider)
         .info(_tag, 'Removing media $mediaId from editor selection');
+    final updatedFits = Map<String, VideoTemplateImageFit>.from(
+      state.selectedImageFits,
+    )..remove(mediaId);
     state = state.copyWith(
       selectedMedia: List.unmodifiable(
         state.selectedMedia.where((item) => item.id != mediaId),
       ),
+      selectedImageFits: Map.unmodifiable(updatedFits),
     );
     _syncTimelineMedia();
   }
@@ -98,6 +103,28 @@ class EditorMediaSelectionViewModel
     _syncTimelineMedia();
   }
 
+  void imageFitSelected({
+    required String mediaId,
+    required VideoTemplateImageFit imageFit,
+  }) {
+    if (!state.containsMedia(mediaId)) {
+      return;
+    }
+
+    ref
+        .read(appLoggerProvider)
+        .info(_tag, 'Changed image fit for $mediaId to ${imageFit.name}');
+    state = state.copyWith(
+      selectedImageFits: Map.unmodifiable({
+        ...state.selectedImageFits,
+        mediaId: imageFit,
+      }),
+    );
+    ref
+        .read(timelineViewModelProvider.notifier)
+        .updateMediaImageFit(mediaId: mediaId, imageFit: imageFit);
+  }
+
   void clearSelection() {
     ref.read(appLoggerProvider).info(_tag, 'Clearing editor media selection');
     state = const EditorMediaSelectionState.initial();
@@ -107,6 +134,9 @@ class EditorMediaSelectionViewModel
   void _syncTimelineMedia() {
     ref
         .read(timelineViewModelProvider.notifier)
-        .syncSelectedMediaToMarkers(state.selectedMedia);
+        .syncSelectedMediaToMarkers(
+          selectedMedia: state.selectedMedia,
+          selectedImageFits: state.selectedImageFits,
+        );
   }
 }

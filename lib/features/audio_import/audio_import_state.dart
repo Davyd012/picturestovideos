@@ -41,6 +41,7 @@ class AudioImportState {
     required this.errorStage,
     required this.errorMessage,
     required this.warningMessage,
+    required this.isSongOnly,
   });
 
   const AudioImportState.initial()
@@ -51,7 +52,8 @@ class AudioImportState {
       completedStages = const [],
       errorStage = null,
       errorMessage = null,
-      warningMessage = null;
+      warningMessage = null,
+      isSongOnly = false;
 
   final AudioSource? source;
   final AudioData? audioData;
@@ -61,6 +63,7 @@ class AudioImportState {
   final AudioImportPipelineStage? errorStage;
   final String? errorMessage;
   final String? warningMessage;
+  final bool isSongOnly;
 
   bool get hasSelectedFile => source != null;
   bool get hasAudio => source != null && audioData != null;
@@ -73,7 +76,7 @@ class AudioImportState {
   bool get hasWarning => warningMessage != null && warningMessage!.isNotEmpty;
 
   bool get canOpenEditor =>
-      hasAudio &&
+      hasSelectedFile &&
       completedStages.contains(AudioImportPipelineStage.buildTimeline);
 
   AudioImportFlowState get flowState {
@@ -122,6 +125,11 @@ class AudioImportState {
       return 'Waiting for file selection';
     }
     if (isSuccess) {
+      if (isSongOnly) {
+        return hasWarning
+            ? 'Song selected with limited playback'
+            : 'Song selected for manual markers';
+      }
       return hasWarning
           ? 'Ready for editor handoff with limited playback'
           : 'Ready for editor handoff';
@@ -171,7 +179,9 @@ class AudioImportState {
       AudioImportPipelineStage.importFile =>
         hasSelectedFile ? importDetail : 'Choose an audio file to begin.',
       AudioImportPipelineStage.decodeAudio =>
-        hasAudio
+        isSongOnly
+            ? 'Skipped audio decoding for manual markers.'
+            : hasAudio
             ? 'Decoded ${audioData!.samples.length} samples.'
             : 'Decoding audio samples in the background.',
       AudioImportPipelineStage.analyzeAudio =>
@@ -210,6 +220,7 @@ class AudioImportState {
     AudioImportPipelineStage? errorStage,
     String? errorMessage,
     String? warningMessage,
+    bool? isSongOnly,
     bool clearActiveStage = false,
     bool clearError = false,
     bool clearWarning = false,
@@ -225,6 +236,7 @@ class AudioImportState {
       warningMessage: clearWarning
           ? null
           : warningMessage ?? this.warningMessage,
+      isSongOnly: isSongOnly ?? this.isSongOnly,
     );
   }
 }

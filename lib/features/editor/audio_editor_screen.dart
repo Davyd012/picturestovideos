@@ -6,6 +6,7 @@ import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/core/audio/domain/audio_source.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -132,6 +133,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
             events: events,
             eventState: eventState,
             selectedMedia: mediaSelection.selectedMedia,
+            selectedImageFits: mediaSelection.selectedImageFits,
             audioDuration: importedAudio?.audioData?.duration,
             audioData: importedAudio?.audioData,
             audioSource: importedAudio?.source,
@@ -197,6 +199,7 @@ class _EditorTabBody extends ConsumerWidget {
     required this.events,
     required this.eventState,
     required this.selectedMedia,
+    required this.selectedImageFits,
     required this.audioDuration,
     required this.audioData,
     required this.audioSource,
@@ -210,6 +213,7 @@ class _EditorTabBody extends ConsumerWidget {
   final List<BeatEvent> events;
   final AsyncValue<EventSystemState> eventState;
   final List<LibraryMediaItem> selectedMedia;
+  final Map<String, VideoTemplateImageFit> selectedImageFits;
   final Duration? audioDuration;
   final AudioData? audioData;
   final AudioSource? audioSource;
@@ -232,9 +236,13 @@ class _EditorTabBody extends ConsumerWidget {
       ),
       EditorTab.clips => ClipsTabView(
         selectedMedia: selectedMedia,
+        selectedImageFits: selectedImageFits,
         onReorderMedia: (oldIndex, newIndex) => ref
             .read(editorMediaSelectionViewModelProvider.notifier)
             .reorderMedia(oldIndex: oldIndex, newIndex: newIndex),
+        onImageFitSelected: (mediaId, imageFit) => ref
+            .read(editorMediaSelectionViewModelProvider.notifier)
+            .imageFitSelected(mediaId: mediaId, imageFit: imageFit),
         onOpenTimeline: () => ref
             .read(editorTabViewModelProvider.notifier)
             .tabSelected(EditorTab.timeline),
@@ -267,6 +275,7 @@ class _EditorTabBody extends ConsumerWidget {
         selectedTemplate:
             timeline?.selectedTemplate ?? VideoTemplates.cleanMemories,
         selectedMedia: selectedMedia,
+        selectedImageFits: selectedImageFits,
         selectedMarker: timeline?.selectedMarker,
         events: events,
         eventStatusText: _eventStatusText(eventState),
@@ -318,6 +327,7 @@ class _EditorTabBody extends ConsumerWidget {
           time: playback?.currentTime ?? Duration.zero,
           beatMap: beatMap,
           selectedMedia: selectedMedia,
+          selectedImageFits: selectedImageFits,
           audioDuration: audioDuration,
         );
   }

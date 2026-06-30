@@ -437,7 +437,7 @@ String _buildVisualFilter({
   final title = _escapeDrawText(clip.title);
   final subtitle = _escapeDrawText(clip.tagline);
   final filters = <String>[
-    _imageFilter(template: template, width: width, height: height),
+    _imageFilter(clip: clip, template: template, width: width, height: height),
     ..._frameFilters(template: template, width: width, height: height),
     ..._overlayFilters(template: template, width: width, height: height),
     ..._textFilters(
@@ -453,11 +453,12 @@ String _buildVisualFilter({
 }
 
 String _imageFilter({
+  required MediaTrackClipPayload clip,
   required VideoTemplate template,
   required int width,
   required int height,
 }) {
-  if (template.imageFit == VideoTemplateImageFit.cover) {
+  if (clip.imageFit == VideoTemplateImageFit.cover) {
     return [
       'scale=w=$width:h=$height:force_original_aspect_ratio=increase',
       'crop=$width:$height',
@@ -639,7 +640,7 @@ String _buildSignature(BuildPreviewVideoRequest request) {
     '${request.width}x${request.height}',
     '${request.frameRate}',
     for (final clip in request.clips)
-      '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}',
+      '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}:${clip.imageFit.name}',
   ].join('|');
 }
 
@@ -657,6 +658,7 @@ String _previewClipCacheKey({
     clip.title,
     clip.tagline,
     clip.sourcePath,
+    clip.imageFit.name,
     clip.start.inMilliseconds,
     clip.end.inMilliseconds,
     sourceStat.size,

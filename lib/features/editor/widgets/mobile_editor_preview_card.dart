@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_editor_preview_frame_use_case.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/editor/editor_preview_state.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
@@ -48,11 +49,7 @@ class MobileEditorPreviewCard extends ConsumerWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _PreviewSurface(
-                  sourcePath: activeClip?.sourcePath,
-                  title: activeClip?.title,
-                  template: project?.template,
-                ),
+                _PreviewSurface(activeClip: activeClip),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -153,31 +150,28 @@ class MobileEditorPreviewCard extends ConsumerWidget {
 }
 
 class _PreviewSurface extends StatelessWidget {
-  const _PreviewSurface({
-    required this.sourcePath,
-    required this.title,
-    required this.template,
-  });
+  const _PreviewSurface({required this.activeClip});
 
-  final String? sourcePath;
-  final String? title;
-  final VideoTemplate? template;
+  final MediaTrackClipPayload? activeClip;
 
   @override
   Widget build(BuildContext context) {
-    final path = sourcePath;
+    final path = activeClip?.sourcePath;
     if (path != null && path.isNotEmpty) {
-      return Image.file(
-        File(path),
-        fit: template?.imageFit == VideoTemplateImageFit.contain
-            ? BoxFit.contain
-            : BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return _FallbackPreview(title: title);
-        },
+      return ColoredBox(
+        color: context.colors.scrim,
+        child: Image.file(
+          File(path),
+          fit: activeClip?.imageFit == VideoTemplateImageFit.contain
+              ? BoxFit.contain
+              : BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _FallbackPreview(title: activeClip?.title);
+          },
+        ),
       );
     }
-    return _FallbackPreview(title: title);
+    return _FallbackPreview(title: activeClip?.title);
   }
 }
 

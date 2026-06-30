@@ -53,7 +53,7 @@ void main() {
     await tester.tap(find.text('Import'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Choose file'));
+    await tester.tap(find.text('Analyze WAV'));
     await tester.pumpAndSettle();
 
     expect(find.text('Import complete'), findsOneWidget);
@@ -230,6 +230,16 @@ class _NoopAudioRepository implements AudioRepository {
 
   @override
   Future<SelectedAudioFile> importAudioFromPath(String path) async {
+    return _selectedAudioFile();
+  }
+
+  @override
+  Future<SelectedAudioFile?> selectSong() async {
+    return null;
+  }
+
+  @override
+  Future<SelectedAudioFile> selectSongFromPath(String path) async {
     return _selectedAudioFile();
   }
 }

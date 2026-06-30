@@ -69,6 +69,27 @@ void main() {
     expect(state?.source, isNull);
   });
 
+  test('selectSongOnly opens editor without decoding audio', () async {
+    final container = ProviderContainer(overrides: _audioImportOverrides());
+    addTearDown(container.dispose);
+
+    await container.read(audioImportViewModelProvider.future);
+    await container
+        .read(audioImportViewModelProvider.notifier)
+        .selectSongOnly();
+
+    final state = container.read(audioImportViewModelProvider).value;
+    final timeline = container.read(timelineViewModelProvider).value;
+    final playback = container.read(playbackViewModelProvider).value;
+
+    expect(state?.source?.fileName, 'beat.wav');
+    expect(state?.audioData, isNull);
+    expect(state?.isSongOnly, isTrue);
+    expect(state?.canOpenEditor, isTrue);
+    expect(timeline?.project?.beatMap.beats, isEmpty);
+    expect(playback?.hasLoadedAudioSource, isTrue);
+  });
+
   test('pickAudioFile applies saved marker preset', () async {
     const audioData = AudioData(
       samples: [0.0, 0.8, -0.4, 0.6, -0.2, 0.3],
@@ -311,6 +332,11 @@ class _FakeImportAudioUseCase extends ImportAudioUseCase {
   Future<SelectedAudioFile?> call() async {
     return result;
   }
+
+  @override
+  Future<SelectedAudioFile?> selectSong() async {
+    return result;
+  }
 }
 
 class _FakePrepareAudioForAnalysisUseCase
@@ -396,6 +422,16 @@ class _NoopAudioRepository implements AudioRepository {
 
   @override
   Future<SelectedAudioFile> importAudioFromPath(String path) async {
+    return _selectedAudioFile();
+  }
+
+  @override
+  Future<SelectedAudioFile?> selectSong() async {
+    return null;
+  }
+
+  @override
+  Future<SelectedAudioFile> selectSongFromPath(String path) async {
     return _selectedAudioFile();
   }
 }

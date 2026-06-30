@@ -5,12 +5,14 @@ import 'package:picturestovideos/core/audio/application/audio_marker_preset_use_
 import 'package:picturestovideos/core/audio/application/decode_wav_audio_use_case.dart';
 import 'package:picturestovideos/core/audio/application/import_audio_use_case.dart';
 import 'package:picturestovideos/core/audio/application/prepare_audio_for_analysis_use_case.dart';
+import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/audio/domain/audio_frame.dart';
 import 'package:picturestovideos/core/audio/domain/audio_marker_preset.dart';
 import 'package:picturestovideos/core/audio/domain/audio_processing_task.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/selected_audio_file.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
@@ -79,6 +81,52 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
     await _runImportPipeline(selectedFile, previousState: previousState);
   }
 
+  Future<void> selectSongOnly() async {
+    final logger = ref.read(appLoggerProvider);
+    final previousState = state.value ?? const AudioImportState.initial();
+    if (previousState.isBusy) {
+      return;
+    }
+
+    logger.info(_tag, 'Song-only selection requested');
+    state = AsyncData(
+      previousState.copyWith(
+        status: AudioImportPipelineStatus.pickingFile,
+        clearActiveStage: true,
+        clearError: true,
+        clearWarning: true,
+        isSongOnly: true,
+      ),
+    );
+    final selectedFile = await ref
+        .read(importAudioUseCaseProvider)
+        .selectSong();
+    await _runSongOnlyPipeline(selectedFile, previousState: previousState);
+  }
+
+  Future<void> selectSongOnlyFromPath(String path) async {
+    final logger = ref.read(appLoggerProvider);
+    final previousState = state.value ?? const AudioImportState.initial();
+    if (previousState.isBusy) {
+      return;
+    }
+
+    logger.info(_tag, 'Manual song-only selection requested for $path');
+    state = AsyncData(
+      previousState.copyWith(
+        status: AudioImportPipelineStatus.pickingFile,
+        clearActiveStage: true,
+        clearError: true,
+        clearWarning: true,
+        isSongOnly: true,
+      ),
+    );
+    final selectedFile = await ref
+        .read(importAudioUseCaseProvider)
+        .selectSongFromPath(path);
+    await _runSongOnlyPipeline(selectedFile, previousState: previousState);
+  }
+
   Future<void> stopImport() async {
     _pipelineSession++;
     ref.read(appLoggerProvider).warning(_tag, 'Import stopped by user');
@@ -116,6 +164,7 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
       errorStage: null,
       errorMessage: null,
       warningMessage: null,
+      isSongOnly: false,
     );
     state = AsyncData(currentState);
 
@@ -258,6 +307,7 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
             beatMap: beatMap,
             events: events,
             selectedMedia: _selectedMedia,
+            selectedImageFits: _selectedImageFits,
           );
       if (!_isCurrentSession(session)) {
         return;
@@ -295,12 +345,125 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
     }
   }
 
+  Future<void> _runSongOnlyPipeline(
+    SelectedAudioFile? selectedFile, {
+    required AudioImportState previousState,
+  }) async {
+    final session = ++_pipelineSession;
+    if (selectedFile == null) {
+      ref
+          .read(appLoggerProvider)
+          .warning(_tag, 'Song selection canceled or returned no file');
+      if (_isCurrentSession(session)) {
+        state = AsyncData(previousState);
+      }
+      return;
+    }
+
+    await _resetDownstreamState();
+
+    var currentState = AudioImportState(
+      source: selectedFile.source,
+      audioData: null,
+      status: AudioImportPipelineStatus.running,
+      activeStage: AudioImportPipelineStage.preparePlayback,
+      completedStages: const [AudioImportPipelineStage.importFile],
+      errorStage: null,
+      errorMessage: null,
+      warningMessage: null,
+      isSongOnly: true,
+    );
+    state = AsyncData(currentState);
+
+    try {
+      const manualBeatMap = BeatMap(
+        beats: [],
+        bpm: 0,
+        averageBeatInterval: Duration(seconds: 2),
+      );
+      try {
+        await ref
+            .read(playbackViewModelProvider.notifier)
+            .preparePlayback(
+              beatMap: manualBeatMap,
+              audioSourcePath: selectedFile.source.path,
+            );
+        if (!_isCurrentSession(session)) {
+          return;
+        }
+      } catch (error, stackTrace) {
+        ref
+            .read(appLoggerProvider)
+            .warning(
+              _tag,
+              'Playback preparation failed for song-only selection: ${_playbackPreparationMessage(error)}',
+            );
+        ref.read(appLoggerProvider).debug(_tag, stackTrace.toString());
+        currentState = currentState.copyWith(
+          warningMessage: _playbackPreparationMessage(error),
+        );
+      }
+      currentState = _advanceState(
+        currentState,
+        completedStage: AudioImportPipelineStage.preparePlayback,
+        nextStage: AudioImportPipelineStage.buildTimeline,
+      );
+      state = AsyncData(currentState);
+
+      await ref
+          .read(timelineViewModelProvider.notifier)
+          .buildProjectTimeline(
+            beatMap: manualBeatMap,
+            events: const [],
+            selectedMedia: _selectedMedia,
+            selectedImageFits: _selectedImageFits,
+          );
+      if (!_isCurrentSession(session)) {
+        return;
+      }
+
+      currentState =
+          _advanceState(
+            currentState,
+            completedStage: AudioImportPipelineStage.buildTimeline,
+          ).copyWith(
+            status: AudioImportPipelineStatus.success,
+            clearActiveStage: true,
+          );
+      state = AsyncData(currentState);
+    } catch (error, stackTrace) {
+      if (!_isCurrentSession(session)) {
+        return;
+      }
+      ref
+          .read(appLoggerProvider)
+          .error(
+            _tag,
+            error,
+            stackTrace,
+            message: 'Song-only import pipeline failed',
+          );
+      state = AsyncData(
+        currentState.copyWith(
+          status: AudioImportPipelineStatus.failure,
+          errorStage: currentState.activeStage,
+          errorMessage: error.toString(),
+          clearActiveStage: true,
+        ),
+      );
+    }
+  }
+
   bool _isCurrentSession(int session) {
     return session == _pipelineSession;
   }
 
   List<LibraryMediaItem> get _selectedMedia {
     return ref.read(editorMediaSelectionViewModelProvider).selectedMedia;
+  }
+
+  Map<String, VideoTemplateImageFit> get _selectedImageFits {
+    return ref.read(editorMediaSelectionViewModelProvider).selectedImageFits;
   }
 
   Future<void> _completePipelineFromMarkerPreset({
@@ -366,6 +529,7 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           beatMap: beatMap,
           events: events,
           selectedMedia: _selectedMedia,
+          selectedImageFits: _selectedImageFits,
         );
     if (!_isCurrentSession(session)) {
       return;

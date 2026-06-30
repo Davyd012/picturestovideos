@@ -18,6 +18,7 @@ class BuildMediaTrackUseCase {
     required BeatMap beatMap,
     required List<LibraryMediaItem> selectedMedia,
     required List<BeatEvent> markerEvents,
+    Map<String, VideoTemplateImageFit> selectedImageFits = const {},
     VideoTemplate template = VideoTemplates.cleanMemories,
   }) {
     if (markerEvents.isEmpty || selectedMedia.isEmpty) {
@@ -49,6 +50,7 @@ class BuildMediaTrackUseCase {
             start: start,
             end: end,
             sourcePath: item.sourcePath,
+            imageFit: selectedImageFits[item.id] ?? template.imageFit,
           ),
         ),
       );

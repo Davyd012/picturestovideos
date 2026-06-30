@@ -214,7 +214,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       '${renderSize.width}x${renderSize.height}',
       '$_previewFrameRate',
       for (final clip in clips)
-        '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}',
+        '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}:${clip.imageFit.name}',
     ].join('|');
   }
 

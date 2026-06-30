@@ -24,6 +24,7 @@ class BuildProjectTimelineUseCase {
     required BeatMap beatMap,
     required List<BeatEvent> events,
     List<LibraryMediaItem> selectedMedia = const [],
+    Map<String, VideoTemplateImageFit> selectedImageFits = const {},
     VideoTemplate template = VideoTemplates.cleanMemories,
   }) {
     final tracks = <TimelineTrack>[
@@ -36,6 +37,7 @@ class BuildProjectTimelineUseCase {
     final mediaTrack = _buildMediaTrackUseCase(
       beatMap: beatMap,
       selectedMedia: selectedMedia,
+      selectedImageFits: selectedImageFits,
       markerEvents: events,
       template: template,
     );

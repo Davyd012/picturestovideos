@@ -18,6 +18,7 @@ class ToolsTabView extends ConsumerWidget {
     required this.playback,
     required this.selectedTemplate,
     required this.selectedMedia,
+    required this.selectedImageFits,
     required this.selectedMarker,
     required this.events,
     required this.eventStatusText,
@@ -35,6 +36,7 @@ class ToolsTabView extends ConsumerWidget {
   final PlaybackState? playback;
   final VideoTemplate selectedTemplate;
   final List<LibraryMediaItem> selectedMedia;
+  final Map<String, VideoTemplateImageFit> selectedImageFits;
   final TimelineMarkerSelection? selectedMarker;
   final List<BeatEvent> events;
   final String eventStatusText;
@@ -156,6 +158,7 @@ class ToolsTabView extends ConsumerWidget {
                       beatMap: beatMap!,
                       events: events,
                       selectedMedia: selectedMedia,
+                      selectedImageFits: selectedImageFits,
                     )
               : null,
           icon: const Icon(Icons.sync),

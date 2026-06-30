@@ -4,12 +4,16 @@ import 'package:picturestovideos/shared/extensions/build_context_theme_extension
 class ImportEmptyState extends StatelessWidget {
   const ImportEmptyState({
     required this.onChooseFile,
+    required this.onSelectSongOnly,
     required this.onImportFromPath,
+    required this.onSelectSongOnlyFromPath,
     super.key,
   });
 
   final VoidCallback onChooseFile;
+  final VoidCallback onSelectSongOnly;
   final VoidCallback onImportFromPath;
+  final VoidCallback onSelectSongOnlyFromPath;
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +34,9 @@ class ImportEmptyState extends StatelessWidget {
                     const SizedBox(height: 32),
                     _UploadCard(
                       onChooseFile: onChooseFile,
+                      onSelectSongOnly: onSelectSongOnly,
                       onImportFromPath: onImportFromPath,
+                      onSelectSongOnlyFromPath: onSelectSongOnlyFromPath,
                     ),
                   ],
                 ),
@@ -74,11 +80,15 @@ class _BrandHeader extends StatelessWidget {
 class _UploadCard extends StatelessWidget {
   const _UploadCard({
     required this.onChooseFile,
+    required this.onSelectSongOnly,
     required this.onImportFromPath,
+    required this.onSelectSongOnlyFromPath,
   });
 
   final VoidCallback onChooseFile;
+  final VoidCallback onSelectSongOnly;
   final VoidCallback onImportFromPath;
+  final VoidCallback onSelectSongOnlyFromPath;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +108,7 @@ class _UploadCard extends StatelessWidget {
             Text('Drop a WAV file here', style: context.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'Only WAV files are supported for now.',
+              'Analyze a WAV file, or select any song and add markers yourself.',
               style: context.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -111,12 +121,22 @@ class _UploadCard extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onChooseFile,
                   icon: const Icon(Icons.folder_open),
-                  label: const Text('Choose file'),
+                  label: const Text('Analyze WAV'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onSelectSongOnly,
+                  icon: const Icon(Icons.library_music_outlined),
+                  label: const Text('Select song only'),
                 ),
                 OutlinedButton.icon(
                   onPressed: onImportFromPath,
                   icon: const Icon(Icons.terminal),
-                  label: const Text('Import from path'),
+                  label: const Text('WAV from path'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onSelectSongOnlyFromPath,
+                  icon: const Icon(Icons.audio_file_outlined),
+                  label: const Text('Song from path'),
                 ),
               ],
             ),

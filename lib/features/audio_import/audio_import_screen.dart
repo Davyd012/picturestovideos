@@ -97,7 +97,12 @@ class _ImportAudioBody extends ConsumerWidget {
         AudioImportFlowState.empty => ImportEmptyState(
           onChooseFile: () =>
               ref.read(audioImportViewModelProvider.notifier).pickAudioFile(),
-          onImportFromPath: () => _showImportFromPathDialog(context, ref),
+          onSelectSongOnly: () =>
+              ref.read(audioImportViewModelProvider.notifier).selectSongOnly(),
+          onImportFromPath: () =>
+              _showImportFromPathDialog(context, ref, songOnly: false),
+          onSelectSongOnlyFromPath: () =>
+              _showImportFromPathDialog(context, ref, songOnly: true),
         ),
         AudioImportFlowState.pickingFile ||
         AudioImportFlowState.importing ||
@@ -132,8 +137,9 @@ class _ImportAudioBody extends ConsumerWidget {
 
   Future<void> _showImportFromPathDialog(
     BuildContext context,
-    WidgetRef ref,
-  ) async {
+    WidgetRef ref, {
+    required bool songOnly,
+  }) async {
     final controller = TextEditingController();
     final navigator = Navigator.of(context);
 
@@ -141,13 +147,15 @@ class _ImportAudioBody extends ConsumerWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Import WAV from path'),
+          title: Text(
+            songOnly ? 'Select song from path' : 'Import WAV from path',
+          ),
           content: TextField(
             controller: controller,
             autofocus: true,
             decoration: const InputDecoration(
               hintText: '/home/user/audio/track.wav',
-              labelText: 'Absolute WAV path',
+              labelText: 'Absolute audio path',
             ),
           ),
           actions: [
@@ -158,11 +166,17 @@ class _ImportAudioBody extends ConsumerWidget {
             FilledButton(
               onPressed: () async {
                 navigator.pop();
-                await ref
-                    .read(audioImportViewModelProvider.notifier)
-                    .importAudioFromPath(controller.text);
+                if (songOnly) {
+                  await ref
+                      .read(audioImportViewModelProvider.notifier)
+                      .selectSongOnlyFromPath(controller.text);
+                } else {
+                  await ref
+                      .read(audioImportViewModelProvider.notifier)
+                      .importAudioFromPath(controller.text);
+                }
               },
-              child: const Text('Import'),
+              child: Text(songOnly ? 'Select' : 'Import'),
             ),
           ],
         );

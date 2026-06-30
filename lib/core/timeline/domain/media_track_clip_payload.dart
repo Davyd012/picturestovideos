@@ -1,3 +1,5 @@
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
+
 class MediaTrackClipPayload {
   const MediaTrackClipPayload({
     required this.mediaId,
@@ -6,6 +8,7 @@ class MediaTrackClipPayload {
     required this.start,
     required this.end,
     required this.sourcePath,
+    required this.imageFit,
   });
 
   final String mediaId;
@@ -14,6 +17,7 @@ class MediaTrackClipPayload {
   final Duration start;
   final Duration end;
   final String sourcePath;
+  final VideoTemplateImageFit imageFit;
 
   Map<String, Object?> toJson() {
     return {
@@ -24,6 +28,7 @@ class MediaTrackClipPayload {
       'startMs': start.inMilliseconds,
       'endMs': end.inMilliseconds,
       'sourcePath': sourcePath,
+      'imageFit': imageFit.name,
     };
   }
 
@@ -35,6 +40,7 @@ class MediaTrackClipPayload {
       start: Duration(milliseconds: json['startMs']! as int),
       end: Duration(milliseconds: json['endMs']! as int),
       sourcePath: json['sourcePath']! as String,
+      imageFit: VideoTemplateImageFit.fromJson(json['imageFit'] as String?),
     );
   }
 
@@ -45,6 +51,7 @@ class MediaTrackClipPayload {
     Duration? start,
     Duration? end,
     String? sourcePath,
+    VideoTemplateImageFit? imageFit,
   }) {
     return MediaTrackClipPayload(
       mediaId: mediaId ?? this.mediaId,
@@ -53,6 +60,7 @@ class MediaTrackClipPayload {
       start: start ?? this.start,
       end: end ?? this.end,
       sourcePath: sourcePath ?? this.sourcePath,
+      imageFit: imageFit ?? this.imageFit,
     );
   }
 }

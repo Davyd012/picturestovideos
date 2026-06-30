@@ -103,10 +103,7 @@ class _EditorPreviewCardState extends ConsumerState<EditorPreviewCard> {
             if (hasVideoSurface)
               Video(controller: _videoController, fit: BoxFit.cover)
             else if (previewFrame.hasActiveClip)
-              _LivePreviewSurface(
-                previewFrame: previewFrame,
-                template: widget.project?.template,
-              )
+              _LivePreviewSurface(previewFrame: previewFrame)
             else
               ColoredBox(color: context.colors.surfaceContainerHighest),
             DecoratedBox(
@@ -389,13 +386,9 @@ class _ActivePreviewCopy extends StatelessWidget {
 }
 
 class _LivePreviewSurface extends StatelessWidget {
-  const _LivePreviewSurface({
-    required this.previewFrame,
-    required this.template,
-  });
+  const _LivePreviewSurface({required this.previewFrame});
 
   final EditorPreviewFrame previewFrame;
-  final VideoTemplate? template;
 
   @override
   Widget build(BuildContext context) {
@@ -405,18 +398,21 @@ class _LivePreviewSurface extends StatelessWidget {
       return _MissingLivePreviewSurface(title: activeClip.title);
     }
 
-    return Image.file(
-      File(sourcePath),
-      fit: _livePreviewFit(template),
-      errorBuilder: (context, error, stackTrace) {
-        return _MissingLivePreviewSurface(title: activeClip.title);
-      },
+    return ColoredBox(
+      color: context.colors.scrim,
+      child: Image.file(
+        File(sourcePath),
+        fit: _livePreviewFit(activeClip.imageFit),
+        errorBuilder: (context, error, stackTrace) {
+          return _MissingLivePreviewSurface(title: activeClip.title);
+        },
+      ),
     );
   }
 }
 
-BoxFit _livePreviewFit(VideoTemplate? template) {
-  if (template?.imageFit == VideoTemplateImageFit.cover) {
+BoxFit _livePreviewFit(VideoTemplateImageFit imageFit) {
+  if (imageFit == VideoTemplateImageFit.cover) {
     return BoxFit.cover;
   }
   return BoxFit.contain;

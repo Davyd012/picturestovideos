@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -92,6 +93,7 @@ class ResolveMediaTrackClipsUseCase {
         start: event.time,
         end: Duration(milliseconds: endMs ?? event.time.inMilliseconds),
         sourcePath: sourcePath,
+        imageFit: VideoTemplateImageFit.cover,
       );
     }
     return null;

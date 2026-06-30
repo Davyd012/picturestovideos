@@ -2,19 +2,25 @@ import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class ClipsTabView extends StatelessWidget {
   const ClipsTabView({
     required this.selectedMedia,
+    required this.selectedImageFits,
     required this.onReorderMedia,
+    required this.onImageFitSelected,
     required this.onOpenTimeline,
     super.key,
   });
 
   final List<LibraryMediaItem> selectedMedia;
+  final Map<String, VideoTemplateImageFit> selectedImageFits;
   final void Function(int oldIndex, int newIndex) onReorderMedia;
+  final void Function(String mediaId, VideoTemplateImageFit imageFit)
+  onImageFitSelected;
   final VoidCallback onOpenTimeline;
 
   @override
@@ -61,6 +67,9 @@ class ClipsTabView extends StatelessWidget {
                   item: item,
                   index: index,
                   canReorder: selectedMedia.length > 1,
+                  imageFit: _imageFitFor(item.id),
+                  onImageFitSelected: (imageFit) =>
+                      onImageFitSelected(item.id, imageFit),
                 ),
               );
             },
@@ -84,6 +93,10 @@ class ClipsTabView extends StatelessWidget {
       ],
     );
   }
+
+  VideoTemplateImageFit _imageFitFor(String mediaId) {
+    return selectedImageFits[mediaId] ?? VideoTemplateImageFit.cover;
+  }
 }
 
 class _ClipListItem extends StatelessWidget {
@@ -91,39 +104,86 @@ class _ClipListItem extends StatelessWidget {
     required this.item,
     required this.index,
     required this.canReorder,
+    this.imageFit = VideoTemplateImageFit.cover,
+    this.onImageFitSelected,
   });
 
   final LibraryMediaItem item;
   final int index;
   final bool canReorder;
+  final VideoTemplateImageFit imageFit;
+  final ValueChanged<VideoTemplateImageFit>? onImageFitSelected;
 
   @override
   Widget build(BuildContext context) {
     return Card.outlined(
-      child: ListTile(
-        minVerticalPadding: 12,
-        leading: _Thumbnail(item: item),
-        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          '${_formatDuration(Duration(seconds: index * 3))}  /  3s',
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (canReorder)
-              ReorderableDragStartListener(
-                index: index,
-                child: Icon(
-                  Icons.drag_handle,
-                  color: context.colors.onSurfaceVariant,
-                ),
-              )
-            else
-              Icon(Icons.drag_handle, color: context.colors.onSurfaceVariant),
-            IconButton(onPressed: null, icon: const Icon(Icons.more_vert)),
-          ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: ListTile(
+          minVerticalPadding: 12,
+          leading: _Thumbnail(item: item),
+          title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _ImageFitSelector(
+              imageFit: imageFit,
+              onImageFitSelected: onImageFitSelected,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${_formatDuration(Duration(seconds: index * 3))} / 3s',
+                style: context.textTheme.labelMedium,
+              ),
+              const SizedBox(width: 8),
+              if (canReorder)
+                ReorderableDragStartListener(
+                  index: index,
+                  child: Icon(
+                    Icons.drag_handle,
+                    color: context.colors.onSurfaceVariant,
+                  ),
+                )
+              else
+                Icon(Icons.drag_handle, color: context.colors.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _ImageFitSelector extends StatelessWidget {
+  const _ImageFitSelector({
+    required this.imageFit,
+    required this.onImageFitSelected,
+  });
+
+  final VideoTemplateImageFit imageFit;
+  final ValueChanged<VideoTemplateImageFit>? onImageFitSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<VideoTemplateImageFit>(
+      segments: const [
+        ButtonSegment(
+          value: VideoTemplateImageFit.cover,
+          icon: Icon(Icons.crop),
+          label: Text('Crop'),
+        ),
+        ButtonSegment(
+          value: VideoTemplateImageFit.contain,
+          icon: Icon(Icons.fit_screen),
+          label: Text('Full'),
+        ),
+      ],
+      selected: {imageFit},
+      onSelectionChanged: onImageFitSelected == null
+          ? null
+          : (selection) => onImageFitSelected!(selection.single),
     );
   }
 }

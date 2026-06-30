@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/features/editor/widgets/clips_tab_view.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 
@@ -20,10 +21,12 @@ void main() {
                 _mediaItem(id: 'second', title: 'Second.png'),
                 _mediaItem(id: 'third', title: 'Third.png'),
               ],
+              selectedImageFits: const {},
               onReorderMedia: (oldValue, newValue) {
                 oldIndex = oldValue;
                 newIndex = newValue;
               },
+              onImageFitSelected: (_, _) {},
               onOpenTimeline: () {},
             ),
           ),
@@ -38,6 +41,36 @@ void main() {
 
     expect(oldIndex, 0);
     expect(newIndex, 2);
+  });
+
+  testWidgets('clips tab changes image fit per item', (tester) async {
+    String? mediaId;
+    VideoTemplateImageFit? imageFit;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ClipsTabView(
+              selectedMedia: [_mediaItem(id: 'first', title: 'First.png')],
+              selectedImageFits: const {'first': VideoTemplateImageFit.cover},
+              onReorderMedia: (_, _) {},
+              onImageFitSelected: (id, fit) {
+                mediaId = id;
+                imageFit = fit;
+              },
+              onOpenTimeline: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Full'));
+    await tester.pumpAndSettle();
+
+    expect(mediaId, 'first');
+    expect(imageFit, VideoTemplateImageFit.contain);
   });
 }
 
