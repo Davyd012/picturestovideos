@@ -20,6 +20,7 @@ class TimelineTabView extends StatelessWidget {
     required this.events,
     required this.onTimelineScaleChanged,
     required this.onCurrentPointChanged,
+    this.audioDuration,
     super.key,
   });
 
@@ -31,12 +32,13 @@ class TimelineTabView extends StatelessWidget {
   final List<BeatEvent> events;
   final ValueChanged<double> onTimelineScaleChanged;
   final ValueChanged<Duration> onCurrentPointChanged;
+  final Duration? audioDuration;
 
   @override
   Widget build(BuildContext context) {
     final markers = _markers;
     final clips = _clips;
-    final duration = _duration(markers, clips);
+    final duration = _duration(markers, clips, audioDuration);
     final nextIndex = playback?.nextBeatIndex ?? 0;
     final scale = timelineScale
         .clamp(_minTimelineScale, _maxTimelineScale)
@@ -456,8 +458,14 @@ class PositionedPlayhead extends StatelessWidget {
   }
 }
 
-Duration _duration(List<Beat> markers, List<MediaTrackClipPayload> clips) {
-  var duration = const Duration(seconds: 30);
+Duration _duration(
+  List<Beat> markers,
+  List<MediaTrackClipPayload> clips,
+  Duration? audioDuration,
+) {
+  var duration = audioDuration != null && audioDuration > Duration.zero
+      ? audioDuration
+      : Duration.zero;
   for (final marker in markers) {
     if (marker.time > duration) {
       duration = marker.time;
@@ -468,7 +476,7 @@ Duration _duration(List<Beat> markers, List<MediaTrackClipPayload> clips) {
       duration = clip.end;
     }
   }
-  return duration;
+  return duration > Duration.zero ? duration : const Duration(seconds: 30);
 }
 
 Duration _timeForPosition({

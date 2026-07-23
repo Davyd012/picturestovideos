@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
@@ -19,6 +20,7 @@ class BuildMediaTrackUseCase {
     required List<LibraryMediaItem> selectedMedia,
     required List<BeatEvent> markerEvents,
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+    Map<String, ImageCropTransform> selectedCropTransforms = const {},
     VideoTemplate template = VideoTemplates.cleanMemories,
   }) {
     if (markerEvents.isEmpty || selectedMedia.isEmpty) {
@@ -51,6 +53,8 @@ class BuildMediaTrackUseCase {
             end: end,
             sourcePath: item.sourcePath,
             imageFit: selectedImageFits[item.id] ?? template.imageFit,
+            cropTransform:
+                selectedCropTransforms[item.id] ?? ImageCropTransform.centered,
           ),
         ),
       );

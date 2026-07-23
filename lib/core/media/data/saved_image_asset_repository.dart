@@ -5,5 +5,7 @@ abstract interface class SavedImageAssetRepository {
 
   Future<void> upsertAll(List<SavedImageAsset> assets);
 
+  Future<void> removeAll(Set<String> ids);
+
   Future<void> clear();
 }

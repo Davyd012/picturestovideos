@@ -66,6 +66,25 @@ class SharedPreferencesSavedImageAssetRepository
     );
   }
 
+  @override
+  Future<void> removeAll(Set<String> ids) async {
+    if (ids.isEmpty) {
+      return;
+    }
+    final nextAssets = [
+      for (final asset in await loadAll())
+        if (!ids.contains(asset.id)) asset,
+    ];
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _storageKey,
+      jsonEncode({
+        'version': 2,
+        'assets': [for (final asset in nextAssets) _serialize(asset)],
+      }),
+    );
+  }
+
   Map<String, Object?> _serialize(SavedImageAsset asset) {
     return {
       'id': asset.id,
@@ -73,6 +92,8 @@ class SharedPreferencesSavedImageAssetRepository
       'sourcePath': asset.sourcePath,
       'byteLength': asset.byteLength,
       'importedOn': asset.importedOn.toIso8601String(),
+      'fileModifiedOn': asset.fileModifiedOn?.toIso8601String(),
+      'importOrder': asset.importOrder,
     };
   }
 
@@ -83,6 +104,11 @@ class SharedPreferencesSavedImageAssetRepository
       sourcePath: json['sourcePath']! as String,
       byteLength: json['byteLength'] as int? ?? 0,
       importedOn: DateTime.parse(json['importedOn']! as String),
+      fileModifiedOn: switch (json['fileModifiedOn']) {
+        final String value => DateTime.tryParse(value),
+        _ => null,
+      },
+      importOrder: json['importOrder'] as int? ?? 0,
     );
   }
 }

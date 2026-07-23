@@ -13,6 +13,8 @@ class LibraryMediaItem {
     required this.byteLength,
     required this.thumbnailBytes,
     required this.sourcePath,
+    this.fileModifiedOn,
+    this.importOrder = 0,
     this.isFavorite = false,
   });
 
@@ -25,6 +27,8 @@ class LibraryMediaItem {
   final int byteLength;
   final Uint8List thumbnailBytes;
   final String sourcePath;
+  final DateTime? fileModifiedOn;
+  final int importOrder;
   final bool isFavorite;
 
   factory LibraryMediaItem.fromImportedImageAsset(ImportedImageAsset asset) {
@@ -38,6 +42,8 @@ class LibraryMediaItem {
       byteLength: asset.byteLength,
       thumbnailBytes: asset.thumbnailBytes,
       sourcePath: asset.sourcePath,
+      fileModifiedOn: asset.fileModifiedOn,
+      importOrder: asset.importOrder,
     );
   }
 

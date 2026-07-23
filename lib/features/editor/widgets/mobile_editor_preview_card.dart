@@ -35,7 +35,10 @@ class MobileEditorPreviewCard extends ConsumerWidget {
           currentTime: playback?.currentTime ?? Duration.zero,
         );
     final activeClip = previewFrame.activeClip;
-    final duration = previewState.result?.totalDuration ?? _fallbackDuration;
+    final duration =
+        playback?.sourceDuration ??
+        previewState.result?.totalDuration ??
+        _fallbackDuration;
     final currentTime = playback?.currentTime ?? Duration.zero;
     final progress = _progress(currentTime, duration, previewFrame.progress);
     final aspectRatio = project?.template.aspectRatio.value ?? 16 / 9;
@@ -165,6 +168,23 @@ class _PreviewSurface extends StatelessWidget {
           fit: activeClip?.imageFit == VideoTemplateImageFit.contain
               ? BoxFit.contain
               : BoxFit.cover,
+          alignment: Alignment(
+            activeClip!.cropTransform.focalX,
+            activeClip!.cropTransform.focalY,
+          ),
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (activeClip!.imageFit == VideoTemplateImageFit.contain) {
+              return child;
+            }
+            return Transform.scale(
+              scale: activeClip!.cropTransform.zoom,
+              alignment: Alignment(
+                activeClip!.cropTransform.focalX,
+                activeClip!.cropTransform.focalY,
+              ),
+              child: child,
+            );
+          },
           errorBuilder: (context, error, stackTrace) {
             return _FallbackPreview(title: activeClip?.title);
           },

@@ -21,6 +21,8 @@ abstract interface class AudioPlayerRepository {
 
   Duration get currentPosition;
 
+  Duration? get sourceDuration;
+
   bool get hasLoadedSource;
 
   bool get isCompleted;
@@ -63,11 +65,15 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   StreamSubscription<Duration>? _positionSubscription;
   StreamSubscription<void>? _completeSubscription;
   Duration _currentPosition = Duration.zero;
+  Duration? _sourceDuration;
   String? _loadedSourcePath;
   bool _isCompleted = false;
 
   @override
   Duration get currentPosition => _currentPosition;
+
+  @override
+  Duration? get sourceDuration => _sourceDuration;
 
   @override
   bool get hasLoadedSource =>
@@ -86,6 +92,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   Future<void> load(String? audioSourcePath) async {
     if (audioSourcePath == null || audioSourcePath.isEmpty) {
       _loadedSourcePath = null;
+      _sourceDuration = null;
       _logger.warning(
         'AudioPlayerRepository',
         'No audio source path available for playback',
@@ -103,6 +110,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
 
     await _player.stop();
     await _setSource(audioSourcePath);
+    _sourceDuration = await _player.getDuration();
     _loadedSourcePath = audioSourcePath;
     _currentPosition = Duration.zero;
     _isCompleted = false;
@@ -122,6 +130,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
 
     await _player.stop();
     await _setSource(loadedSourcePath);
+    _sourceDuration = await _player.getDuration();
     _currentPosition = Duration.zero;
     _isCompleted = false;
     _controller.add(_currentPosition);
@@ -208,6 +217,7 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
   final StreamController<Duration> _controller;
   final StreamController<void> _completeController;
   Duration _currentPosition = Duration.zero;
+  Duration? _sourceDuration;
   String? _loadedSourcePath;
   bool _isPlaying = false;
   bool _isCompleted = false;
@@ -215,6 +225,9 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
 
   @override
   Duration get currentPosition => _currentPosition;
+
+  @override
+  Duration? get sourceDuration => _sourceDuration;
 
   @override
   bool get hasLoadedSource =>
@@ -234,6 +247,10 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
     _loadedSourcePath = audioSourcePath;
     _isCompleted = false;
     _loadCount += audioSourcePath == null || audioSourcePath.isEmpty ? 0 : 1;
+  }
+
+  void setSourceDuration(Duration? duration) {
+    _sourceDuration = duration;
   }
 
   @override

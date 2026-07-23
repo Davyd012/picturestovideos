@@ -13,6 +13,7 @@ import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/selected_audio_file.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/features/audio_analysis/audio_analysis_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
@@ -308,6 +309,7 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
             events: events,
             selectedMedia: _selectedMedia,
             selectedImageFits: _selectedImageFits,
+            selectedCropTransforms: _selectedCropTransforms,
           );
       if (!_isCurrentSession(session)) {
         return;
@@ -417,6 +419,7 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
             events: const [],
             selectedMedia: _selectedMedia,
             selectedImageFits: _selectedImageFits,
+            selectedCropTransforms: _selectedCropTransforms,
           );
       if (!_isCurrentSession(session)) {
         return;
@@ -464,6 +467,12 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
 
   Map<String, VideoTemplateImageFit> get _selectedImageFits {
     return ref.read(editorMediaSelectionViewModelProvider).selectedImageFits;
+  }
+
+  Map<String, ImageCropTransform> get _selectedCropTransforms {
+    return ref
+        .read(editorMediaSelectionViewModelProvider)
+        .selectedCropTransforms;
   }
 
   Future<void> _completePipelineFromMarkerPreset({
@@ -530,6 +539,7 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           events: events,
           selectedMedia: _selectedMedia,
           selectedImageFits: _selectedImageFits,
+          selectedCropTransforms: _selectedCropTransforms,
         );
     if (!_isCurrentSession(session)) {
       return;

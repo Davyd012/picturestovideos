@@ -10,6 +10,32 @@ import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 
 void main() {
+  test('preparePlayback exposes loaded source duration', () async {
+    final repository = ManualAudioPlayerRepository()
+      ..setSourceDuration(const Duration(minutes: 3, seconds: 42));
+    final container = ProviderContainer(
+      overrides: [audioPlayerRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(playbackViewModelProvider.future);
+    await container
+        .read(playbackViewModelProvider.notifier)
+        .preparePlayback(
+          beatMap: const BeatMap(
+            beats: [],
+            bpm: 0,
+            averageBeatInterval: Duration(seconds: 2),
+          ),
+          audioSourcePath: '/tmp/song.mp3',
+        );
+
+    expect(
+      container.read(playbackViewModelProvider).value?.sourceDuration,
+      const Duration(minutes: 3, seconds: 42),
+    );
+  });
+
   test('step updates playback time and triggered beats', () async {
     final repository = ManualAudioPlayerRepository();
     final container = ProviderContainer(

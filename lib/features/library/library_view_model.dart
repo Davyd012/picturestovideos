@@ -5,6 +5,7 @@ import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 
 final libraryViewModelProvider =
     NotifierProvider.autoDispose<LibraryViewModel, LibraryState>(
@@ -89,6 +90,45 @@ class LibraryViewModel extends Notifier<LibraryState> {
     state = state.copyWith(clearError: true, clearStatusMessage: true);
   }
 
+  Future<void> removeImportedImages(Set<String> itemIds) async {
+    if (itemIds.isEmpty) {
+      return;
+    }
+    state = state.copyWith(
+      isImporting: true,
+      clearError: true,
+      clearStatusMessage: true,
+    );
+    try {
+      await ref.read(savedImageAssetRepositoryProvider).removeAll(itemIds);
+      ref
+          .read(editorMediaSelectionViewModelProvider.notifier)
+          .removeAllMedia(itemIds);
+      state = state.copyWith(
+        items: List.unmodifiable(
+          state.items.where((item) => !itemIds.contains(item.id)),
+        ),
+        selectedItemIds: const {},
+        isImporting: false,
+        statusMessage:
+            'Removed ${itemIds.length} image${itemIds.length == 1 ? '' : 's'} from the app.',
+      );
+    } catch (error, stackTrace) {
+      ref
+          .read(appLoggerProvider)
+          .error(
+            _tag,
+            error,
+            stackTrace,
+            message: 'Removing imported images failed',
+          );
+      state = state.copyWith(
+        isImporting: false,
+        errorMessage: error.toString(),
+      );
+    }
+  }
+
   Future<void> _importImages({
     required String action,
     required Future<List<ImportedImageAsset>> Function() importCall,
@@ -163,6 +203,8 @@ class LibraryViewModel extends Notifier<LibraryState> {
           sourcePath: asset.sourcePath,
           byteLength: asset.byteLength,
           importedOn: asset.importedOn,
+          fileModifiedOn: asset.fileModifiedOn,
+          importOrder: asset.importOrder,
         ),
     ];
   }

@@ -22,11 +22,15 @@ void main() {
                 _mediaItem(id: 'third', title: 'Third.png'),
               ],
               selectedImageFits: const {},
+              selectedCropTransforms: const {},
               onReorderMedia: (oldValue, newValue) {
                 oldIndex = oldValue;
                 newIndex = newValue;
               },
               onImageFitSelected: (_, _) {},
+              onCropTransformChanged: (_, _) {},
+              onApplyImageFitToAll: (_) {},
+              onMoveMediaToPosition: (_, _) {},
               onOpenTimeline: () {},
             ),
           ),
@@ -54,10 +58,55 @@ void main() {
             child: ClipsTabView(
               selectedMedia: [_mediaItem(id: 'first', title: 'First.png')],
               selectedImageFits: const {'first': VideoTemplateImageFit.cover},
+              selectedCropTransforms: const {},
               onReorderMedia: (_, _) {},
               onImageFitSelected: (id, fit) {
                 mediaId = id;
                 imageFit = fit;
+              },
+              onCropTransformChanged: (_, _) {},
+              onApplyImageFitToAll: (_) {},
+              onMoveMediaToPosition: (_, _) {},
+              onOpenTimeline: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Fill frame (crop)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Full image').last);
+    await tester.pumpAndSettle();
+
+    expect(mediaId, 'first');
+    expect(imageFit, VideoTemplateImageFit.contain);
+  });
+
+  testWidgets('clips tab moves an image to a numbered position', (
+    tester,
+  ) async {
+    String? mediaId;
+    int? position;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ClipsTabView(
+              selectedMedia: [
+                _mediaItem(id: 'first', title: 'First.png'),
+                _mediaItem(id: 'second', title: 'Second.png'),
+              ],
+              selectedImageFits: const {},
+              selectedCropTransforms: const {},
+              onReorderMedia: (_, _) {},
+              onImageFitSelected: (_, _) {},
+              onCropTransformChanged: (_, _) {},
+              onApplyImageFitToAll: (_) {},
+              onMoveMediaToPosition: (id, nextPosition) {
+                mediaId = id;
+                position = nextPosition;
               },
               onOpenTimeline: () {},
             ),
@@ -66,11 +115,14 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Full'));
+    await tester.tap(find.byTooltip('Move to position').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), '2');
+    await tester.tap(find.text('Move'));
     await tester.pumpAndSettle();
 
     expect(mediaId, 'first');
-    expect(imageFit, VideoTemplateImageFit.contain);
+    expect(position, 2);
   });
 }
 

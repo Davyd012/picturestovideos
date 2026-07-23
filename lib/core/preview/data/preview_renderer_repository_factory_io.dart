@@ -459,9 +459,14 @@ String _imageFilter({
   required int height,
 }) {
   if (clip.imageFit == VideoTemplateImageFit.cover) {
+    final crop = clip.cropTransform;
+    final scaledWidth = (width * crop.zoom).round();
+    final scaledHeight = (height * crop.zoom).round();
+    final cropX = ((crop.focalX + 1) / 2).toStringAsFixed(6);
+    final cropY = ((crop.focalY + 1) / 2).toStringAsFixed(6);
     return [
-      'scale=w=$width:h=$height:force_original_aspect_ratio=increase',
-      'crop=$width:$height',
+      'scale=w=$scaledWidth:h=$scaledHeight:force_original_aspect_ratio=increase',
+      "crop=$width:$height:x='(iw-ow)*$cropX':y='(ih-oh)*$cropY'",
     ].join(',');
   }
 
@@ -640,7 +645,7 @@ String _buildSignature(BuildPreviewVideoRequest request) {
     '${request.width}x${request.height}',
     '${request.frameRate}',
     for (final clip in request.clips)
-      '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}:${clip.imageFit.name}',
+      '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}:${clip.imageFit.name}:${clip.cropTransform.focalX}:${clip.cropTransform.focalY}:${clip.cropTransform.zoom}',
   ].join('|');
 }
 
@@ -659,6 +664,9 @@ String _previewClipCacheKey({
     clip.tagline,
     clip.sourcePath,
     clip.imageFit.name,
+    clip.cropTransform.focalX,
+    clip.cropTransform.focalY,
+    clip.cropTransform.zoom,
     clip.start.inMilliseconds,
     clip.end.inMilliseconds,
     sourceStat.size,

@@ -112,6 +112,9 @@ void main() {
         .pickImages();
 
     expect(assets, hasLength(25));
+    expect(assets.first.fileName, 'Image_24.jpg');
+    expect(assets.last.fileName, 'Image_0.jpg');
+    expect(assets.first.importOrder, 0);
     expect(assets.every((asset) => asset.thumbnailBytes.isEmpty), isTrue);
     expect(
       assets.every((asset) => asset.byteLength == 4 * 1024 * 1024),
@@ -168,6 +171,62 @@ void main() {
       'First.png',
     ]);
   });
+
+  test(
+    'removeImportedImages clears persistence and staged selection',
+    () async {
+      final savedRepository = _MemorySavedImageAssetRepository();
+      final container = ProviderContainer(
+        overrides: [
+          imageImportRepositoryProvider.overrideWithValue(
+            _FakeImageImportRepository(
+              assets: [
+                ImportedImageAsset(
+                  id: '/tmp/first.png',
+                  fileName: 'First.png',
+                  sourcePath: '/tmp/first.png',
+                  bytes: Uint8List.fromList([1]),
+                  importedOn: DateTime(2026),
+                ),
+                ImportedImageAsset(
+                  id: '/tmp/second.png',
+                  fileName: 'Second.png',
+                  sourcePath: '/tmp/second.png',
+                  bytes: Uint8List.fromList([2]),
+                  importedOn: DateTime(2026),
+                ),
+              ],
+            ),
+          ),
+          savedImageAssetRepositoryProvider.overrideWithValue(savedRepository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(libraryViewModelProvider.notifier).pickImages();
+      container
+          .read(editorMediaSelectionViewModelProvider.notifier)
+          .addAllMedia(container.read(libraryViewModelProvider).items);
+      await container
+          .read(libraryViewModelProvider.notifier)
+          .removeImportedImages({'/tmp/first.png'});
+
+      expect(
+        container.read(libraryViewModelProvider).items.map((item) => item.id),
+        ['/tmp/second.png'],
+      );
+      expect(
+        container
+            .read(editorMediaSelectionViewModelProvider)
+            .selectedMedia
+            .map((item) => item.id),
+        ['/tmp/second.png'],
+      );
+      expect((await savedRepository.loadAll()).map((asset) => asset.id), [
+        '/tmp/second.png',
+      ]);
+    },
+  );
 }
 
 class _FakeImageFilePicker implements ImageFilePicker {
@@ -210,6 +269,11 @@ class _MemorySavedImageAssetRepository implements SavedImageAssetRepository {
   @override
   Future<List<SavedImageAsset>> loadAll() async {
     return List.unmodifiable(assets);
+  }
+
+  @override
+  Future<void> removeAll(Set<String> ids) async {
+    assets.removeWhere((asset) => ids.contains(asset.id));
   }
 
   @override

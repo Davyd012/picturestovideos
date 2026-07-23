@@ -155,6 +155,11 @@ class _MemorySavedImageAssetRepository implements SavedImageAssetRepository {
   }
 
   @override
+  Future<void> removeAll(Set<String> ids) async {
+    _assets.removeWhere((asset) => ids.contains(asset.id));
+  }
+
+  @override
   Future<void> upsertAll(List<SavedImageAsset> assets) async {
     for (final asset in assets) {
       _assets.removeWhere((currentAsset) => currentAsset.id == asset.id);

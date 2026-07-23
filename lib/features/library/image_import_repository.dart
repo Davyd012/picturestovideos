@@ -25,6 +25,8 @@ class ImportedImageAsset {
     required this.importedOn,
     Uint8List? bytes,
     int? byteLength,
+    this.fileModifiedOn,
+    this.importOrder = 0,
   }) : thumbnailBytes = bytes ?? Uint8List(0),
        byteLength = byteLength ?? bytes?.length ?? 0;
 
@@ -34,6 +36,8 @@ class ImportedImageAsset {
   final DateTime importedOn;
   final Uint8List thumbnailBytes;
   final int byteLength;
+  final DateTime? fileModifiedOn;
+  final int importOrder;
 }
 
 abstract interface class ImageImportRepository {
@@ -70,6 +74,11 @@ class DeviceImageImportRepository implements ImageImportRepository {
         continue;
       }
 
+      DateTime? fileModifiedOn;
+      final sourceFile = File(path);
+      if (await sourceFile.exists()) {
+        fileModifiedOn = await sourceFile.lastModified();
+      }
       assets.add(
         ImportedImageAsset(
           id: path,
@@ -78,11 +87,12 @@ class DeviceImageImportRepository implements ImageImportRepository {
           bytes: file.bytes,
           byteLength: file.size,
           importedOn: importedOn,
+          fileModifiedOn: fileModifiedOn,
         ),
       );
     }
 
-    return List.unmodifiable(assets);
+    return _reverseWithImportOrder(assets);
   }
 
   @override
@@ -131,6 +141,7 @@ class DeviceImageImportRepository implements ImageImportRepository {
           fileName: fileName,
           sourcePath: file.path,
           byteLength: await file.length(),
+          fileModifiedOn: await file.lastModified(),
           importedOn: importedOn,
         ),
       );
@@ -140,7 +151,26 @@ class DeviceImageImportRepository implements ImageImportRepository {
       'ImageImportRepository',
       'Imported ${assets.length} images from folder $normalizedPath',
     );
-    return List.unmodifiable(assets);
+    return _reverseWithImportOrder(assets);
+  }
+
+  List<ImportedImageAsset> _reverseWithImportOrder(
+    List<ImportedImageAsset> assets,
+  ) {
+    final reversed = assets.reversed.toList(growable: false);
+    return List.unmodifiable([
+      for (var index = 0; index < reversed.length; index++)
+        ImportedImageAsset(
+          id: reversed[index].id,
+          fileName: reversed[index].fileName,
+          sourcePath: reversed[index].sourcePath,
+          importedOn: reversed[index].importedOn,
+          bytes: reversed[index].thumbnailBytes,
+          byteLength: reversed[index].byteLength,
+          fileModifiedOn: reversed[index].fileModifiedOn,
+          importOrder: index,
+        ),
+    ]);
   }
 
   bool _isSupportedExtension(String extension) {

@@ -1,4 +1,5 @@
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 
 class MediaTrackClipPayload {
   const MediaTrackClipPayload({
@@ -9,6 +10,7 @@ class MediaTrackClipPayload {
     required this.end,
     required this.sourcePath,
     required this.imageFit,
+    this.cropTransform = ImageCropTransform.centered,
   });
 
   final String mediaId;
@@ -18,6 +20,7 @@ class MediaTrackClipPayload {
   final Duration end;
   final String sourcePath;
   final VideoTemplateImageFit imageFit;
+  final ImageCropTransform cropTransform;
 
   Map<String, Object?> toJson() {
     return {
@@ -29,6 +32,7 @@ class MediaTrackClipPayload {
       'endMs': end.inMilliseconds,
       'sourcePath': sourcePath,
       'imageFit': imageFit.name,
+      'cropTransform': cropTransform.toJson(),
     };
   }
 
@@ -41,6 +45,7 @@ class MediaTrackClipPayload {
       end: Duration(milliseconds: json['endMs']! as int),
       sourcePath: json['sourcePath']! as String,
       imageFit: VideoTemplateImageFit.fromJson(json['imageFit'] as String?),
+      cropTransform: ImageCropTransform.fromJson(json['cropTransform']),
     );
   }
 
@@ -52,6 +57,7 @@ class MediaTrackClipPayload {
     Duration? end,
     String? sourcePath,
     VideoTemplateImageFit? imageFit,
+    ImageCropTransform? cropTransform,
   }) {
     return MediaTrackClipPayload(
       mediaId: mediaId ?? this.mediaId,
@@ -61,6 +67,7 @@ class MediaTrackClipPayload {
       end: end ?? this.end,
       sourcePath: sourcePath ?? this.sourcePath,
       imageFit: imageFit ?? this.imageFit,
+      cropTransform: cropTransform ?? this.cropTransform,
     );
   }
 }

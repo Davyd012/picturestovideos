@@ -7,6 +7,8 @@ import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/core/audio/domain/audio_source.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
+import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -83,6 +85,13 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
       timelineState: timelineState,
       playbackState: playbackState,
     );
+    final project = timeline?.project;
+    final hasExportableClips =
+        project != null &&
+        ref
+            .read(resolvePreviewClipsUseCaseProvider)
+            .call(beatMap: project.beatMap, project: project)
+            .isNotEmpty;
 
     return AppShellScaffold(
       currentRoute: AppRoutes.audioEditor,
@@ -95,7 +104,7 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
         Padding(
           padding: const EdgeInsets.only(right: 16),
           child: FilledButton.icon(
-            onPressed: beatMap == null
+            onPressed: !hasExportableClips
                 ? null
                 : () => context.appNavigator.goToDownload(),
             icon: const Icon(Icons.download_outlined),
@@ -134,7 +143,9 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
             eventState: eventState,
             selectedMedia: mediaSelection.selectedMedia,
             selectedImageFits: mediaSelection.selectedImageFits,
-            audioDuration: importedAudio?.audioData?.duration,
+            selectedCropTransforms: mediaSelection.selectedCropTransforms,
+            audioDuration:
+                importedAudio?.audioData?.duration ?? playback?.sourceDuration,
             audioData: importedAudio?.audioData,
             audioSource: importedAudio?.source,
             audioSourcePath: importedAudio?.source?.path,
@@ -200,6 +211,7 @@ class _EditorTabBody extends ConsumerWidget {
     required this.eventState,
     required this.selectedMedia,
     required this.selectedImageFits,
+    required this.selectedCropTransforms,
     required this.audioDuration,
     required this.audioData,
     required this.audioSource,
@@ -214,6 +226,7 @@ class _EditorTabBody extends ConsumerWidget {
   final AsyncValue<EventSystemState> eventState;
   final List<LibraryMediaItem> selectedMedia;
   final Map<String, VideoTemplateImageFit> selectedImageFits;
+  final Map<String, ImageCropTransform> selectedCropTransforms;
   final Duration? audioDuration;
   final AudioData? audioData;
   final AudioSource? audioSource;
@@ -233,16 +246,27 @@ class _EditorTabBody extends ConsumerWidget {
             .read(timelineViewModelProvider.notifier)
             .timelineScaleChanged(scale),
         onCurrentPointChanged: (position) => _seekTo(ref, position),
+        audioDuration: audioDuration,
       ),
       EditorTab.clips => ClipsTabView(
         selectedMedia: selectedMedia,
         selectedImageFits: selectedImageFits,
+        selectedCropTransforms: selectedCropTransforms,
         onReorderMedia: (oldIndex, newIndex) => ref
             .read(editorMediaSelectionViewModelProvider.notifier)
             .reorderMedia(oldIndex: oldIndex, newIndex: newIndex),
         onImageFitSelected: (mediaId, imageFit) => ref
             .read(editorMediaSelectionViewModelProvider.notifier)
             .imageFitSelected(mediaId: mediaId, imageFit: imageFit),
+        onCropTransformChanged: (mediaId, transform) => ref
+            .read(editorMediaSelectionViewModelProvider.notifier)
+            .cropTransformChanged(mediaId: mediaId, transform: transform),
+        onApplyImageFitToAll: (imageFit) => ref
+            .read(editorMediaSelectionViewModelProvider.notifier)
+            .imageFitSelectedForAll(imageFit),
+        onMoveMediaToPosition: (mediaId, position) => ref
+            .read(editorMediaSelectionViewModelProvider.notifier)
+            .moveMediaToPosition(mediaId: mediaId, position: position),
         onOpenTimeline: () => ref
             .read(editorTabViewModelProvider.notifier)
             .tabSelected(EditorTab.timeline),
@@ -328,6 +352,7 @@ class _EditorTabBody extends ConsumerWidget {
           beatMap: beatMap,
           selectedMedia: selectedMedia,
           selectedImageFits: selectedImageFits,
+          selectedCropTransforms: selectedCropTransforms,
           audioDuration: audioDuration,
         );
   }

@@ -3,21 +3,20 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_state.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class StagedImagesScreen extends ConsumerWidget {
   const StagedImagesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stagedItems = ref.watch(
-      editorMediaSelectionViewModelProvider.select((state) {
-        return state.selectedMedia;
-      }),
-    );
+    final editorState = ref.watch(editorMediaSelectionViewModelProvider);
+    final stagedItems = editorState.selectedMedia;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -56,6 +55,8 @@ class StagedImagesScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 24),
+              _SequenceToolbar(state: editorState),
+              const SizedBox(height: 16),
               Expanded(
                 child: stagedItems.isEmpty
                     ? const _NoStagedImagesCard()
@@ -149,9 +150,128 @@ class StagedImageTile extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: ReorderableDragStartListener(
-          index: index,
-          child: const Icon(Icons.drag_handle),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: () => _showMoveDialog(context, ref),
+              tooltip: context.l10n.moveToPosition,
+              icon: const Icon(Icons.pin_outlined),
+            ),
+            ReorderableDragStartListener(
+              index: index,
+              child: const Icon(Icons.drag_handle),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showMoveDialog(BuildContext context, WidgetRef ref) async {
+    var input = '${index + 1}';
+    final itemCount = ref
+        .read(editorMediaSelectionViewModelProvider)
+        .selectedMedia
+        .length;
+    final position = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.moveImage),
+        content: TextFormField(
+          initialValue: input,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onChanged: (value) => input = value,
+          decoration: InputDecoration(
+            labelText: context.l10n.position,
+            helperText: context.l10n.positionRange(itemCount),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = int.tryParse(input);
+              if (value == null || value < 1 || value > itemCount) {
+                return;
+              }
+              Navigator.of(context).pop(value);
+            },
+            child: Text(context.l10n.move),
+          ),
+        ],
+      ),
+    );
+    if (position == null) {
+      return;
+    }
+    ref
+        .read(editorMediaSelectionViewModelProvider.notifier)
+        .moveMediaToPosition(mediaId: item.id, position: position);
+  }
+}
+
+class _SequenceToolbar extends ConsumerWidget {
+  const _SequenceToolbar({required this.state});
+
+  final EditorMediaSelectionState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final viewModel = ref.read(editorMediaSelectionViewModelProvider.notifier);
+    return Card.outlined(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            DropdownMenu<StagedSequenceSort>(
+              initialSelection: state.sequenceSort,
+              label: Text(context.l10n.sequenceOrder),
+              leadingIcon: const Icon(Icons.sort),
+              dropdownMenuEntries: [
+                DropdownMenuEntry(
+                  value: StagedSequenceSort.custom,
+                  label: context.l10n.custom,
+                  enabled: false,
+                ),
+                DropdownMenuEntry(
+                  value: StagedSequenceSort.importOrder,
+                  label: context.l10n.importOrder,
+                ),
+                DropdownMenuEntry(
+                  value: StagedSequenceSort.title,
+                  label: context.l10n.title,
+                ),
+                DropdownMenuEntry(
+                  value: StagedSequenceSort.fileDate,
+                  label: context.l10n.fileDate,
+                ),
+              ],
+              onSelected: (sort) {
+                if (sort != null) {
+                  viewModel.sortSequence(sort);
+                }
+              },
+            ),
+            OutlinedButton.icon(
+              onPressed: state.selectedMedia.length < 2
+                  ? null
+                  : viewModel.reverseSequence,
+              icon: Icon(
+                state.isSortAscending
+                    ? Icons.arrow_downward
+                    : Icons.arrow_upward,
+              ),
+              label: Text(context.l10n.reverseCurrent),
+            ),
+          ],
         ),
       ),
     );

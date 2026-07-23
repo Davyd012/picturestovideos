@@ -1,26 +1,38 @@
 import 'dart:typed_data';
 import 'dart:io';
+import 'package:flutter/gestures.dart';
 
 import 'package:flutter/material.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class ClipsTabView extends StatelessWidget {
   const ClipsTabView({
     required this.selectedMedia,
     required this.selectedImageFits,
+    required this.selectedCropTransforms,
     required this.onReorderMedia,
     required this.onImageFitSelected,
+    required this.onCropTransformChanged,
+    required this.onApplyImageFitToAll,
+    required this.onMoveMediaToPosition,
     required this.onOpenTimeline,
     super.key,
   });
 
   final List<LibraryMediaItem> selectedMedia;
   final Map<String, VideoTemplateImageFit> selectedImageFits;
+  final Map<String, ImageCropTransform> selectedCropTransforms;
   final void Function(int oldIndex, int newIndex) onReorderMedia;
   final void Function(String mediaId, VideoTemplateImageFit imageFit)
   onImageFitSelected;
+  final void Function(String mediaId, ImageCropTransform transform)
+  onCropTransformChanged;
+  final ValueChanged<VideoTemplateImageFit> onApplyImageFitToAll;
+  final void Function(String mediaId, int position) onMoveMediaToPosition;
   final VoidCallback onOpenTimeline;
 
   @override
@@ -30,18 +42,27 @@ class ClipsTabView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
+        Text(
+          'Queued image clips (${clips.length})',
+          style: context.textTheme.titleMedium,
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: [
-            Expanded(
-              child: Text(
-                'Queued image clips (${clips.length})',
-                style: context.textTheme.titleMedium,
-              ),
+            TextButton.icon(
+              onPressed: selectedMedia.isEmpty
+                  ? null
+                  : () => onApplyImageFitToAll(VideoTemplateImageFit.cover),
+              icon: const Icon(Icons.crop),
+              label: Text(context.l10n.cropAll),
             ),
             TextButton.icon(
-              onPressed: null,
-              icon: const Icon(Icons.swap_vert),
-              label: const Text('Reorder'),
+              onPressed: selectedMedia.isEmpty
+                  ? null
+                  : () => onApplyImageFitToAll(VideoTemplateImageFit.contain),
+              icon: const Icon(Icons.fit_screen),
+              label: Text(context.l10n.fullImageForAll),
             ),
           ],
         ),
@@ -70,6 +91,14 @@ class ClipsTabView extends StatelessWidget {
                   imageFit: _imageFitFor(item.id),
                   onImageFitSelected: (imageFit) =>
                       onImageFitSelected(item.id, imageFit),
+                  cropTransform:
+                      selectedCropTransforms[item.id] ??
+                      ImageCropTransform.centered,
+                  onCropTransformChanged: (transform) =>
+                      onCropTransformChanged(item.id, transform),
+                  itemCount: selectedMedia.length,
+                  onMoveToPosition: (position) =>
+                      onMoveMediaToPosition(item.id, position),
                 ),
               );
             },
@@ -106,6 +135,10 @@ class _ClipListItem extends StatelessWidget {
     required this.canReorder,
     this.imageFit = VideoTemplateImageFit.cover,
     this.onImageFitSelected,
+    this.cropTransform = ImageCropTransform.centered,
+    this.onCropTransformChanged,
+    this.itemCount = 0,
+    this.onMoveToPosition,
   });
 
   final LibraryMediaItem item;
@@ -113,46 +146,132 @@ class _ClipListItem extends StatelessWidget {
   final bool canReorder;
   final VideoTemplateImageFit imageFit;
   final ValueChanged<VideoTemplateImageFit>? onImageFitSelected;
+  final ImageCropTransform cropTransform;
+  final ValueChanged<ImageCropTransform>? onCropTransformChanged;
+  final int itemCount;
+  final ValueChanged<int>? onMoveToPosition;
 
   @override
   Widget build(BuildContext context) {
     return Card.outlined(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: ListTile(
-          minVerticalPadding: 12,
-          leading: _Thumbnail(item: item),
-          title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: _ImageFitSelector(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                _Thumbnail(item: item),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_formatDuration(Duration(seconds: index * 3))} / 3s',
+                        style: context.textTheme.labelMedium,
+                      ),
+                    ],
+                  ),
+                ),
+                if (onMoveToPosition != null)
+                  IconButton(
+                    onPressed: () => _openMoveDialog(context),
+                    tooltip: context.l10n.moveToPosition,
+                    icon: const Icon(Icons.format_list_numbered),
+                  ),
+                if (canReorder)
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.drag_handle,
+                        color: context.colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _ImageFitSelector(
               imageFit: imageFit,
               onImageFitSelected: onImageFitSelected,
             ),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                '${_formatDuration(Duration(seconds: index * 3))} / 3s',
-                style: context.textTheme.labelMedium,
+            if (imageFit == VideoTemplateImageFit.cover) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: onCropTransformChanged == null
+                      ? null
+                      : () => _openCropEditor(context),
+                  icon: const Icon(Icons.open_with),
+                  label: Text(context.l10n.adjustCrop),
+                ),
               ),
-              const SizedBox(width: 8),
-              if (canReorder)
-                ReorderableDragStartListener(
-                  index: index,
-                  child: Icon(
-                    Icons.drag_handle,
-                    color: context.colors.onSurfaceVariant,
-                  ),
-                )
-              else
-                Icon(Icons.drag_handle, color: context.colors.onSurfaceVariant),
             ],
-          ),
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _openMoveDialog(BuildContext context) async {
+    var input = '${index + 1}';
+    final position = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.moveImage),
+        content: TextFormField(
+          initialValue: input,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          onChanged: (value) => input = value,
+          decoration: InputDecoration(
+            labelText: context.l10n.position,
+            helperText: context.l10n.positionRange(itemCount),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = int.tryParse(input);
+              if (value == null || value < 1 || value > itemCount) {
+                return;
+              }
+              Navigator.of(context).pop(value);
+            },
+            child: Text(context.l10n.move),
+          ),
+        ],
+      ),
+    );
+    if (position != null) {
+      onMoveToPosition?.call(position);
+    }
+  }
+
+  Future<void> _openCropEditor(BuildContext context) async {
+    final transform = await showDialog<ImageCropTransform>(
+      context: context,
+      builder: (context) =>
+          _CropEditorDialog(item: item, initialTransform: cropTransform),
+    );
+    if (transform != null) {
+      onCropTransformChanged?.call(transform);
+    }
   }
 }
 
@@ -167,23 +286,186 @@ class _ImageFitSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<VideoTemplateImageFit>(
-      segments: const [
-        ButtonSegment(
+    return DropdownButtonFormField<VideoTemplateImageFit>(
+      initialValue: imageFit,
+      isExpanded: true,
+      decoration: const InputDecoration(prefixIcon: Icon(Icons.aspect_ratio)),
+      items: [
+        DropdownMenuItem(
           value: VideoTemplateImageFit.cover,
-          icon: Icon(Icons.crop),
-          label: Text('Crop'),
+          child: Text(
+            context.l10n.fillFrameCrop,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-        ButtonSegment(
+        DropdownMenuItem(
           value: VideoTemplateImageFit.contain,
-          icon: Icon(Icons.fit_screen),
-          label: Text('Full'),
+          child: Text(
+            context.l10n.fullImage,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
-      selected: {imageFit},
-      onSelectionChanged: onImageFitSelected == null
+      onChanged: onImageFitSelected == null
           ? null
-          : (selection) => onImageFitSelected!(selection.single),
+          : (value) {
+              if (value != null) {
+                onImageFitSelected!(value);
+              }
+            },
+    );
+  }
+}
+
+class _CropEditorDialog extends StatefulWidget {
+  const _CropEditorDialog({required this.item, required this.initialTransform});
+
+  final LibraryMediaItem item;
+  final ImageCropTransform initialTransform;
+
+  @override
+  State<_CropEditorDialog> createState() => _CropEditorDialogState();
+}
+
+class _CropEditorDialogState extends State<_CropEditorDialog> {
+  late ImageCropTransform _transform;
+  late ImageCropTransform _gestureStartTransform;
+  Offset _gestureStartPoint = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _transform = widget.initialTransform;
+    _gestureStartTransform = _transform;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(context.l10n.adjustCrop),
+      content: SizedBox(
+        width: 560,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: ClipRect(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Listener(
+                      onPointerSignal: (event) {
+                        if (event is PointerScrollEvent) {
+                          final change = event.scrollDelta.dy > 0 ? -0.1 : 0.1;
+                          setState(() {
+                            _transform = _transform.copyWith(
+                              zoom: _transform.zoom + change,
+                            );
+                          });
+                        }
+                      },
+                      child: GestureDetector(
+                        onScaleStart: (details) {
+                          _gestureStartTransform = _transform;
+                          _gestureStartPoint = details.focalPoint;
+                        },
+                        onScaleUpdate: (details) {
+                          final delta = details.focalPoint - _gestureStartPoint;
+                          setState(() {
+                            _transform = _gestureStartTransform.copyWith(
+                              zoom: _gestureStartTransform.zoom * details.scale,
+                              focalX:
+                                  _gestureStartTransform.focalX -
+                                  delta.dx / (constraints.maxWidth / 2),
+                              focalY:
+                                  _gestureStartTransform.focalY -
+                                  delta.dy / (constraints.maxHeight / 2),
+                            );
+                          });
+                        },
+                        child: _CropPreview(
+                          item: widget.item,
+                          transform: _transform,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.zoom_in),
+                Expanded(
+                  child: Slider(
+                    min: 1,
+                    max: ImageCropTransform.maxZoom,
+                    value: _transform.zoom,
+                    onChanged: (zoom) {
+                      setState(() {
+                        _transform = _transform.copyWith(zoom: zoom);
+                      });
+                    },
+                  ),
+                ),
+                Text('${_transform.zoom.toStringAsFixed(1)}×'),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            setState(() {
+              _transform = ImageCropTransform.centered;
+            });
+          },
+          child: Text(context.l10n.reset),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(context.l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_transform),
+          child: Text(context.l10n.apply),
+        ),
+      ],
+    );
+  }
+}
+
+class _CropPreview extends StatelessWidget {
+  const _CropPreview({required this.item, required this.transform});
+
+  final LibraryMediaItem item;
+  final ImageCropTransform transform;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = item.thumbnailBytes.isNotEmpty
+        ? Image.memory(
+            item.thumbnailBytes,
+            fit: BoxFit.cover,
+            alignment: Alignment(transform.focalX, transform.focalY),
+          )
+        : Image.file(
+            File(item.sourcePath),
+            fit: BoxFit.cover,
+            alignment: Alignment(transform.focalX, transform.focalY),
+          );
+    return ColoredBox(
+      color: context.colors.scrim,
+      child: Transform.scale(
+        scale: transform.zoom,
+        alignment: Alignment(transform.focalX, transform.focalY),
+        child: image,
+      ),
     );
   }
 }

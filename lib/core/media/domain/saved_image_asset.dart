@@ -5,6 +5,8 @@ class SavedImageAsset {
     required this.sourcePath,
     required this.byteLength,
     required this.importedOn,
+    this.fileModifiedOn,
+    this.importOrder = 0,
   });
 
   final String id;
@@ -12,4 +14,6 @@ class SavedImageAsset {
   final String sourcePath;
   final int byteLength;
   final DateTime importedOn;
+  final DateTime? fileModifiedOn;
+  final int importOrder;
 }

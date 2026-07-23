@@ -403,6 +403,23 @@ class _LivePreviewSurface extends StatelessWidget {
       child: Image.file(
         File(sourcePath),
         fit: _livePreviewFit(activeClip.imageFit),
+        alignment: Alignment(
+          activeClip.cropTransform.focalX,
+          activeClip.cropTransform.focalY,
+        ),
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (activeClip.imageFit == VideoTemplateImageFit.contain) {
+            return child;
+          }
+          return Transform.scale(
+            scale: activeClip.cropTransform.zoom,
+            alignment: Alignment(
+              activeClip.cropTransform.focalX,
+              activeClip.cropTransform.focalY,
+            ),
+            child: child,
+          );
+        },
         errorBuilder: (context, error, stackTrace) {
           return _MissingLivePreviewSurface(title: activeClip.title);
         },

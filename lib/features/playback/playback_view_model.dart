@@ -77,6 +77,7 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
         isPlaying: false,
         isCompleted: false,
         audioSourcePath: audioSourcePath,
+        sourceDuration: repository.sourceDuration,
       ),
     );
   }

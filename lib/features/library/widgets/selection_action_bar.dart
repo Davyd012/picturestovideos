@@ -4,6 +4,7 @@ import 'package:picturestovideos/features/editor/editor_media_selection_view_mod
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class SelectionActionBar extends ConsumerWidget {
   const SelectionActionBar({required this.selectedItems, super.key});
@@ -35,9 +36,9 @@ class SelectionActionBar extends ConsumerWidget {
                 OutlinedButton.icon(
                   onPressed: selectedItems.isEmpty
                       ? null
-                      : () => _removeSelected(ref),
-                  icon: const Icon(Icons.remove_circle_outline),
-                  label: const Text('Remove'),
+                      : () => _removeSelected(context, ref),
+                  icon: const Icon(Icons.delete_outline),
+                  label: Text(context.l10n.removeImported),
                 ),
                 TextButton.icon(
                   onPressed: ref
@@ -64,13 +65,29 @@ class SelectionActionBar extends ConsumerWidget {
     ref.read(libraryViewModelProvider.notifier).clearItemSelection();
   }
 
-  void _removeSelected(WidgetRef ref) {
-    final editorViewModel = ref.read(
-      editorMediaSelectionViewModelProvider.notifier,
+  Future<void> _removeSelected(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.removeImportedTitle),
+        content: Text(context.l10n.removeImportedMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.remove),
+          ),
+        ],
+      ),
     );
-    for (final item in selectedItems) {
-      editorViewModel.removeMedia(item.id);
+    if (confirmed != true) {
+      return;
     }
-    ref.read(libraryViewModelProvider.notifier).clearItemSelection();
+    await ref.read(libraryViewModelProvider.notifier).removeImportedImages({
+      for (final item in selectedItems) item.id,
+    });
   }
 }

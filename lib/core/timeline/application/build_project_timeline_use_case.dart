@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/application/build_media_track_use_case.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -25,6 +26,7 @@ class BuildProjectTimelineUseCase {
     required List<BeatEvent> events,
     List<LibraryMediaItem> selectedMedia = const [],
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+    Map<String, ImageCropTransform> selectedCropTransforms = const {},
     VideoTemplate template = VideoTemplates.cleanMemories,
   }) {
     final tracks = <TimelineTrack>[
@@ -38,6 +40,7 @@ class BuildProjectTimelineUseCase {
       beatMap: beatMap,
       selectedMedia: selectedMedia,
       selectedImageFits: selectedImageFits,
+      selectedCropTransforms: selectedCropTransforms,
       markerEvents: events,
       template: template,
     );

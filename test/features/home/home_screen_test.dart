@@ -143,5 +143,8 @@ class _MemorySavedImageAssetRepository implements SavedImageAssetRepository {
   }
 
   @override
+  Future<void> removeAll(Set<String> ids) async {}
+
+  @override
   Future<void> upsertAll(List<SavedImageAsset> assets) async {}
 }

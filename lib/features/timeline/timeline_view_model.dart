@@ -4,6 +4,7 @@ import 'package:picturestovideos/core/audio/domain/audio_data.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/timeline/application/build_project_timeline_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -36,6 +37,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required List<BeatEvent> events,
     List<LibraryMediaItem> selectedMedia = const [],
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+    Map<String, ImageCropTransform> selectedCropTransforms = const {},
   }) async {
     final currentState = _currentState;
     final currentProject = currentState.project;
@@ -59,6 +61,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
             events: markerEvents,
             selectedMedia: selectedMedia,
             selectedImageFits: selectedImageFits,
+            selectedCropTransforms: selectedCropTransforms,
             template: currentState.selectedTemplate,
           );
       final serializedProject = ref
@@ -154,6 +157,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   void syncSelectedMediaToMarkers({
     required List<LibraryMediaItem> selectedMedia,
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+    Map<String, ImageCropTransform> selectedCropTransforms = const {},
   }) {
     final currentState = _currentState;
     final project = currentState.project;
@@ -173,6 +177,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
           events: markers,
           selectedMedia: selectedMedia,
           selectedImageFits: selectedImageFits,
+          selectedCropTransforms: selectedCropTransforms,
           template: currentState.selectedTemplate,
         );
     _emit(
@@ -226,6 +231,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required BeatMap? beatMap,
     required List<LibraryMediaItem> selectedMedia,
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+    Map<String, ImageCropTransform> selectedCropTransforms = const {},
     required Duration? audioDuration,
   }) {
     if (selectedMedia.isEmpty) {
@@ -264,6 +270,8 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         imageFit:
             selectedImageFits[item.id] ??
             currentState.selectedTemplate.imageFit,
+        cropTransform:
+            selectedCropTransforms[item.id] ?? ImageCropTransform.centered,
       ),
     );
     final tracksWithMarker = _upsertMarkerTrack(
@@ -330,6 +338,94 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
       return;
     }
 
+    final updatedProject = project.copyWith(
+      tracks: List.unmodifiable(updatedTracks),
+    );
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
+      ),
+    );
+  }
+
+  void updateAllMediaImageFits(VideoTemplateImageFit imageFit) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) {
+      return;
+    }
+    final updatedTracks = [
+      for (final track in project.tracks)
+        track.id == 'track-media'
+            ? track.copyWith(
+                events: List.unmodifiable([
+                  for (final event in track.events)
+                    event.payload is MediaTrackClipPayload
+                        ? BeatEvent(
+                            time: event.time,
+                            type: event.type,
+                            payload: (event.payload as MediaTrackClipPayload)
+                                .copyWith(imageFit: imageFit),
+                          )
+                        : event,
+                ]),
+              )
+            : track,
+    ];
+    final updatedProject = project.copyWith(
+      tracks: List.unmodifiable(updatedTracks),
+    );
+    _emit(
+      currentState.copyWith(
+        project: updatedProject,
+        serializedProject: _serialize(updatedProject),
+      ),
+    );
+  }
+
+  void updateMediaCropTransform({
+    required String mediaId,
+    required ImageCropTransform transform,
+  }) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) {
+      return;
+    }
+    var didUpdate = false;
+    final updatedTracks = [
+      for (final track in project.tracks)
+        track.id == 'track-media'
+            ? track.copyWith(
+                events: List.unmodifiable([
+                  for (final event in track.events)
+                    event.payload is MediaTrackClipPayload &&
+                            (event.payload as MediaTrackClipPayload).mediaId ==
+                                mediaId
+                        ? BeatEvent(
+                            time: event.time,
+                            type: event.type,
+                            payload: (event.payload as MediaTrackClipPayload)
+                                .copyWith(cropTransform: transform),
+                          )
+                        : event,
+                ]),
+              )
+            : track,
+    ];
+    for (final track in updatedTracks) {
+      if (track.id == 'track-media') {
+        didUpdate = track.events.any(
+          (event) =>
+              event.payload is MediaTrackClipPayload &&
+              (event.payload as MediaTrackClipPayload).mediaId == mediaId,
+        );
+      }
+    }
+    if (!didUpdate) {
+      return;
+    }
     final updatedProject = project.copyWith(
       tracks: List.unmodifiable(updatedTracks),
     );

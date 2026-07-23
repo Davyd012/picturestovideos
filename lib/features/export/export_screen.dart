@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_view_model.dart';
@@ -35,8 +37,13 @@ class ExportScreen extends ConsumerWidget {
     );
     final playback = playbackState.asData?.value;
     final audioSourcePath = importState.asData?.value.source?.path;
-    final canRender =
-        beatMap != null && project != null && !exportState.isRendering;
+    final exportClips = project == null
+        ? const <MediaTrackClipPayload>[]
+        : ref
+              .read(resolvePreviewClipsUseCaseProvider)
+              .call(beatMap: project.beatMap, project: project);
+    final hasExportableClips = exportClips.isNotEmpty;
+    final canRender = hasExportableClips && !exportState.isRendering;
 
     return AppShellScaffold(
       currentRoute: AppRoutes.download,
@@ -76,6 +83,7 @@ class ExportScreen extends ConsumerWidget {
                         project: project,
                         beatMap: beatMap,
                         playback: playback,
+                        hasExportableClips: hasExportableClips,
                         exportState: exportState,
                         onRender: () => ref
                             .read(exportViewModelProvider.notifier)
@@ -100,6 +108,7 @@ class ExportScreen extends ConsumerWidget {
                       child: _ExportSidePanel(
                         project: project,
                         beatMap: beatMap,
+                        hasExportableClips: hasExportableClips,
                       ),
                     ),
                   ],
@@ -109,6 +118,7 @@ class ExportScreen extends ConsumerWidget {
                   project: project,
                   beatMap: beatMap,
                   playback: playback,
+                  hasExportableClips: hasExportableClips,
                   exportState: exportState,
                   onRender: () => ref
                       .read(exportViewModelProvider.notifier)
@@ -127,7 +137,11 @@ class ExportScreen extends ConsumerWidget {
                       ),
                 ),
                 const SizedBox(height: 24),
-                _ExportSidePanel(project: project, beatMap: beatMap),
+                _ExportSidePanel(
+                  project: project,
+                  beatMap: beatMap,
+                  hasExportableClips: hasExportableClips,
+                ),
               ],
             ],
           );
@@ -165,6 +179,7 @@ class _ExportMainColumn extends StatelessWidget {
     required this.beatMap,
     required this.playback,
     required this.exportState,
+    required this.hasExportableClips,
     required this.onRender,
     required this.onSave,
     required this.onShare,
@@ -174,6 +189,7 @@ class _ExportMainColumn extends StatelessWidget {
   final BeatMap? beatMap;
   final PlaybackState? playback;
   final ExportState exportState;
+  final bool hasExportableClips;
   final VoidCallback onRender;
   final VoidCallback onSave;
   final VoidCallback onShare;
@@ -187,12 +203,14 @@ class _ExportMainColumn extends StatelessWidget {
           beatMap: beatMap,
           playback: playback,
           exportState: exportState,
+          hasExportableClips: hasExportableClips,
         ),
         const SizedBox(height: 24),
         _ExportActionCard(
           project: project,
           beatMap: beatMap,
           exportState: exportState,
+          hasExportableClips: hasExportableClips,
           onRender: onRender,
           onSave: onSave,
         ),
@@ -209,12 +227,14 @@ class _PreviewSummaryCard extends StatelessWidget {
     required this.beatMap,
     required this.playback,
     required this.exportState,
+    required this.hasExportableClips,
   });
 
   final ProjectTimeline? project;
   final BeatMap? beatMap;
   final PlaybackState? playback;
   final ExportState exportState;
+  final bool hasExportableClips;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +252,7 @@ class _PreviewSummaryCard extends StatelessWidget {
                 children: [
                   Chip(
                     label: Text(
-                      beatMap == null
+                      !hasExportableClips
                           ? 'Preview unavailable'
                           : 'Image preview summary',
                     ),
@@ -240,7 +260,9 @@ class _PreviewSummaryCard extends StatelessWidget {
                   const Spacer(),
                   Align(
                     child: Icon(
-                      beatMap == null ? Icons.hide_image_outlined : Icons.movie,
+                      !hasExportableClips
+                          ? Icons.hide_image_outlined
+                          : Icons.movie,
                       size: 72,
                       color: context.colors.primary,
                     ),
@@ -258,8 +280,8 @@ class _PreviewSummaryCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              beatMap == null
-                                  ? 'Build the timeline, add images, and generate beat-synced clips before exporting the final output.'
+                              !hasExportableClips
+                                  ? 'Add timed image clips before exporting the final output.'
                                   : exportState.statusMessage,
                               style: context.textTheme.bodyLarge,
                             ),
@@ -277,7 +299,7 @@ class _PreviewSummaryCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 24),
                       Text(
-                        _durationLabel(beatMap, playback),
+                        _durationLabel(project, beatMap, playback),
                         style: context.textTheme.headlineSmall,
                       ),
                     ],
@@ -291,12 +313,17 @@ class _PreviewSummaryCard extends StatelessWidget {
     );
   }
 
-  String _durationLabel(BeatMap? beatMap, PlaybackState? playback) {
-    if (beatMap == null || beatMap.beats.isEmpty) {
-      return '00:00:00';
-    }
-
-    final end = playback?.currentTime ?? beatMap.beats.last.time;
+  String _durationLabel(
+    ProjectTimeline? project,
+    BeatMap? beatMap,
+    PlaybackState? playback,
+  ) {
+    final sourceDuration = playback?.sourceDuration;
+    final mediaEnd = _projectMediaEnd(project);
+    final beatEnd = beatMap?.beats.isNotEmpty ?? false
+        ? beatMap!.beats.last.time
+        : Duration.zero;
+    final end = sourceDuration ?? (mediaEnd > beatEnd ? mediaEnd : beatEnd);
     final minutes = end.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = end.inSeconds.remainder(60).toString().padLeft(2, '0');
     final millis = (end.inMilliseconds.remainder(1000) ~/ 10)
@@ -311,6 +338,7 @@ class _ExportActionCard extends StatelessWidget {
     required this.project,
     required this.beatMap,
     required this.exportState,
+    required this.hasExportableClips,
     required this.onRender,
     required this.onSave,
   });
@@ -318,6 +346,7 @@ class _ExportActionCard extends StatelessWidget {
   final ProjectTimeline? project;
   final BeatMap? beatMap;
   final ExportState exportState;
+  final bool hasExportableClips;
   final VoidCallback onRender;
   final VoidCallback onSave;
 
@@ -326,7 +355,7 @@ class _ExportActionCard extends StatelessWidget {
     final details = _ExportDetails.fromData(project: project, beatMap: beatMap);
     final canRender =
         project != null &&
-        beatMap != null &&
+        hasExportableClips &&
         !exportState.isRendering &&
         !exportState.isSaving &&
         !exportState.isSharing;
@@ -488,10 +517,15 @@ class _ShareActionsCard extends StatelessWidget {
 }
 
 class _ExportSidePanel extends StatelessWidget {
-  const _ExportSidePanel({required this.project, required this.beatMap});
+  const _ExportSidePanel({
+    required this.project,
+    required this.beatMap,
+    required this.hasExportableClips,
+  });
 
   final ProjectTimeline? project;
   final BeatMap? beatMap;
+  final bool hasExportableClips;
 
   @override
   Widget build(BuildContext context) {
@@ -540,9 +574,9 @@ class _ExportSidePanel extends StatelessWidget {
               children: [
                 Text('Next steps', style: context.textTheme.titleLarge),
                 const SizedBox(height: 16),
-                if (beatMap == null) ...[
+                if (!hasExportableClips) ...[
                   Text(
-                    'The export handoff is blocked until the beat map and timeline are ready.',
+                    'Add timed image clips before exporting.',
                     style: context.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 16),
@@ -629,7 +663,7 @@ class _ExportDetails {
     required ProjectTimeline? project,
     required BeatMap? beatMap,
   }) {
-    if (beatMap == null || beatMap.beats.isEmpty) {
+    if (project == null) {
       return const _ExportDetails(
         resolutionLabel: '1080 x 1920',
         frameRateLabel: '30 fps',
@@ -640,15 +674,30 @@ class _ExportDetails {
     }
 
     final sizeEstimate =
-        96 + (beatMap.beats.length * 3) + ((project?.tracks.length ?? 1) * 8);
+        96 + ((beatMap?.beats.length ?? 0) * 3) + (project.tracks.length * 8);
 
     return _ExportDetails(
-      resolutionLabel:
-          project?.template.aspectRatio.exportResolutionLabel ?? '1080 x 1920',
+      resolutionLabel: project.template.aspectRatio.exportResolutionLabel,
       frameRateLabel: '30 fps',
       codecLabel: 'MP4 video',
       fileSizeLabel: '$sizeEstimate MB',
-      templateLabel: project?.template.name ?? 'Default',
+      templateLabel: project.template.name,
     );
   }
+}
+
+Duration _projectMediaEnd(ProjectTimeline? project) {
+  var end = Duration.zero;
+  if (project == null) {
+    return end;
+  }
+  for (final track in project.tracks) {
+    for (final event in track.events) {
+      final payload = event.payload;
+      if (payload is MediaTrackClipPayload && payload.end > end) {
+        end = payload.end;
+      }
+    }
+  }
+  return end;
 }

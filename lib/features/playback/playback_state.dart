@@ -10,6 +10,7 @@ class PlaybackState {
     required this.isPlaying,
     required this.isCompleted,
     this.audioSourcePath,
+    this.sourceDuration,
   });
 
   const PlaybackState.initial()
@@ -23,7 +24,8 @@ class PlaybackState {
       triggeredBeats = const [],
       isPlaying = false,
       isCompleted = false,
-      audioSourcePath = null;
+      audioSourcePath = null,
+      sourceDuration = null;
 
   final BeatMap beatMap;
   final Duration currentTime;
@@ -32,6 +34,7 @@ class PlaybackState {
   final bool isPlaying;
   final bool isCompleted;
   final String? audioSourcePath;
+  final Duration? sourceDuration;
 
   bool get hasBeatMap => beatMap.beats.isNotEmpty;
   bool get hasLoadedAudioSource =>
@@ -48,6 +51,7 @@ class PlaybackState {
     bool? isPlaying,
     bool? isCompleted,
     String? audioSourcePath,
+    Duration? sourceDuration,
   }) {
     return PlaybackState(
       beatMap: beatMap ?? this.beatMap,
@@ -57,6 +61,7 @@ class PlaybackState {
       isPlaying: isPlaying ?? this.isPlaying,
       isCompleted: isCompleted ?? this.isCompleted,
       audioSourcePath: audioSourcePath ?? this.audioSourcePath,
+      sourceDuration: sourceDuration ?? this.sourceDuration,
     );
   }
 }
