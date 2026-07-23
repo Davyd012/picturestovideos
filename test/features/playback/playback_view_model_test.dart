@@ -36,6 +36,45 @@ void main() {
     );
   });
 
+  test(
+    'empty beat map preserves the current position between transport actions',
+    () async {
+      final repository = ManualAudioPlayerRepository();
+      final container = ProviderContainer(
+        overrides: [
+          audioPlayerRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      const beatMap = BeatMap(
+        beats: [],
+        bpm: 0,
+        averageBeatInterval: Duration.zero,
+      );
+
+      await container.read(playbackViewModelProvider.future);
+      await container
+          .read(playbackViewModelProvider.notifier)
+          .preparePlayback(beatMap: beatMap, audioSourcePath: '/tmp/song.wav');
+      await container
+          .read(playbackViewModelProvider.notifier)
+          .step(const Duration(seconds: 15));
+
+      await container
+          .read(playbackViewModelProvider.notifier)
+          .preparePlayback(beatMap: beatMap, audioSourcePath: '/tmp/song.wav');
+      await container
+          .read(playbackViewModelProvider.notifier)
+          .step(const Duration(seconds: 10));
+
+      final state = container.read(playbackViewModelProvider).value;
+      expect(repository.loadCount, 1);
+      expect(repository.currentPosition, const Duration(seconds: 25));
+      expect(state?.currentTime, const Duration(seconds: 25));
+    },
+  );
+
   test('step updates playback time and triggered beats', () async {
     final repository = ManualAudioPlayerRepository();
     final container = ProviderContainer(

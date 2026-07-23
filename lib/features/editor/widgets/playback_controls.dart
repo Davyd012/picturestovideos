@@ -19,9 +19,8 @@ class PlaybackControls extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final canControl =
-        beatMap != null &&
-        ((playback?.hasLoadedAudioSource ?? false) ||
-            (audioSourcePath?.isNotEmpty ?? false));
+        (playback?.hasLoadedAudioSource ?? false) ||
+        (audioSourcePath?.isNotEmpty ?? false);
     final isPlaying = playback?.isPlaying ?? false;
 
     return Row(
@@ -71,14 +70,10 @@ class PlaybackControls extends ConsumerWidget {
   }
 
   Future<void> _preparePlayback(WidgetRef ref) async {
-    final resolvedBeatMap = beatMap;
-    if (resolvedBeatMap == null) {
-      return;
-    }
     await ref
         .read(playbackViewModelProvider.notifier)
         .preparePlayback(
-          beatMap: resolvedBeatMap,
+          beatMap: beatMap ?? _emptyBeatMap,
           audioSourcePath: audioSourcePath,
         );
   }
@@ -92,3 +87,9 @@ class PlaybackControls extends ConsumerWidget {
     await ref.read(playbackViewModelProvider.notifier).play();
   }
 }
+
+const _emptyBeatMap = BeatMap(
+  beats: [],
+  bpm: 0,
+  averageBeatInterval: Duration.zero,
+);

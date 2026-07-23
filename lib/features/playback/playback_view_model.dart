@@ -48,9 +48,10 @@ class PlaybackViewModel extends AsyncNotifier<PlaybackState> {
     final logger = ref.read(appLoggerProvider);
     final repository = ref.read(audioPlayerRepositoryProvider);
     final previousState = state.value ?? const PlaybackState.initial();
+    final shouldLoadAudioSource =
+        (audioSourcePath?.isNotEmpty ?? false) && !repository.hasLoadedSource;
     final shouldReloadSession =
-        !previousState.hasBeatMap ||
-        !previousState.hasLoadedAudioSource ||
+        shouldLoadAudioSource ||
         previousState.isCompleted ||
         repository.isCompleted ||
         previousState.audioSourcePath != audioSourcePath ||
