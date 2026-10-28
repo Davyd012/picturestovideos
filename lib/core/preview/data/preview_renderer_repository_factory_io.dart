@@ -26,6 +26,9 @@ import 'package:picturestovideos/core/composition/domain/frame_time_quantizer.da
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 
+// Increment when filter graphs, frame sampling, or render output semantics change.
+const _rendererPipelineSignature = 'renderer-pipeline-v2';
+
 PreviewRendererRepository createPreviewRendererRepository(AppLogger logger) {
   if (Platform.isAndroid) {
     return AndroidPreviewRendererRepository(logger: logger);
@@ -918,6 +921,7 @@ String _buildSignature(
   Map<String, String> sourceFingerprints,
 ) {
   return _stableHexKey([
+    _rendererPipelineSignature,
     request.projectId,
     rendererVersion,
     fontSignature,
@@ -952,7 +956,8 @@ String _previewClipCacheKey({
   required String? rendererVersion,
 }) {
   return _stableHexKey([
-    'motion-caption-source-content-v6',
+    _rendererPipelineSignature,
+    'motion-caption-source-content-v7',
     clip.mediaId,
     clip.caption,
     clip.captionSupportingLine,

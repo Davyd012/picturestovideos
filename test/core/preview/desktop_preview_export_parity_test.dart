@@ -154,13 +154,22 @@ void main() {
         ))!;
         _traceParity('after capture ${parityCase.name}');
         late final Uint8List previewBytes;
+        late final Uint8List previewPngBytes;
         try {
           previewBytes = (await tester.runAsync(
             () => image.toByteData(format: ui.ImageByteFormat.rawRgba),
           ))!.buffer.asUint8List();
+          previewPngBytes = (await tester.runAsync(
+            () => image.toByteData(format: ui.ImageByteFormat.png),
+          ))!.buffer.asUint8List();
         } finally {
           image.dispose();
         }
+        await tester.runAsync(
+          () =>
+              File('$outputPrefix-${parityCase.name}-preview.png')
+                  .writeAsBytes(previewPngBytes),
+        );
 
         final rendered = (await tester.runAsync(
           () => renderer.buildPreviewVideo(request),
@@ -176,6 +185,13 @@ void main() {
             ),
           ))!;
           late final _PixelDifference filterDifference;
+          final filterArtifactPath =
+              '$outputPrefix-${parityCase.name}-filter.png';
+          await tester.runAsync(
+            () =>
+                File(filterArtifactPath)
+                    .writeAsBytes(rendered.thumbnails.single.bytes),
+          );
           try {
             final filterImage = (await tester.runAsync(
               () => filterCodec.getNextFrame(),
@@ -211,6 +227,11 @@ void main() {
           final decodedFileBytes = (await tester.runAsync(
             () => File(decodedPath).readAsBytes(),
           ))!;
+          await tester.runAsync(
+            () =>
+                File('$outputPrefix-${parityCase.name}-decoded.png')
+                    .writeAsBytes(decodedFileBytes),
+          );
           final decodedCodec = (await tester.runAsync(
             () => ui.instantiateImageCodec(
               decodedFileBytes,
