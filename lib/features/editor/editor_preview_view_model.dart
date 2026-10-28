@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/preview/application/build_preview_video_use_case.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
+import 'package:picturestovideos/core/preview/domain/render_cancellation.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -17,13 +19,14 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
   static const _tag = 'EditorPreviewViewModel';
   static const _previewFrameRate = 12;
   int _renderGeneration = 0;
+  RenderCancellation? _cancellation;
 
   @override
   EditorPreviewState build() {
+    ref.onDispose(() => _cancellation?.cancel());
     ref.read(appLoggerProvider).info(_tag, 'Initializing editor preview state');
     return const EditorPreviewState.initial().copyWith(
-      statusMessage:
-          'Preview is waiting for a timeline. Import audio, add images, then rebuild the timeline to start preview generation.',
+      statusMessage: 'Preview is waiting for a timeline. Import audio, add images, then rebuild the timeline to start preview generation.',
     );
   }
 
@@ -33,6 +36,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
     String? reason,
   }) {
     if (project == null) {
+      _cancellation?.cancel();
       _renderGeneration++;
       ref
           .read(appLoggerProvider)
@@ -42,8 +46,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
           );
       state = state.copyWith(
         status: EditorPreviewStatus.idle,
-        statusMessage:
-            'Preview is waiting for a timeline. Import audio, add images, then rebuild the timeline to start preview generation.',
+        statusMessage: 'Preview is waiting for a timeline. Import audio, add images, then rebuild the timeline to start preview generation.',
         clearResult: true,
         clearSignature: true,
         clearError: true,
@@ -55,6 +58,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
         .read(resolvePreviewClipsUseCaseProvider)
         .call(beatMap: project.beatMap, project: project);
     if (clips.isEmpty) {
+      _cancellation?.cancel();
       _renderGeneration++;
       ref
           .read(appLoggerProvider)
@@ -77,6 +81,8 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       clips: clips,
       audioSourcePath: audioSourcePath,
       template: project.template,
+      audioMix: project.audioMix,
+      audioSourceDuration: project.audioDuration,
     );
     if (state.signature == signature && (state.isRendering || state.isReady)) {
       return;
@@ -85,6 +91,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       return;
     }
 
+    _cancellation?.cancel();
     _renderGeneration++;
     ref
         .read(appLoggerProvider)
@@ -98,7 +105,6 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       statusMessage:
           'Live preview ready with ${clips.length} marker-synced image clips.',
       clearError: true,
-      clearResult: true,
     );
   }
 
@@ -124,12 +130,16 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       clips: clips,
       audioSourcePath: audioSourcePath,
       template: project.template,
+      audioMix: project.audioMix,
+      audioSourceDuration: project.audioDuration,
     );
     if (state.signature == signature && (state.isRendering || state.isReady)) {
       return;
     }
 
     final renderGeneration = ++_renderGeneration;
+    _cancellation?.cancel();
+    final cancellation = _cancellation = RenderCancellation();
     ref
         .read(appLoggerProvider)
         .info(_tag, 'Rendering preview for ${clips.length} image clips');
@@ -139,7 +149,6 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
       statusMessage:
           'Rendering ${clips.length} image clips into the preview video.',
       clearError: true,
-      clearResult: true,
     );
 
     try {
@@ -155,38 +164,43 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
               height: renderSize.height,
               frameRate: _previewFrameRate,
               template: project.template,
+              audioMix: project.audioMix,
+              audioSourceDuration: project.audioDuration,
             ),
+            cancellation: cancellation,
           );
+      cancellation.throwIfCancelled();
       if (renderGeneration != _renderGeneration) {
         return;
       }
       state = state.copyWith(
         status: EditorPreviewStatus.ready,
         result: result,
-        signature: result.signature,
+        signature: signature,
+        renderedSignature: signature,
         statusMessage: 'Preview video ready at ${result.outputPath}',
         clearError: true,
       );
     } catch (error, stackTrace) {
+      if (renderGeneration != _renderGeneration || error is RenderCancelled) {
+        return;
+      }
       final userMessage = error.toString().contains('ffmpeg')
           ? 'Video rendering failed. Check that the selected image and audio files are still available.'
           : 'Preview generation failed. Check the app logs for image render details.';
       ref
           .read(appLoggerProvider)
           .error(_tag, error, stackTrace, message: 'Preview generation failed');
-      if (renderGeneration != _renderGeneration) {
-        return;
-      }
       state = state.copyWith(
         status: EditorPreviewStatus.failure,
         errorMessage: userMessage,
         statusMessage: userMessage,
-        clearResult: true,
       );
     }
   }
 
   void invalidate() {
+    _cancellation?.cancel();
     _renderGeneration++;
     state = state.copyWith(
       status: EditorPreviewStatus.idle,
@@ -194,6 +208,7 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
           'Preview has been invalidated. Waiting for the next timeline update.',
       clearResult: true,
       clearSignature: true,
+      clearRenderedSignature: true,
       clearError: true,
     );
   }
@@ -205,16 +220,20 @@ class EditorPreviewViewModel extends Notifier<EditorPreviewState> {
     required List<MediaTrackClipPayload> clips,
     required String? audioSourcePath,
     required VideoTemplate template,
+    required AudioMix audioMix,
+    required Duration? audioSourceDuration,
   }) {
     final renderSize = _renderSizeFor(template);
     return [
       projectId,
       _templateSignature(template),
       audioSourcePath ?? 'no-audio',
+      audioMix.toJson().toString(),
+      audioSourceDuration?.inMicroseconds,
       '${renderSize.width}x${renderSize.height}',
       '$_previewFrameRate',
       for (final clip in clips)
-        '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.title}:${clip.tagline}:${clip.sourcePath}:${clip.imageFit.name}:${clip.cropTransform.focalX}:${clip.cropTransform.focalY}:${clip.cropTransform.zoom}',
+        '${clip.mediaId}:${clip.start.inMilliseconds}:${clip.end.inMilliseconds}:${clip.caption}:${clip.captionSupportingLine}:${clip.captionSettings.toJson()}:${clip.sourcePath}:${clip.imageFit.name}:${clip.cropTransform.focalX}:${clip.cropTransform.focalY}:${clip.cropTransform.zoom}:${clip.motionOverride?.name}:${clip.motionIntensity.name}:${clip.useStyleMotionIntensity}:${clip.transitionOverride?.name}:${clip.transitionDuration.inMicroseconds}',
     ].join('|');
   }
 

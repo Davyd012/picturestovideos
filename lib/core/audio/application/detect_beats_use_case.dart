@@ -11,12 +11,7 @@ final detectBeatsUseCaseProvider = Provider<DetectBeatsUseCase>(
 );
 
 class DetectBeatsUseCase {
-  const DetectBeatsUseCase({required BeatDetector beatDetector})
-    : this._(beatDetector);
-
-  const DetectBeatsUseCase._(this._beatDetector);
-
-  final BeatDetector _beatDetector;
+  const DetectBeatsUseCase({required BeatDetector beatDetector});
 
   Future<List<Beat>> call({
     required List<AudioFrame> frames,

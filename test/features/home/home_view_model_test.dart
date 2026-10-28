@@ -7,6 +7,7 @@ import 'package:picturestovideos/core/media/data/saved_image_asset_repository.da
 import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
 import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
+import 'package:picturestovideos/features/home/home_state.dart';
 import 'package:picturestovideos/features/home/home_view_model.dart';
 
 void main() {
@@ -65,8 +66,8 @@ void main() {
 
     expect(opened, isFalse);
     expect(
-      container.read(homeViewModelProvider).value?.statusMessage,
-      'This saved audio does not have a file path.',
+      container.read(homeViewModelProvider).value?.statusCode,
+      HomeStatusCode.missingAudioPath,
     );
   });
 }

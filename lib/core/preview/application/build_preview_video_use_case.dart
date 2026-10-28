@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/preview/data/preview_renderer_repository.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/preview/domain/render_cancellation.dart';
 
 final buildPreviewVideoUseCaseProvider = Provider<BuildPreviewVideoUseCase>(
   (ref) => BuildPreviewVideoUseCase(
@@ -17,10 +18,12 @@ class BuildPreviewVideoUseCase {
   Future<BuildPreviewVideoResult> call(
     BuildPreviewVideoRequest request, {
     BuildPreviewVideoProgressCallback? onProgress,
+    RenderCancellation? cancellation,
   }) {
     return _previewRendererRepository.buildPreviewVideo(
       request,
       onProgress: onProgress,
+      cancellation: cancellation,
     );
   }
 }

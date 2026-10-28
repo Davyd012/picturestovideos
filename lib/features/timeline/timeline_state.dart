@@ -18,7 +18,7 @@ class TimelineState {
       serializedProject = null,
       selectedMarker = null,
       nextQueuedMediaIndex = 0,
-      selectedTemplate = VideoTemplates.cleanMemories,
+      selectedTemplate = VideoTemplates.calmMemories,
       timelineScale = 1.0;
 
   final ProjectTimeline? project;

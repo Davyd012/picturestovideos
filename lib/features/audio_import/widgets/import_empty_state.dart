@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class ImportEmptyState extends StatelessWidget {
   const ImportEmptyState({
@@ -60,13 +61,13 @@ class _BrandHeader extends StatelessWidget {
         Image.asset('lib/assets/icon.png', width: 112, height: 112),
         const SizedBox(height: 24),
         Text(
-          'Pictures to Videos',
+          context.l10n.productName,
           style: context.textTheme.headlineMedium,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         Text(
-          'Turn rhythm and still images into motion.',
+          context.l10n.importTagline,
           style: context.textTheme.bodyLarge?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
@@ -105,10 +106,10 @@ class _UploadCard extends StatelessWidget {
               color: context.colors.primary,
             ),
             const SizedBox(height: 16),
-            Text('Drop a WAV file here', style: context.textTheme.titleLarge),
+            Text(context.l10n.dropWav, style: context.textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'Analyze a WAV file, or select any song and add markers yourself.',
+              context.l10n.importInstructions,
               style: context.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -121,22 +122,22 @@ class _UploadCard extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: onChooseFile,
                   icon: const Icon(Icons.folder_open),
-                  label: const Text('Analyze WAV'),
+                  label: Text(context.l10n.analyzeWav),
                 ),
                 FilledButton.tonalIcon(
                   onPressed: onSelectSongOnly,
                   icon: const Icon(Icons.library_music_outlined),
-                  label: const Text('Select song only'),
+                  label: Text(context.l10n.selectSongOnly),
                 ),
                 OutlinedButton.icon(
                   onPressed: onImportFromPath,
                   icon: const Icon(Icons.terminal),
-                  label: const Text('WAV from path'),
+                  label: Text(context.l10n.wavFromPath),
                 ),
                 OutlinedButton.icon(
                   onPressed: onSelectSongOnlyFromPath,
                   icon: const Icon(Icons.audio_file_outlined),
-                  label: const Text('Song from path'),
+                  label: Text(context.l10n.songFromPath),
                 ),
               ],
             ),

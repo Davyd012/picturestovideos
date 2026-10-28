@@ -1,10 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'dart:typed_data';
+
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_state.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
+import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 
 final editorMediaSelectionViewModelProvider =
     NotifierProvider<EditorMediaSelectionViewModel, EditorMediaSelectionState>(
@@ -21,6 +26,45 @@ class EditorMediaSelectionViewModel
         .read(appLoggerProvider)
         .info(_tag, 'Initializing editor media selection state');
     return const EditorMediaSelectionState.initial();
+  }
+
+  /// Restores the queue without rebuilding or altering the saved timeline.
+  void restoreProject(ProjectTimeline project) {
+    final byId = <String, MediaTrackClipPayload>{};
+    for (final track in project.tracks) {
+      if (track.id != 'track-media') continue;
+      for (final event in track.events) {
+        final clip = event.payload;
+        if (clip is MediaTrackClipPayload) {
+          byId.putIfAbsent(clip.mediaId, () => clip);
+        }
+      }
+    }
+    state = EditorMediaSelectionState(
+      selectedMedia: List.unmodifiable(
+        byId.values.map(
+          (clip) => LibraryMediaItem(
+            id: clip.mediaId,
+            title: clip.title,
+            tagline: clip.tagline,
+            sizeLabel: '',
+            importedOnLabel: '',
+            importedOn: DateTime.fromMillisecondsSinceEpoch(0),
+            byteLength: 0,
+            thumbnailBytes: Uint8List(0),
+            sourcePath: clip.sourcePath,
+          ),
+        ),
+      ),
+      selectedImageFits: Map.unmodifiable({
+        for (final clip in byId.values) clip.mediaId: clip.imageFit,
+      }),
+      selectedCropTransforms: Map.unmodifiable({
+        for (final clip in byId.values) clip.mediaId: clip.cropTransform,
+      }),
+      sequenceSort: StagedSequenceSort.custom,
+      isSortAscending: true,
+    );
   }
 
   void toggleMedia(LibraryMediaItem item) {

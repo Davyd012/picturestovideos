@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/app/localizations/app_localizations.dart';
 import 'package:picturestovideos/core/audio/data/audio_marker_preset_repository.dart';
 import 'package:picturestovideos/core/audio/data/shared_preferences_audio_marker_preset_repository.dart';
 import 'package:picturestovideos/core/audio/domain/audio_marker_preset.dart';
@@ -8,6 +10,8 @@ import 'package:picturestovideos/core/media/data/saved_image_asset_repository.da
 import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
 import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
+import 'package:picturestovideos/core/timeline/data/project_repository.dart';
+import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/home/home_screen.dart';
 
 void main() {
@@ -59,6 +63,40 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('Russian home screen and navigation use one locale', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _overrides(),
+        child: MaterialApp(
+          locale: const Locale('ru'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          home: const HomeScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Главная'), findsAtLeastNWidgets(1));
+    expect(find.text('Сохранённые проекты'), findsOneWidget);
+    expect(find.text('Сохранённые материалы'), findsOneWidget);
+    expect(find.text('Сохранённое аудио'), findsOneWidget);
+    expect(find.text('Сохранённые изображения'), findsOneWidget);
+    expect(find.text('Библиотека'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
+    expect(find.text('Saved media'), findsNothing);
+    expect(find.text('Saved audio'), findsNothing);
+  });
 }
 
 dynamic _overrides({
@@ -66,6 +104,7 @@ dynamic _overrides({
   List<SavedImageAsset> assets = const [],
 }) {
   return [
+    projectRepositoryProvider.overrideWithValue(_MemoryProjectRepository()),
     audioMarkerPresetRepositoryProvider.overrideWithValue(
       _MemoryAudioMarkerPresetRepository(presets: presets),
     ),
@@ -73,6 +112,16 @@ dynamic _overrides({
       _MemorySavedImageAssetRepository(assets: assets),
     ),
   ];
+}
+
+class _MemoryProjectRepository implements ProjectRepository {
+  @override
+  List<ProjectStorageIssue> get lastLoadIssues => const [];
+
+  @override
+  Future<List<ProjectTimeline>> loadAll() async => const [];
+  @override
+  Future<void> save(ProjectTimeline project) async {}
 }
 
 AudioMarkerPreset _preset({String? sourcePath}) {

@@ -32,9 +32,7 @@ class HomeViewModel extends AsyncNotifier<HomeState> {
     final sourcePath = preset.sourcePath?.trim();
     if (sourcePath == null || sourcePath.isEmpty) {
       state = AsyncData(
-        currentState.copyWith(
-          statusMessage: 'This saved audio does not have a file path.',
-        ),
+        currentState.copyWith(statusCode: HomeStatusCode.missingAudioPath),
       );
       return false;
     }
@@ -43,14 +41,15 @@ class HomeViewModel extends AsyncNotifier<HomeState> {
     if (!await file.exists()) {
       state = AsyncData(
         currentState.copyWith(
-          statusMessage: 'No audio file exists at $sourcePath.',
+          statusCode: HomeStatusCode.missingAudioFile,
+          statusPath: sourcePath,
         ),
       );
       return false;
     }
 
     state = AsyncData(
-      currentState.copyWith(isOpeningAudio: true, clearStatusMessage: true),
+      currentState.copyWith(isOpeningAudio: true, clearStatus: true),
     );
     try {
       await ref
@@ -67,7 +66,7 @@ class HomeViewModel extends AsyncNotifier<HomeState> {
       state = AsyncData(
         currentState.copyWith(
           isOpeningAudio: false,
-          statusMessage: error.toString(),
+          statusCode: HomeStatusCode.openAudioFailed,
         ),
       );
       return false;
@@ -85,7 +84,8 @@ class HomeViewModel extends AsyncNotifier<HomeState> {
       audioPresets: List.unmodifiable(audioPresets),
       imageAssets: List.unmodifiable(imageAssets),
       isOpeningAudio: false,
-      statusMessage: null,
+      statusCode: null,
+      statusPath: null,
     );
   }
 }

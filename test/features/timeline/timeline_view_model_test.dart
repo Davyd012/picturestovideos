@@ -10,6 +10,10 @@ import 'package:picturestovideos/core/audio/domain/audio_marker_preset.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
+import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -20,6 +24,171 @@ import 'package:picturestovideos/features/timeline/timeline_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 void main() {
+  test(
+    'style selection preserves aspect ratio and explicit clip choices',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container.read(timelineViewModelProvider.future);
+      final vm = container.read(timelineViewModelProvider.notifier);
+      const map = BeatMap(
+        beats: [],
+        bpm: 0,
+        averageBeatInterval: Duration(seconds: 1),
+      );
+      await vm.buildProjectTimeline(
+        beatMap: map,
+        events: const [],
+        selectedMedia: [_mediaItem('one', 'one.jpg')],
+      );
+      final clip =
+          _trackEvents(
+                container.read(timelineViewModelProvider).value!.project,
+                'track-media',
+              )!.single.payload
+              as MediaTrackClipPayload;
+      vm.captionChanged(
+        clipId: clip.clipId,
+        caption: 'Memory',
+        supportingLine: '',
+      );
+      vm.clipMotionChanged(
+        clipId: clip.clipId,
+        preset: ClipMotionPreset.slowZoomOut,
+        intensity: ClipMotionIntensity.subtle,
+      );
+      vm.aspectRatioSelected(VideoTemplateAspectRatio.square);
+      vm.templateSelected(VideoTemplates.celebration);
+      final project = container.read(timelineViewModelProvider).value!.project!;
+      final after =
+          _trackEvents(project, 'track-media')!.single.payload
+              as MediaTrackClipPayload;
+      expect(project.template.aspectRatio, VideoTemplateAspectRatio.square);
+      expect(after.caption, 'Memory');
+      expect(
+        after.motionFor(project.template).preset,
+        ClipMotionPreset.slowZoomOut,
+      );
+      expect(
+        after.motionFor(project.template).intensity,
+        ClipMotionIntensity.subtle,
+      );
+    },
+  );
+  test(
+    'repeated photos have independent edits that survive rebuilding',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container.read(timelineViewModelProvider.future);
+      final vm = container.read(timelineViewModelProvider.notifier);
+      const map = BeatMap(
+        beats: [],
+        bpm: 120,
+        averageBeatInterval: Duration(seconds: 1),
+      );
+      const markers = [
+        BeatEvent(time: Duration.zero, type: 'marker'),
+        BeatEvent(time: Duration(seconds: 3), type: 'marker'),
+        BeatEvent(time: Duration(seconds: 6), type: 'marker'),
+        BeatEvent(time: Duration(seconds: 9), type: 'marker'),
+      ];
+      final photo = _mediaItem('one', 'one.jpg');
+      final other = _mediaItem('two', 'two.jpg');
+      await vm.buildProjectTimeline(
+        beatMap: map,
+        events: markers,
+        selectedMedia: [photo, other],
+      );
+      vm.addManualImagePointAt(
+        time: const Duration(seconds: 6),
+        beatMap: map,
+        selectedMedia: [photo],
+        audioDuration: null,
+      );
+      List<MediaTrackClipPayload> clips() => _trackEvents(
+        container.read(timelineViewModelProvider).value!.project,
+        'track-media',
+      )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+      final firstId = clips()[0].clipId;
+      final repeatedId = clips()[2].clipId;
+      expect(firstId, isNotEmpty);
+      expect(firstId, isNot(repeatedId));
+      vm.captionChanged(
+        clipId: repeatedId,
+        caption: 'Наше лето',
+        supportingLine: '2026',
+      );
+      vm.captionSettingsChanged(
+        clipId: repeatedId,
+        settings: const CaptionSettings(
+          placement: CaptionPlacement.top,
+          entrance: CaptionEntrance.fade,
+          startFraction: 0.25,
+          endFraction: 0.75,
+        ),
+      );
+      vm.clipImageFitChanged(
+        clipId: repeatedId,
+        imageFit: VideoTemplateImageFit.contain,
+      );
+      const crop = ImageCropTransform(focalX: 0.5, focalY: -0.25, zoom: 2);
+      vm.clipCropChanged(clipId: repeatedId, transform: crop);
+      expect(
+        clips().singleWhere((clip) => clip.clipId == firstId).cropTransform,
+        ImageCropTransform.centered,
+      );
+      vm.clipMotionChanged(
+        clipId: repeatedId,
+        preset: ClipMotionPreset.gentlePan,
+        intensity: ClipMotionIntensity.moreMovement,
+      );
+      expect(clips()[0].caption, isEmpty);
+      vm.syncSelectedMediaToMarkers(selectedMedia: [other, photo]);
+      expect(clips().map((clip) => clip.mediaId), ['one', 'two', 'one']);
+      await vm.buildProjectTimeline(
+        beatMap: map,
+        events: markers,
+        selectedMedia: [other, photo],
+      );
+      final retained = clips().singleWhere((clip) => clip.clipId == repeatedId);
+      expect(retained.caption, 'Наше лето');
+      expect(retained.captionSupportingLine, '2026');
+      expect(retained.captionSettings.placement, CaptionPlacement.top);
+      expect(retained.captionSettings.entrance, CaptionEntrance.fade);
+      expect(retained.captionSettings.startFraction, 0.25);
+      expect(retained.imageFit, VideoTemplateImageFit.contain);
+      expect(retained.cropTransform, crop);
+      final serializer = const ProjectSerializer();
+      final reopened = serializer.deserialize(
+        serializer.serialize(
+          container.read(timelineViewModelProvider).value!.project!,
+        ),
+      );
+      final reopenedClips = _trackEvents(
+        reopened,
+        'track-media',
+      )!.map((event) => event.payload as MediaTrackClipPayload);
+      expect(
+        reopenedClips
+            .singleWhere((clip) => clip.clipId == repeatedId)
+            .cropTransform,
+        crop,
+      );
+      expect(
+        reopenedClips
+            .singleWhere((clip) => clip.clipId == firstId)
+            .cropTransform,
+        ImageCropTransform.centered,
+      );
+      expect(retained.motionOverride, ClipMotionPreset.gentlePan);
+      expect(retained.motionIntensity, ClipMotionIntensity.moreMovement);
+      expect(
+        clips().singleWhere((clip) => clip.clipId == firstId).caption,
+        isEmpty,
+      );
+    },
+  );
   test(
     'buildProjectTimeline creates a project with serialized payload',
     () async {
@@ -175,7 +344,7 @@ void main() {
     expect(container.read(timelineViewModelProvider).value?.timelineScale, 3);
   });
 
-  test('deleteImageMarkerAt removes nearest marker and media clip', () async {
+  test('deleteImageMarkerAt preserves the media sequence', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -215,11 +384,11 @@ void main() {
       const Duration(milliseconds: 500),
     ]);
     expect(_trackEvents(project, 'track-media')?.map((event) => event.time), [
-      const Duration(milliseconds: 500),
+      Duration.zero,
     ]);
   });
 
-  test('clearImageMarkers removes all marker and media events', () async {
+  test('clearImageMarkers preserves the media sequence', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -254,7 +423,7 @@ void main() {
 
     final state = container.read(timelineViewModelProvider).value;
     expect(_trackEvents(state?.project, 'track-markers'), isEmpty);
-    expect(_trackEvents(state?.project, 'track-media'), isEmpty);
+    expect(_trackEvents(state?.project, 'track-media'), hasLength(1));
     expect(state?.selectedMarker, isNull);
     expect(state?.nextQueuedMediaIndex, 0);
   });
@@ -305,8 +474,8 @@ void main() {
 
     expect(payloads?.map((payload) => payload.mediaId), ['img-1', 'img-2']);
     expect(payloads?.map((payload) => payload.start), [
-      const Duration(milliseconds: 500),
-      const Duration(milliseconds: 1000),
+      Duration.zero,
+      const Duration(milliseconds: 3500),
     ]);
   });
 }

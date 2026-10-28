@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -7,10 +5,10 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_editor_preview_frame_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/editor_preview_frame.dart';
-import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/editor/editor_preview_state.dart';
 import 'package:picturestovideos/features/editor/editor_preview_view_model.dart';
+import 'package:picturestovideos/features/editor/widgets/mobile_editor_preview_card.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
@@ -103,7 +101,10 @@ class _EditorPreviewCardState extends ConsumerState<EditorPreviewCard> {
             if (hasVideoSurface)
               Video(controller: _videoController, fit: BoxFit.cover)
             else if (previewFrame.hasActiveClip)
-              _LivePreviewSurface(previewFrame: previewFrame)
+              CompositionPreviewCanvas(
+                frame: previewFrame,
+                template: widget.project?.template,
+              )
             else
               ColoredBox(color: context.colors.surfaceContainerHighest),
             DecoratedBox(
@@ -385,88 +386,6 @@ class _ActivePreviewCopy extends StatelessWidget {
   }
 }
 
-class _LivePreviewSurface extends StatelessWidget {
-  const _LivePreviewSurface({required this.previewFrame});
-
-  final EditorPreviewFrame previewFrame;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeClip = previewFrame.activeClip!;
-    final sourcePath = activeClip.sourcePath;
-    if (sourcePath.isEmpty) {
-      return _MissingLivePreviewSurface(title: activeClip.title);
-    }
-
-    return ColoredBox(
-      color: context.colors.scrim,
-      child: Image.file(
-        File(sourcePath),
-        fit: _livePreviewFit(activeClip.imageFit),
-        alignment: Alignment(
-          activeClip.cropTransform.focalX,
-          activeClip.cropTransform.focalY,
-        ),
-        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-          if (activeClip.imageFit == VideoTemplateImageFit.contain) {
-            return child;
-          }
-          return Transform.scale(
-            scale: activeClip.cropTransform.zoom,
-            alignment: Alignment(
-              activeClip.cropTransform.focalX,
-              activeClip.cropTransform.focalY,
-            ),
-            child: child,
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _MissingLivePreviewSurface(title: activeClip.title);
-        },
-      ),
-    );
-  }
-}
-
-BoxFit _livePreviewFit(VideoTemplateImageFit imageFit) {
-  if (imageFit == VideoTemplateImageFit.cover) {
-    return BoxFit.cover;
-  }
-  return BoxFit.contain;
-}
-
-class _MissingLivePreviewSurface extends StatelessWidget {
-  const _MissingLivePreviewSurface({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: context.colors.surfaceContainerHighest,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.broken_image_outlined,
-              size: 48,
-              color: context.colors.onSurfaceVariant,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: context.textTheme.titleMedium?.copyWith(
-                color: context.colors.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _EmptyPreviewCopy extends StatelessWidget {
   const _EmptyPreviewCopy({required this.beatMap, required this.previewState});
 
@@ -483,10 +402,8 @@ class _EmptyPreviewCopy extends StatelessWidget {
       EditorPreviewStatus.failure =>
         previewState.errorMessage ??
             'The image preview could not be generated on this device.',
-      _ when beatMap == null =>
-        'Import audio, build the beat map, then sync images to render the preview.',
-      _ =>
-        'Queue images from the library and run auto-sync to create the preview track.',
+      _ when beatMap == null => 'Import audio, build the beat map, then sync images to render the preview.',
+      _ => 'Queue images from the library and run auto-sync to create the preview track.',
     };
 
     return Column(

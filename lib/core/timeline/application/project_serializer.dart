@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
+import 'package:picturestovideos/core/timeline/domain/sequence_pacing.dart';
 
 final projectSerializerProvider = Provider<ProjectSerializer>(
   (ref) => const ProjectSerializer(),
@@ -15,10 +17,19 @@ final projectSerializerProvider = Provider<ProjectSerializer>(
 class ProjectSerializer {
   const ProjectSerializer();
 
+  static const currentSchemaVersion = 10;
+
   Map<String, Object?> serialize(ProjectTimeline project) {
     return {
+      'schemaVersion': currentSchemaVersion,
       'id': project.id,
       'name': project.name,
+      'audioSourcePath': project.audioSourcePath,
+      'audioDurationMs': project.audioDuration?.inMilliseconds,
+      'pacing': project.pacing.name,
+      'hasManualEdits': project.hasManualEdits,
+      'snapToMarkers': project.snapToMarkers,
+      'audioMix': project.audioMix.toJson(),
       'template': project.template.toJson(),
       'beatMap': {
         'bpm': project.beatMap.bpm,
@@ -48,12 +59,28 @@ class ProjectSerializer {
   }
 
   ProjectTimeline deserialize(Map<String, Object?> json) {
+    final version = json['schemaVersion'] as int? ?? 0;
+    if (version < 0 || version > currentSchemaVersion) {
+      throw FormatException('Unsupported project schema version: $version');
+    }
     final beatMapJson = json['beatMap']! as Map<String, Object?>;
     final tracksJson = json['tracks']! as List<Object?>;
 
     return ProjectTimeline(
       id: json['id']! as String,
       name: json['name']! as String,
+      audioSourcePath: json['audioSourcePath'] as String?,
+      audioDuration: json['audioDurationMs'] is int
+          ? Duration(milliseconds: json['audioDurationMs']! as int)
+          : null,
+      pacing:
+          SequencePacing.values
+              .where((value) => value.name == json['pacing'])
+              .firstOrNull ??
+          SequencePacing.balanced,
+      hasManualEdits: json['hasManualEdits'] as bool? ?? true,
+      snapToMarkers: json['snapToMarkers'] as bool? ?? true,
+      audioMix: AudioMix.fromJson(json['audioMix']),
       template: _deserializeTemplate(json['template']),
       beatMap: BeatMap(
         beats: [
@@ -66,8 +93,8 @@ class ProjectSerializer {
         ),
       ),
       tracks: [
-        for (final trackJson in tracksJson)
-          _deserializeTrack(trackJson! as Map<String, Object?>),
+        for (var i = 0; i < tracksJson.length; i++)
+          _deserializeTrack(tracksJson[i]! as Map<String, Object?>, i, version),
       ],
     );
   }
@@ -92,22 +119,35 @@ class ProjectSerializer {
     return VideoTemplates.cleanMemories;
   }
 
-  TimelineTrack _deserializeTrack(Map<String, Object?> json) {
+  TimelineTrack _deserializeTrack(
+    Map<String, Object?> json,
+    int trackIndex,
+    int version,
+  ) {
+    final events = json['events']! as List<Object?>;
     return TimelineTrack(
       id: json['id']! as String,
       name: json['name']! as String,
       events: [
-        for (final eventJson in json['events']! as List<Object?>)
-          _deserializeEvent(eventJson! as Map<String, Object?>),
+        for (var i = 0; i < events.length; i++)
+          _deserializeEvent(
+            events[i]! as Map<String, Object?>,
+            'legacy-$trackIndex-$i',
+            version,
+          ),
       ],
     );
   }
 
-  BeatEvent _deserializeEvent(Map<String, Object?> json) {
+  BeatEvent _deserializeEvent(
+    Map<String, Object?> json,
+    String legacyClipId,
+    int version,
+  ) {
     return BeatEvent(
       time: Duration(milliseconds: json['timeMs']! as int),
       type: json['type']! as String,
-      payload: _deserializePayload(json['payload']),
+      payload: _deserializePayload(json['payload'], legacyClipId, version),
     );
   }
 
@@ -118,10 +158,19 @@ class ProjectSerializer {
     return payload?.toString();
   }
 
-  Object? _deserializePayload(Object? payload) {
+  Object? _deserializePayload(
+    Object? payload,
+    String legacyClipId,
+    int version,
+  ) {
     if (payload is Map<String, Object?> &&
         payload['kind'] == 'media-track-clip') {
-      return MediaTrackClipPayload.fromJson(payload);
+      return MediaTrackClipPayload.fromJson(
+        version < 5 && !payload.containsKey('transitionOverride')
+            ? {...payload, 'transitionOverride': 'cut'}
+            : payload,
+        legacyClipId: legacyClipId,
+      );
     }
     return payload;
   }

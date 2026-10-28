@@ -4,6 +4,8 @@ enum LibraryFilter { all, recent, staged, favorites }
 
 enum LibrarySortOrder { newest, oldest, name, fileSize }
 
+enum LibraryImportStatus { noNewImages, imagesAdded, imagesRemoved }
+
 class LibraryState {
   const LibraryState({
     required this.query,
@@ -15,7 +17,8 @@ class LibraryState {
     required this.isReviewingStaged,
     required this.isImporting,
     required this.errorMessage,
-    required this.statusMessage,
+    required this.importStatus,
+    required this.statusItemCount,
   });
 
   const LibraryState.initial()
@@ -28,7 +31,8 @@ class LibraryState {
       isReviewingStaged = false,
       isImporting = false,
       errorMessage = null,
-      statusMessage = null;
+      importStatus = null,
+      statusItemCount = 0;
 
   final String query;
   final String folderPathInput;
@@ -39,7 +43,8 @@ class LibraryState {
   final bool isReviewingStaged;
   final bool isImporting;
   final String? errorMessage;
-  final String? statusMessage;
+  final LibraryImportStatus? importStatus;
+  final int statusItemCount;
 
   List<LibraryMediaItem> visibleItems(Set<String> stagedIds) {
     final normalizedQuery = query.trim().toLowerCase();
@@ -108,7 +113,8 @@ class LibraryState {
     bool? isReviewingStaged,
     bool? isImporting,
     String? errorMessage,
-    String? statusMessage,
+    LibraryImportStatus? importStatus,
+    int? statusItemCount,
     bool clearError = false,
     bool clearStatusMessage = false,
   }) {
@@ -122,9 +128,12 @@ class LibraryState {
       isReviewingStaged: isReviewingStaged ?? this.isReviewingStaged,
       isImporting: isImporting ?? this.isImporting,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
-      statusMessage: clearStatusMessage
+      importStatus: clearStatusMessage
           ? null
-          : statusMessage ?? this.statusMessage,
+          : importStatus ?? this.importStatus,
+      statusItemCount: clearStatusMessage
+          ? 0
+          : statusItemCount ?? this.statusItemCount,
     );
   }
 }

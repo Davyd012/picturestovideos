@@ -49,10 +49,9 @@ abstract interface class ImageImportRepository {
 
 class DeviceImageImportRepository implements ImageImportRepository {
   const DeviceImageImportRepository({
-    required ImageFilePicker filePicker,
-    required AppLogger logger,
-  }) : _filePicker = filePicker,
-       _logger = logger;
+    required this._filePicker,
+    required this._logger,
+  });
 
   final ImageFilePicker _filePicker;
   final AppLogger _logger;
@@ -120,9 +119,10 @@ class DeviceImageImportRepository implements ImageImportRepository {
     final entities = await directory.list().toList();
     final files = entities.whereType<File>().toList(growable: false)
       ..sort(
-        (a, b) => _fileNameForPath(
-          a.path,
-        ).toLowerCase().compareTo(_fileNameForPath(b.path).toLowerCase()),
+        (a, b) =>
+            _fileNameForPath(a.path)
+                .toLowerCase()
+                .compareTo(_fileNameForPath(b.path).toLowerCase()),
       );
 
     final importedOn = DateTime.now();

@@ -1,8 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show debugDefaultTargetPlatformOverride;
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/app/localizations/app_localizations.dart';
 import 'package:picturestovideos/core/media/data/saved_image_asset_repository.dart';
 import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
 import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
@@ -30,10 +34,97 @@ void main() {
     expect(find.text('Imported: 0'), findsOneWidget);
   });
 
+  testWidgets('library empty state uses the selected locale', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _overrides(),
+        child: const _LibraryTestApp(locale: Locale('ru')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Библиотека изображений'), findsOneWidget);
+    expect(find.text('Импорт фотографий'), findsOneWidget);
+    expect(find.text('Выбрать фотографии'), findsOneWidget);
+    expect(find.text('Импортировать папку'), findsOneWidget);
+  });
+
+  testWidgets('Android explains that images must use the photo picker', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(),
+          child: const _LibraryTestApp(locale: Locale('ru')),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'На Android выбирайте фотографии через системный выбор. Импорт по пути к папке недоступен.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Импортировать папку'),
+            )
+            .onPressed,
+        isNull,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('populated library toolbar and import status are localized', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _overrides(),
+        child: const _LibraryTestApp(locale: Locale('ru')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Выбрать фотографии'));
+    await tester.tap(find.text('Выбрать фотографии'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сортировка'), findsWidgets);
+    expect(find.text('Все'), findsOneWidget);
+    expect(find.text('Недавние'), findsOneWidget);
+    expect(find.text('Избранное'), findsOneWidget);
+    expect(find.text('Добавить все импортированные'), findsOneWidget);
+    expect(find.text('Добавлено 2 изображения в библиотеку.'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.byType(TextField).first)
+          .decoration!
+          .hintText,
+      'Поиск фотографий, папок и дат',
+    );
+    await tester.ensureVisible(find.text('Импортировать ещё'));
+    await tester.tap(find.text('Импортировать ещё'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Новые поддерживаемые фотографии не добавлены.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('library screen imports, filters, and stages images', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(1000, 1000));
+    await tester.binding.setSurfaceSize(const Size(1000, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -52,19 +143,30 @@ void main() {
     expect(find.text('Obsidian_Range_A01.jpg'), findsOneWidget);
     expect(find.text('Stage all imported'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField).first, 'neon');
+    final searchField = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.hintText == 'Search images, folders, or dates',
+      );
+    expect(tester.widget<TextField>(searchField).enabled, isTrue);
+    await tester.enterText(searchField, 'neon');
     await tester.pumpAndSettle();
 
     expect(find.text('Neon_City_D04.png'), findsOneWidget);
     expect(find.text('Obsidian_Range_A01.jpg'), findsNothing);
 
+    await tester.scrollUntilVisible(
+      find.text('Stage').first,
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(find.text('Stage').first);
     await tester.pumpAndSettle();
 
     expect(find.text('Ready for editor'), findsOneWidget);
     expect(find.text('Review staged'), findsOneWidget);
     expect(find.text('1 selected'), findsOneWidget);
-    expect(find.text('Open editor (1)'), findsOneWidget);
+    expect(find.text('Open editor (1)'), findsWidgets);
   });
 
   testWidgets('library screen stages all imported images from toolbar', (
@@ -88,16 +190,28 @@ void main() {
 
     expect(find.text('Ready for editor'), findsOneWidget);
     expect(find.text('Staged: 2'), findsWidgets);
-    expect(find.text('Open editor (2)'), findsOneWidget);
+    expect(find.text('Open editor (2)'), findsWidgets);
   });
 }
 
 class _LibraryTestApp extends StatelessWidget {
-  const _LibraryTestApp();
+  const _LibraryTestApp({this.locale});
+
+  final Locale? locale;
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(home: LibraryScreen());
+    return MaterialApp(
+      locale: locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: const LibraryScreen(),
+    );
   }
 }
 

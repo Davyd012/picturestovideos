@@ -1,6 +1,49 @@
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 
 abstract final class VideoTemplates {
+  static const calmMemories = VideoTemplate(
+    id: 'calm_memories',
+    name: 'Calm memories',
+    description:
+        'Warm and understated, with gentle movement and soft dissolves.',
+    aspectRatio: VideoTemplateAspectRatio.portrait,
+    defaultSlideDuration: Duration(seconds: 5),
+    imageFit: VideoTemplateImageFit.cover,
+    imageAnimation: VideoTemplateImageAnimation.slowZoomIn,
+    textPlacement: VideoTemplateTextPlacement.bottomCenter,
+    overlayStyle: VideoTemplateOverlayStyle.bottomScrim,
+    frameStyle: VideoTemplateFrameStyle.none,
+    transition: VideoTemplateTransition.crossfade,
+  );
+  static const storybook = VideoTemplate(
+    id: 'storybook',
+    name: 'Storybook',
+    description:
+        'Reflective reframing and prominent titles for personal stories.',
+    aspectRatio: VideoTemplateAspectRatio.portrait,
+    defaultSlideDuration: Duration(seconds: 4),
+    imageFit: VideoTemplateImageFit.cover,
+    imageAnimation: VideoTemplateImageAnimation.slowZoomOut,
+    textPlacement: VideoTemplateTextPlacement.center,
+    overlayStyle: VideoTemplateOverlayStyle.cinematicScrim,
+    frameStyle: VideoTemplateFrameStyle.none,
+    transition: VideoTemplateTransition.crossfade,
+  );
+  static const celebration = VideoTemplate(
+    id: 'celebration',
+    name: 'Celebration',
+    description: 'Livelier movement, short captions, and gentle slides.',
+    aspectRatio: VideoTemplateAspectRatio.portrait,
+    defaultSlideDuration: Duration(milliseconds: 2500),
+    imageFit: VideoTemplateImageFit.cover,
+    imageAnimation: VideoTemplateImageAnimation.slowZoomIn,
+    textPlacement: VideoTemplateTextPlacement.center,
+    overlayStyle: VideoTemplateOverlayStyle.cinematicScrim,
+    frameStyle: VideoTemplateFrameStyle.none,
+    transition: VideoTemplateTransition.slideLeft,
+    moreMovementByDefault: true,
+  );
+  static const featured = [calmMemories, storybook, celebration];
   static const cleanMemories = VideoTemplate(
     id: 'clean_memories',
     name: 'Clean Memories',
@@ -72,6 +115,7 @@ abstract final class VideoTemplates {
   );
 
   static const all = [
+    ...featured,
     cleanMemories,
     polaroidCollage,
     cinematicDark,

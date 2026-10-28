@@ -102,7 +102,7 @@ class MarkersTabView extends StatelessWidget {
     if (resolvedProject != null) {
       for (final track in resolvedProject.tracks) {
         if (track.id == 'track-markers') {
-          return track.events;
+          return track.events.where((event) => !event.time.isNegative).toList();
         }
       }
       return const [];

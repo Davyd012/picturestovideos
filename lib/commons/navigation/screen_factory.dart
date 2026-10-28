@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_screen.dart';
 import 'package:picturestovideos/features/editor/audio_editor_screen.dart';
 import 'package:picturestovideos/features/export/export_screen.dart';
 import 'package:picturestovideos/features/home/home_screen.dart';
 import 'package:picturestovideos/features/library/library_screen.dart';
-import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
-import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
 class ScreenFactory {
   const ScreenFactory._();
@@ -52,57 +49,6 @@ class ScreenFactory {
     required WidgetBuilder builder,
   }) {
     return MaterialPageRoute<dynamic>(builder: builder, settings: settings);
-  }
-}
-
-class _PlannedScreen extends StatelessWidget {
-  const _PlannedScreen({required this.args});
-
-  final PlannedScreenArgs args;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppShellScaffold(
-      currentRoute: args.route,
-      title: args.title,
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Card.outlined(
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text('Route'),
-                  subtitle: Text(args.route),
-                ),
-                ListTile(
-                  title: const Text('UI Reference'),
-                  subtitle: Text(args.referenceFile),
-                ),
-                ListTile(
-                  title: const Text('Recommended Build Order'),
-                  subtitle: Text('${args.recommendedStartOrder}'),
-                ),
-                ListTile(
-                  title: const Text('Summary'),
-                  subtitle: Text(args.summary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'This route is planned and documented, but the production screen is not implemented yet.',
-                style: context.textTheme.bodyMedium,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

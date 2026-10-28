@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
+import 'package:picturestovideos/core/audio/data/audio_player_repository.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/preview/data/render_capability_repository.dart';
+import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
 import 'package:picturestovideos/features/export/export_screen.dart';
@@ -17,7 +20,14 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const ProviderScope(child: MaterialApp(home: ExportScreen())),
+      ProviderScope(
+        overrides: [
+          renderCapabilitiesProvider.overrideWith(
+            (ref) async => _capableRenderer(),
+          ),
+        ],
+        child: const MaterialApp(home: ExportScreen()),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -29,7 +39,16 @@ void main() {
   testWidgets('export screen shows ready state when timeline data exists', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final player = ManualAudioPlayerRepository();
+    final container = ProviderContainer(
+      overrides: [
+        audioPlayerRepositoryProvider.overrideWithValue(player),
+        renderCapabilitiesProvider.overrideWith(
+          (ref) async => _capableRenderer(),
+        ),
+      ],
+    );
+    addTearDown(player.dispose);
     addTearDown(container.dispose);
 
     const beatMap = BeatMap(
@@ -63,6 +82,19 @@ void main() {
         .buildProjectTimeline(
           beatMap: beatMap,
           events: container.read(eventSystemViewModelProvider).value!.events,
+          selectedMedia: [
+            LibraryMediaItem(
+              id: 'image',
+              title: 'Image.jpg',
+              sizeLabel: '1 MB',
+              tagline: '',
+              importedOnLabel: '',
+              importedOn: DateTime(2026),
+              byteLength: 1024,
+              thumbnailBytes: Uint8List(0),
+              sourcePath: '/tmp/image.jpg',
+            ),
+          ],
         );
 
     await tester.pumpWidget(
@@ -73,16 +105,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Preview summary'), findsOneWidget);
+    expect(find.text('Image preview summary'), findsOneWidget);
     expect(find.text('Finalize output'), findsOneWidget);
     expect(find.text('Picture To Videos Project'), findsWidgets);
-    expect(find.textContaining('113 MB'), findsOneWidget);
+    expect(find.text('Render'), findsOneWidget);
   });
 
   testWidgets('export is enabled for manually timed clips without beats', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        renderCapabilitiesProvider.overrideWith(
+          (ref) async => _capableRenderer(),
+        ),
+      ],
+    );
     addTearDown(container.dispose);
 
     await container.read(timelineViewModelProvider.future);
@@ -121,4 +159,79 @@ void main() {
     expect(exportButton.onPressed, isNotNull);
     expect(find.text('Preview unavailable'), findsNothing);
   });
+
+  testWidgets('unsupported motion capability disables export with guidance', (
+    tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: [
+        renderCapabilitiesProvider.overrideWith(
+          (ref) async => _capableRenderer(missingZoompan: true),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    container
+        .read(timelineViewModelProvider.notifier)
+        .addManualImagePointAt(
+          time: const Duration(seconds: 1),
+          beatMap: null,
+          selectedMedia: [
+            LibraryMediaItem(
+              id: 'image',
+              title: 'Image.jpg',
+              sizeLabel: '1 MB',
+              tagline: '',
+              importedOnLabel: '',
+              importedOn: DateTime(2026),
+              byteLength: 1024,
+              thumbnailBytes: Uint8List(0),
+              sourcePath: '/tmp/image.jpg',
+            ),
+          ],
+          audioDuration: null,
+        );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: ExportScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final renderButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Render').first,
+    );
+    expect(renderButton.onPressed, isNull);
+    expect(
+      find.textContaining('FFmpeg filter that is unavailable'),
+      findsOneWidget,
+    );
+  });
 }
+
+RenderCapabilities _capableRenderer({bool missingZoompan = false}) =>
+    RenderCapabilities(
+      platformSupported: true,
+      ffmpegAvailable: true,
+      filters: {
+        'scale',
+        'crop',
+        'pad',
+        'drawbox',
+        'drawtext',
+        'xfade',
+        if (!missingZoompan) 'zoompan',
+        'atrim',
+        'asetpts',
+        'afade',
+        'apad',
+      },
+      encoders: {'libx264', 'mpeg4', 'aac'},
+      muxers: {'mp4'},
+      videoEncoder: 'libx264',
+      fontPath: 'Arial.ttf',
+      version: 'FFmpeg test build',
+    );

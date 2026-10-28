@@ -310,6 +310,8 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
             selectedMedia: _selectedMedia,
             selectedImageFits: _selectedImageFits,
             selectedCropTransforms: _selectedCropTransforms,
+            audioSourcePath: currentState.source?.path,
+            audioDuration: currentState.audioData?.duration,
           );
       if (!_isCurrentSession(session)) {
         return;
@@ -420,6 +422,12 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
             selectedMedia: _selectedMedia,
             selectedImageFits: _selectedImageFits,
             selectedCropTransforms: _selectedCropTransforms,
+            audioSourcePath: currentState.source?.path,
+            audioDuration: ref
+                .read(playbackViewModelProvider)
+                .asData
+                ?.value
+                .sourceDuration,
           );
       if (!_isCurrentSession(session)) {
         return;
@@ -540,6 +548,10 @@ class AudioImportViewModel extends AsyncNotifier<AudioImportState> {
           selectedMedia: _selectedMedia,
           selectedImageFits: _selectedImageFits,
           selectedCropTransforms: _selectedCropTransforms,
+          audioSourcePath: nextState.source?.path,
+          audioDuration:
+              nextState.audioData?.duration ??
+              ref.read(playbackViewModelProvider).asData?.value.sourceDuration,
         );
     if (!_isCurrentSession(session)) {
       return;

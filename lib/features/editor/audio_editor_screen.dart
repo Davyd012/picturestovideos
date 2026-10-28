@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
+import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/audio/domain/audio_source.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
+import 'package:picturestovideos/core/preview/data/render_capability_repository.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -31,6 +33,7 @@ import 'package:picturestovideos/features/event_system/event_system_view_model.d
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
+import 'package:picturestovideos/features/projects/project_media_recovery_card.dart';
 import 'package:picturestovideos/features/timeline/timeline_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
@@ -115,11 +118,14 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (project != null) ProjectMediaRecoveryCard(project: project),
           MobileEditorPreviewCard(
             beatMap: beatMap,
             project: timeline?.project,
             playback: playback,
             previewState: previewState,
+            audioSourcePath:
+                project?.audioSourcePath ?? importedAudio?.source?.path,
           ),
           const SizedBox(height: 12),
           EditorSectionTabBar(
@@ -131,7 +137,11 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
           PlaybackControls(
             beatMap: beatMap,
             playback: playback,
-            audioSourcePath: importedAudio?.source?.path,
+            audioSourcePath: project == null
+                ? importedAudio?.source?.path
+                : project.audioSourcePath,
+            audioMix: project?.audioMix ?? const AudioMix(),
+            videoDuration: project?.videoDuration,
           ),
           const SizedBox(height: 16),
           _EditorTabBody(
@@ -148,7 +158,9 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
                 importedAudio?.audioData?.duration ?? playback?.sourceDuration,
             audioData: importedAudio?.audioData,
             audioSource: importedAudio?.source,
-            audioSourcePath: importedAudio?.source?.path,
+            audioSourcePath: project == null
+                ? importedAudio?.source?.path
+                : project.audioSourcePath,
           ),
         ],
       ),
@@ -174,11 +186,15 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
     });
   }
 
-  String? get _audioSourcePath => ref.read(
-    audioImportViewModelProvider.select(
-      (next) => next.asData?.value.source?.path,
-    ),
-  );
+  String? get _audioSourcePath {
+    final project = ref.read(timelineViewModelProvider).asData?.value.project;
+    if (project != null) return project.audioSourcePath;
+    return ref.read(
+      audioImportViewModelProvider.select(
+        (next) => next.asData?.value.source?.path,
+      ),
+    );
+  }
 
   BeatMap? _resolvedBeatMap({
     required AsyncValue<BeatMapState> beatMapState,
@@ -234,6 +250,7 @@ class _EditorTabBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final renderCapabilityState = ref.watch(renderCapabilitiesProvider);
     return switch (selectedTab) {
       EditorTab.timeline => TimelineTabView(
         beatMap: beatMap,
@@ -249,6 +266,51 @@ class _EditorTabBody extends ConsumerWidget {
         audioDuration: audioDuration,
       ),
       EditorTab.clips => ClipsTabView(
+        renderCapabilities: renderCapabilityState.asData?.value,
+        gateRenderCapabilities: true,
+        capabilityProbeFailed: renderCapabilityState.hasError,
+        onFramingChanged: (clipId, fit, crop) {
+          final timeline = ref.read(timelineViewModelProvider.notifier);
+          timeline.clipImageFitChanged(clipId: clipId, imageFit: fit);
+          timeline.clipCropChanged(clipId: clipId, transform: crop);
+        },
+        timelineClips: timeline?.project == null
+            ? const []
+            : ref
+                  .read(resolvePreviewClipsUseCaseProvider)
+                  .call(
+                    beatMap: timeline!.project!.beatMap,
+                    project: timeline!.project,
+                  ),
+        onCaptionChanged: (clipId, title, supportingLine) => ref
+            .read(timelineViewModelProvider.notifier)
+            .captionChanged(
+              clipId: clipId,
+              caption: title,
+              supportingLine: supportingLine,
+            ),
+        onCaptionSettingsChanged: (clipId, settings) => ref
+            .read(timelineViewModelProvider.notifier)
+            .captionSettingsChanged(clipId: clipId, settings: settings),
+        onMotionChanged: (clipId, preset, intensity) => ref
+            .read(timelineViewModelProvider.notifier)
+            .clipMotionChanged(
+              clipId: clipId,
+              preset: preset,
+              intensity: intensity,
+            ),
+        template: timeline?.selectedTemplate,
+        snapToMarkers: timeline?.project?.snapToMarkers ?? true,
+        onTimingChanged: (clipId, duration, snap) => ref
+            .read(timelineViewModelProvider.notifier)
+            .clipTimingChanged(clipId: clipId, duration: duration, snap: snap),
+        onTransitionChanged: (clipId, type, duration) => ref
+            .read(timelineViewModelProvider.notifier)
+            .clipTransitionChanged(
+              clipId: clipId,
+              type: type,
+              duration: duration,
+            ),
         selectedMedia: selectedMedia,
         selectedImageFits: selectedImageFits,
         selectedCropTransforms: selectedCropTransforms,
@@ -293,11 +355,14 @@ class _EditorTabBody extends ConsumerWidget {
         },
       ),
       EditorTab.tools => ToolsTabView(
+        renderCapabilities: renderCapabilityState.asData?.value,
+        gateRenderCapabilities: true,
+        capabilityProbeFailed: renderCapabilityState.hasError,
         beatMap: beatMap,
         project: timeline?.project,
         playback: playback,
         selectedTemplate:
-            timeline?.selectedTemplate ?? VideoTemplates.cleanMemories,
+            timeline?.selectedTemplate ?? VideoTemplates.calmMemories,
         selectedMedia: selectedMedia,
         selectedImageFits: selectedImageFits,
         selectedMarker: timeline?.selectedMarker,
@@ -326,6 +391,8 @@ class _EditorTabBody extends ConsumerWidget {
         .preparePlayback(
           beatMap: resolvedBeatMap,
           audioSourcePath: audioSourcePath,
+          audioMix: timeline?.project?.audioMix ?? const AudioMix(),
+          videoDuration: timeline?.project?.videoDuration,
         );
     await ref.read(playbackViewModelProvider.notifier).seek(position);
   }
@@ -385,9 +452,8 @@ class _EditorTabBody extends ConsumerWidget {
     final message = savedCount == 0
         ? 'Add at least one marker before saving.'
         : 'Saved $savedCount marker${savedCount == 1 ? '' : 's'} as an audio preset.';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

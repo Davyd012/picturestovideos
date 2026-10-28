@@ -8,6 +8,7 @@ import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/image_file_picker.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
+import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 
 void main() {
@@ -50,7 +51,8 @@ void main() {
     expect(state.totalCount, 2);
     expect(visibleItems, hasLength(1));
     expect(visibleItems.first.title, 'Neon_City_D04.png');
-    expect(state.statusMessage, 'Added 2 images to the library.');
+    expect(state.importStatus, LibraryImportStatus.imagesAdded);
+    expect(state.statusItemCount, 2);
   });
 
   test('importImagesFromFolderPath stores imported items', () async {

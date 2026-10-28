@@ -110,8 +110,8 @@ class LibraryViewModel extends Notifier<LibraryState> {
         ),
         selectedItemIds: const {},
         isImporting: false,
-        statusMessage:
-            'Removed ${itemIds.length} image${itemIds.length == 1 ? '' : 's'} from the app.',
+        importStatus: LibraryImportStatus.imagesRemoved,
+        statusItemCount: itemIds.length,
       );
     } catch (error, stackTrace) {
       ref
@@ -153,9 +153,10 @@ class LibraryViewModel extends Notifier<LibraryState> {
       state = state.copyWith(
         items: List.unmodifiable(mergedItems),
         isImporting: false,
-        statusMessage: addedCount == 0
-            ? 'No new supported images were added.'
-            : 'Added $addedCount image${addedCount == 1 ? '' : 's'} to the library.',
+        importStatus: addedCount == 0
+            ? LibraryImportStatus.noNewImages
+            : LibraryImportStatus.imagesAdded,
+        statusItemCount: addedCount,
         clearError: true,
       );
     } catch (error, stackTrace) {

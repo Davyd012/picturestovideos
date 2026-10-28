@@ -4,12 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_editor_preview_frame_use_case.dart';
+import 'package:picturestovideos/core/preview/domain/editor_preview_frame.dart';
+import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
+import 'package:picturestovideos/core/composition/domain/composition_evaluator.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
+import 'package:picturestovideos/core/preview/domain/caption_layout.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/editor/editor_preview_state.dart';
+import 'package:picturestovideos/features/editor/editor_preview_view_model.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class MobileEditorPreviewCard extends ConsumerWidget {
   const MobileEditorPreviewCard({
@@ -17,6 +24,7 @@ class MobileEditorPreviewCard extends ConsumerWidget {
     required this.project,
     required this.playback,
     required this.previewState,
+    this.audioSourcePath,
     super.key,
   });
 
@@ -24,6 +32,7 @@ class MobileEditorPreviewCard extends ConsumerWidget {
   final ProjectTimeline? project;
   final PlaybackState? playback;
   final EditorPreviewState previewState;
+  final String? audioSourcePath;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,8 +43,8 @@ class MobileEditorPreviewCard extends ConsumerWidget {
           project: project,
           currentTime: playback?.currentTime ?? Duration.zero,
         );
-    final activeClip = previewFrame.activeClip;
     final duration =
+        project?.videoDuration ??
         playback?.sourceDuration ??
         previewState.result?.totalDuration ??
         _fallbackDuration;
@@ -49,76 +58,67 @@ class MobileEditorPreviewCard extends ConsumerWidget {
         children: [
           AspectRatio(
             aspectRatio: aspectRatio,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                _PreviewSurface(activeClip: activeClip),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        context.colors.scrim.withValues(alpha: 0.08),
-                        context.colors.scrim.withValues(alpha: 0.54),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _Badge(
-                            label: previewFrame.hasActiveClip
-                                ? '${previewFrame.activeIndex + 1} / ${previewFrame.clips.length}'
-                                : _statusLabel,
-                          ),
-                          const SizedBox(width: 8),
-                          if (activeClip != null)
-                            Expanded(child: _Badge(label: activeClip.title)),
-                        ],
-                      ),
-                      const Spacer(),
-                      Center(
-                        child: IconButton.filledTonal(
-                          onPressed: null,
-                          iconSize: 32,
-                          icon: Icon(
-                            playback?.isPlaying ?? false
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              activeClip?.tagline ?? 'Live sequence preview',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.textTheme.titleMedium,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          _Badge(
-                            label:
-                                '${_formatDuration(currentTime)} / ${_formatDuration(duration)}',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: CompositionPreviewCanvas(
+              frame: previewFrame,
+              template: project?.template,
+            ),
+          ),
+          ListTile(
+            title: Text(context.l10n.editingPreview),
+            trailing: Text(
+              '${_formatDuration(currentTime)} / ${_formatDuration(duration)}',
             ),
           ),
           LinearProgressIndicator(value: progress, minHeight: 6),
+          if (previewState.hasRenderedResult || project != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    isThreeLine: true,
+                    title: Text(context.l10n.renderedPreview),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (previewState.hasRenderedResult)
+                          Text(
+                            previewState.isRenderedPreviewStale
+                                ? context.l10n.renderedPreviewStale
+                                : context.l10n.renderedPreviewCurrent,
+                          ),
+                        Text(context.l10n.renderedPreviewSource),
+                      ],
+                    ),
+                  ),
+                  if (!previewState.isReady ||
+                      previewState.isRenderedPreviewStale)
+                    FilledButton.icon(
+                      onPressed: project == null || previewState.isRendering
+                          ? null
+                          : () => ref
+                                .read(editorPreviewViewModelProvider.notifier)
+                                .renderPreview(
+                                  project,
+                                  audioSourcePath: audioSourcePath,
+                                ),
+                      icon: previewState.isRendering
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.movie_creation_outlined),
+                      label: Text(
+                        previewState.hasRenderedResult
+                            ? context.l10n.refreshRenderedPreview
+                            : context.l10n.renderPreview,
+                      ),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -132,23 +132,137 @@ class MobileEditorPreviewCard extends ConsumerWidget {
     return const Duration(seconds: 30);
   }
 
-  String get _statusLabel {
-    if (beatMap == null) {
-      return 'No markers';
-    }
-    return switch (previewState.status) {
-      EditorPreviewStatus.rendering => 'Rendering',
-      EditorPreviewStatus.ready => 'Ready',
-      EditorPreviewStatus.failure => 'Unavailable',
-      _ => '${beatMap!.beats.length} markers',
-    };
-  }
-
   double _progress(Duration currentTime, Duration duration, double frameValue) {
     if (duration <= Duration.zero) {
       return frameValue.clamp(0, 1);
     }
     return (currentTime.inMilliseconds / duration.inMilliseconds).clamp(0, 1);
+  }
+}
+
+class CompositionPreviewCanvas extends StatelessWidget {
+  const CompositionPreviewCanvas({
+    required this.frame,
+    required this.template,
+    super.key,
+  });
+  final EditorPreviewFrame frame;
+  final VideoTemplate? template;
+
+  @override
+  Widget build(BuildContext context) {
+    final transition = frame.transition;
+    final outgoing = frame.transitionOutgoing;
+    final incoming = frame.transitionIncoming;
+    if (template == null ||
+        transition == null ||
+        outgoing == null ||
+        incoming == null) {
+      return _ClipVisual(
+        clip: frame.activeClip,
+        template: template,
+        time: frame.currentTime,
+        evaluatedLayer: frame.compositionFrame?.layers.lastOrNull,
+      );
+    }
+    final progress = frame.transitionProgress;
+    return ClipRect(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final first = _ClipVisual(
+            clip: outgoing,
+            template: template,
+            time: frame.currentTime,
+            evaluatedLayer: frame.compositionFrame?.layers.firstOrNull,
+          );
+          final second = _ClipVisual(
+            clip: incoming,
+            template: template,
+            time: frame.currentTime,
+            evaluatedLayer: frame.compositionFrame?.layers.lastOrNull,
+          );
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              if (transition.type == ClipTransitionType.slide)
+                Transform.translate(
+                  offset: Offset(-constraints.maxWidth * progress, 0),
+                  child: first,
+                )
+              else
+                first,
+              if (transition.type == ClipTransitionType.slide)
+                Transform.translate(
+                  offset: Offset(constraints.maxWidth * (1 - progress), 0),
+                  child: second,
+                )
+              else
+                Opacity(opacity: progress, child: second),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ClipVisual extends StatelessWidget {
+  const _ClipVisual({
+    required this.clip,
+    required this.template,
+    required this.time,
+    this.evaluatedLayer,
+  });
+  final MediaTrackClipPayload? clip;
+  final VideoTemplate? template;
+  final Duration time;
+  final CompositionLayer? evaluatedLayer;
+
+  @override
+  Widget build(BuildContext context) {
+    final clip = this.clip;
+    final template = this.template;
+    if (clip == null || template == null) {
+      return _PreviewSurface(activeClip: clip);
+    }
+    final layer = evaluatedLayer;
+    final span = clip.end - clip.start;
+    final progress =
+        layer?.progress ??
+        (span <= Duration.zero
+            ? 0.0
+            : ((time - clip.start).inMicroseconds / span.inMicroseconds).clamp(
+                0.0,
+                1.0,
+              ));
+    final motion = clip.motionFor(template);
+    final zoom = layer?.motionZoom ?? motion.zoomAt(progress);
+    final horizontalAnchor =
+        layer?.horizontalAnchor ??
+        motion.horizontalAnchorAt(progress, clip.cropTransform.focalX);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ClipRect(
+          child: Transform.scale(
+            scale: zoom,
+            alignment: Alignment(
+              horizontalAnchor * 2 - 1,
+              clip.cropTransform.focalY,
+            ),
+            child: _PreviewSurface(activeClip: clip),
+          ),
+        ),
+        if (clip.caption.isNotEmpty || clip.captionSupportingLine.isNotEmpty)
+          _CaptionPreview(
+            clip: clip,
+            template: template,
+            time: time,
+            resolvedFrame: layer?.captionFrame,
+            resolvedLayout: layer?.captionLayout,
+          ),
+      ],
+    );
   }
 }
 
@@ -225,16 +339,85 @@ class _FallbackPreview extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge({required this.label});
+class _CaptionPreview extends StatelessWidget {
+  const _CaptionPreview({
+    required this.clip,
+    required this.template,
+    required this.time,
+    this.resolvedFrame,
+    this.resolvedLayout,
+  });
 
-  final String label;
+  final MediaTrackClipPayload clip;
+  final VideoTemplate template;
+  final Duration time;
+  final CaptionFrame? resolvedFrame;
+  final CaptionLayout? resolvedLayout;
 
   @override
   Widget build(BuildContext context) {
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    final frame =
+        resolvedFrame ??
+        clip.captionSettings.evaluate(time - clip.start, clip.end - clip.start);
+    if (!frame.visible) return const SizedBox.shrink();
+    final ratio = template.aspectRatio;
+    final layout =
+        resolvedLayout ??
+        CaptionLayout(
+          title: clip.caption,
+          supportingLine: clip.captionSupportingLine,
+          template: template,
+          settings: clip.captionSettings,
+          width: ratio.exportWidth,
+          height: ratio.exportHeight,
+        );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scale = constraints.maxWidth / layout.width;
+        final slide = clip.captionSettings.entrance == CaptionEntrance.slide
+            ? (layout.height / 30) * (1 - frame.entranceProgress) * scale
+            : 0.0;
+        return Stack(
+          children: [
+            Positioned(
+              top: layout.top * scale + slide,
+              left: constraints.maxWidth * 0.1,
+              right: constraints.maxWidth * 0.1,
+              child: Opacity(
+                opacity: frame.opacity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (layout.titleText.isNotEmpty)
+                      ColoredBox(
+                        color: context.colors.surface,
+                        child: Text(
+                          layout.titleText,
+                          textAlign: TextAlign.center,
+                          style: context.textTheme.titleMedium?.copyWith(
+                            fontSize: layout.titleSize * scale,
+                          ),
+                        ),
+                      ),
+                    if (layout.gap > 0) SizedBox(height: layout.gap * scale),
+                    if (layout.supportText.isNotEmpty)
+                      ColoredBox(
+                        color: context.colors.surface,
+                        child: Text(
+                          layout.supportText,
+                          textAlign: TextAlign.center,
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            fontSize: layout.supportSize * scale,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -30,7 +30,7 @@ void main() {
   testWidgets('audio editor renders timeline details when data is loaded', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(420, 1200));
+    await tester.binding.setSurfaceSize(const Size(420, 2000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final container = ProviderContainer(
@@ -88,6 +88,6 @@ void main() {
 
     expect(find.text('Sequence preview'), findsOneWidget);
     expect(find.byKey(const Key('editor-section-tab-bar')), findsOneWidget);
-    expect(find.textContaining('120.0 BPM'), findsOneWidget);
+    expect(find.textContaining('120.0 BPM'), findsWidgets);
   });
 }

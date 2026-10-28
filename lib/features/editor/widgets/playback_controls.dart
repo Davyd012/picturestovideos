@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 
@@ -9,12 +10,16 @@ class PlaybackControls extends ConsumerWidget {
     required this.beatMap,
     required this.playback,
     required this.audioSourcePath,
+    this.audioMix = const AudioMix(),
+    this.videoDuration,
     super.key,
   });
 
   final BeatMap? beatMap;
   final PlaybackState? playback;
   final String? audioSourcePath;
+  final AudioMix audioMix;
+  final Duration? videoDuration;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -75,6 +80,8 @@ class PlaybackControls extends ConsumerWidget {
         .preparePlayback(
           beatMap: beatMap ?? _emptyBeatMap,
           audioSourcePath: audioSourcePath,
+          audioMix: audioMix,
+          videoDuration: videoDuration,
         );
   }
 

@@ -228,7 +228,7 @@ void main() {
         'img-4',
       ]);
       expect(mediaPayloads?.map((payload) => payload.start), [
-        const Duration(milliseconds: 300),
+        Duration.zero,
         const Duration(milliseconds: 900),
       ]);
     },

@@ -1,16 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/application/audio_marker_preset_use_case.dart';
 import 'package:picturestovideos/core/audio/domain/audio_data.dart';
+import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
+import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
+import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/timeline/application/build_project_timeline_use_case.dart';
+import 'package:picturestovideos/core/timeline/application/edit_clip_boundary_use_case.dart';
+import 'package:picturestovideos/core/timeline/application/update_audio_mix_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
+import 'package:picturestovideos/core/timeline/domain/clip_id.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
+import 'package:picturestovideos/core/timeline/domain/sequence_pacing.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
 import 'package:picturestovideos/features/timeline/timeline_state.dart';
@@ -25,6 +33,8 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   static const _minTimelineScale = 0.75;
   static const _maxTimelineScale = 3.0;
   static const _currentPointDeleteTolerance = Duration(milliseconds: 250);
+  ProjectTimeline? _pacingUndoProject;
+  ProjectTimeline? _pacingAppliedProject;
 
   @override
   Future<TimelineState> build() async {
@@ -38,7 +48,11 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     List<LibraryMediaItem> selectedMedia = const [],
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
     Map<String, ImageCropTransform> selectedCropTransforms = const {},
+    String? audioSourcePath,
+    Duration? audioDuration,
   }) async {
+    _pacingUndoProject = null;
+    _pacingAppliedProject = null;
     final currentState = _currentState;
     final currentProject = currentState.project;
     final markerEvents = _resolveMarkerEvents(
@@ -54,7 +68,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     state = const AsyncLoading();
 
     state = await AsyncValue.guard(() async {
-      final project = ref
+      final builtProject = ref
           .read(buildProjectTimelineUseCaseProvider)
           .call(
             beatMap: beatMap,
@@ -63,7 +77,12 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
             selectedImageFits: selectedImageFits,
             selectedCropTransforms: selectedCropTransforms,
             template: currentState.selectedTemplate,
+            previousProject: currentProject,
+            audioDuration: audioDuration,
           );
+      final project = audioSourcePath == null
+          ? builtProject
+          : builtProject.copyWith(audioSourcePath: audioSourcePath);
       final serializedProject = ref
           .read(projectSerializerProvider)
           .serialize(project);
@@ -80,6 +99,44 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         timelineScale: currentState.timelineScale,
       );
     });
+  }
+
+  Future<void> applyPacingSuggestion({
+    required BeatMap beatMap,
+    required List<BeatEvent> events,
+    required List<LibraryMediaItem> selectedMedia,
+    required Map<String, VideoTemplateImageFit> selectedImageFits,
+    required Duration? audioDuration,
+  }) async {
+    final before = _currentState.project;
+    await buildProjectTimeline(
+      beatMap: beatMap,
+      events: events,
+      selectedMedia: selectedMedia,
+      selectedImageFits: selectedImageFits,
+      audioDuration: audioDuration,
+    );
+    final applied = _currentState.project;
+    if (before != null && applied != null) {
+      _pacingUndoProject = before;
+      _pacingAppliedProject = applied;
+    }
+  }
+
+  void undoPacingSuggestion() {
+    final previous = _pacingUndoProject;
+    if (previous == null ||
+        !identical(_currentState.project, _pacingAppliedProject)) {
+      return;
+    }
+    _pacingUndoProject = null;
+    _pacingAppliedProject = null;
+    _emit(
+      _currentState.copyWith(
+        project: previous,
+        serializedProject: _serialize(previous),
+      ),
+    );
   }
 
   void timelineScaleChanged(double scale) {
@@ -136,7 +193,16 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     String sourceExtension = '',
     int byteLength = 0,
   }) async {
-    final markers = _markerEventsFromProject(_currentState.project);
+    final project = _currentState.project;
+    final offset = project?.audioMix.start ?? Duration.zero;
+    final markers = [
+      for (final marker in _markerEventsFromProject(project))
+        BeatEvent(
+          time: marker.time + offset,
+          type: marker.type,
+          payload: marker.payload,
+        ),
+    ];
     if (markers.isEmpty) {
       return 0;
     }
@@ -165,10 +231,10 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
       return;
     }
 
-    final markers = _markerEventsFromProject(project);
-    if (markers.isEmpty) {
+    if (project.hasManualEdits) {
       return;
     }
+    final markers = _markerEventsFromProject(project);
 
     final updatedProject = ref
         .read(buildProjectTimelineUseCaseProvider)
@@ -179,12 +245,65 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
           selectedImageFits: selectedImageFits,
           selectedCropTransforms: selectedCropTransforms,
           template: currentState.selectedTemplate,
+          previousProject: project,
         );
     _emit(
       currentState.copyWith(
         project: updatedProject,
         serializedProject: _serialize(updatedProject),
         nextQueuedMediaIndex: 0,
+      ),
+    );
+  }
+
+  void pacingSelected(SequencePacing pacing) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null || project.pacing == pacing) return;
+    final updated = project.copyWith(pacing: pacing);
+    _emit(
+      currentState.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+  }
+
+  void audioMixChanged(AudioMix mix) {
+    final current = _currentState;
+    final project = current.project;
+    if (project == null || project.audioMix == mix) return;
+    final updated = const UpdateAudioMixUseCase().call(project, mix);
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+        clearSelectedMarker: true,
+      ),
+    );
+  }
+
+  void clipTimingChanged({
+    required String clipId,
+    Duration? duration,
+    required bool snap,
+  }) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) return;
+    var updated = project.copyWith(snapToMarkers: snap);
+    if (duration != null) {
+      updated = const EditClipBoundaryUseCase().call(
+        project: updated,
+        clipId: clipId,
+        duration: duration,
+        snap: snap,
+      );
+    }
+    _emit(
+      currentState.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
       ),
     );
   }
@@ -242,7 +361,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     final project =
         currentState.project ??
         ProjectTimeline(
-          id: 'project-main',
+          id: newClipId(),
           name: 'Picture To Videos Project',
           beatMap: beatMap ?? _manualBeatMap(audioDuration),
           tracks: const [
@@ -261,6 +380,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
       time: time,
       type: 'image',
       payload: MediaTrackClipPayload(
+        clipId: newClipId(),
         mediaId: item.id,
         title: item.title,
         tagline: item.tagline,
@@ -280,6 +400,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     );
     final updatedProject = project.copyWith(
       beatMap: beatMap ?? project.beatMap,
+      hasManualEdits: true,
       tracks: _upsertManualMediaTrack(
         tracks: tracksWithMarker,
         mediaEvent: mediaEvent,
@@ -302,6 +423,128 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     _emit(
       currentState.copyWith(
         selectedMarker: TimelineMarkerSelection(time: time, mediaId: mediaId),
+      ),
+    );
+  }
+
+  /// Changes text for a single timeline occurrence, even when media is reused.
+  void captionChanged({
+    required String clipId,
+    required String caption,
+    required String supportingLine,
+  }) {
+    _editClip(
+      clipId,
+      (clip) => clip.copyWith(
+        caption: caption,
+        captionSupportingLine: supportingLine,
+      ),
+    );
+  }
+
+  void captionSettingsChanged({
+    required String clipId,
+    required CaptionSettings settings,
+  }) {
+    _editClip(clipId, (clip) => clip.copyWith(captionSettings: settings));
+  }
+
+  void clipImageFitChanged({
+    required String clipId,
+    required VideoTemplateImageFit imageFit,
+  }) {
+    _editClip(clipId, (clip) => clip.copyWith(imageFit: imageFit));
+  }
+
+  void clipMotionChanged({
+    required String clipId,
+    ClipMotionPreset? preset,
+    ClipMotionIntensity? intensity,
+  }) {
+    _editClip(
+      clipId,
+      (clip) => clip.copyWith(
+        motionOverride: preset,
+        clearMotionOverride: preset == null,
+        motionIntensity: intensity,
+        useStyleMotionIntensity: intensity == null,
+      ),
+    );
+  }
+
+  void clipTransitionChanged({
+    required String clipId,
+    ClipTransitionType? type,
+    required Duration duration,
+  }) {
+    _editClip(
+      clipId,
+      (clip) => clip.copyWith(
+        transitionOverride: type,
+        clearTransitionOverride: type == null,
+        transitionDuration: Duration(
+          milliseconds: duration.inMilliseconds.clamp(100, 2000),
+        ),
+      ),
+    );
+  }
+
+  void clipCropChanged({
+    required String clipId,
+    required ImageCropTransform transform,
+  }) {
+    _editClip(clipId, (clip) => clip.copyWith(cropTransform: transform));
+  }
+
+  void _editClip(
+    String clipId,
+    MediaTrackClipPayload Function(MediaTrackClipPayload) edit,
+  ) {
+    if (clipId.isEmpty) return;
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) return;
+    var found = false;
+    final tracks = [
+      for (final track in project.tracks)
+        if (track.id != 'track-media')
+          track
+        else
+          track.copyWith(
+            events: List.unmodifiable([
+              for (final event in track.events)
+                if (event.payload is MediaTrackClipPayload &&
+                    (event.payload as MediaTrackClipPayload).clipId == clipId)
+                  BeatEvent(
+                    time: event.time,
+                    type: event.type,
+                    payload: edit(event.payload as MediaTrackClipPayload),
+                  )
+                else
+                  event,
+            ]),
+          ),
+    ];
+    for (final track in project.tracks) {
+      if (track.id == 'track-media' &&
+          track.events.any(
+            (event) =>
+                event.payload is MediaTrackClipPayload &&
+                (event.payload as MediaTrackClipPayload).clipId == clipId,
+          )) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return;
+    final updated = project.copyWith(
+      tracks: List.unmodifiable(tracks),
+      hasManualEdits: true,
+    );
+    _emit(
+      currentState.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
       ),
     );
   }
@@ -340,6 +583,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
 
     final updatedProject = project.copyWith(
       tracks: List.unmodifiable(updatedTracks),
+      hasManualEdits: true,
     );
     _emit(
       currentState.copyWith(
@@ -375,6 +619,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     ];
     final updatedProject = project.copyWith(
       tracks: List.unmodifiable(updatedTracks),
+      hasManualEdits: true,
     );
     _emit(
       currentState.copyWith(
@@ -428,6 +673,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     }
     final updatedProject = project.copyWith(
       tracks: List.unmodifiable(updatedTracks),
+      hasManualEdits: true,
     );
     _emit(
       currentState.copyWith(
@@ -517,6 +763,28 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     state = const AsyncData(TimelineState.initial());
   }
 
+  void projectOpened(ProjectTimeline project) {
+    _emit(
+      TimelineState(
+        project: project,
+        serializedProject: _serialize(project),
+        selectedMarker: null,
+        nextQueuedMediaIndex: 0,
+        selectedTemplate: project.template,
+        timelineScale: 1,
+      ),
+    );
+  }
+
+  void projectMediaRelinked(ProjectTimeline project) {
+    _emit(
+      _currentState.copyWith(
+        project: project,
+        serializedProject: _serialize(project),
+      ),
+    );
+  }
+
   TimelineState get _currentState {
     return state.asData?.value ?? const TimelineState.initial();
   }
@@ -566,7 +834,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     return List.unmodifiable([
       for (final track in tracks)
         track.copyWith(
-          events: track.id == 'track-markers' || track.id == 'track-media'
+          events: track.id == 'track-markers'
               ? List.unmodifiable([
                   for (final event in track.events)
                     if (event.time != time) event,
@@ -579,9 +847,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   List<TimelineTrack> _clearMarkerTracks(List<TimelineTrack> tracks) {
     return List.unmodifiable([
       for (final track in tracks)
-        track.id == 'track-markers' || track.id == 'track-media'
-            ? track.copyWith(events: const [])
-            : track,
+        track.id == 'track-markers' ? track.copyWith(events: const []) : track,
     ]);
   }
 
@@ -594,6 +860,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     var closestDistance = _currentPointDeleteTolerance;
 
     for (final marker in markers) {
+      if (marker.time.isNegative) continue;
       final distance = _durationDistance(marker.time, time);
       if (distance <= closestDistance) {
         closestDistance = distance;

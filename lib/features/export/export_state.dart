@@ -1,6 +1,17 @@
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 
-enum ExportStatus { idle, rendering, ready, saving, saved, sharing, failure }
+enum ExportStatus {
+  idle,
+  rendering,
+  cancelling,
+  cancelled,
+  ready,
+  saving,
+  saved,
+  sharing,
+  failure,
+}
 
 class ExportState {
   const ExportState({
@@ -8,6 +19,7 @@ class ExportState {
     required this.statusMessage,
     this.result,
     this.errorMessage,
+    this.capabilityIssue,
     this.renderProgress,
   });
 
@@ -16,15 +28,20 @@ class ExportState {
       statusMessage = 'Export is waiting for a ready timeline.',
       result = null,
       errorMessage = null,
+      capabilityIssue = null,
       renderProgress = null;
 
   final ExportStatus status;
   final String statusMessage;
   final BuildPreviewVideoResult? result;
   final String? errorMessage;
+  final RenderCapabilityIssue? capabilityIssue;
   final BuildPreviewVideoProgress? renderProgress;
 
-  bool get isRendering => status == ExportStatus.rendering;
+  bool get isRendering =>
+      status == ExportStatus.rendering || status == ExportStatus.cancelling;
+  bool get isCancelling => status == ExportStatus.cancelling;
+  bool get isCancelled => status == ExportStatus.cancelled;
   bool get isReady =>
       status == ExportStatus.ready ||
       status == ExportStatus.saved ||
@@ -41,6 +58,7 @@ class ExportState {
     String? statusMessage,
     BuildPreviewVideoResult? result,
     String? errorMessage,
+    RenderCapabilityIssue? capabilityIssue,
     BuildPreviewVideoProgress? renderProgress,
     bool clearResult = false,
     bool clearError = false,
@@ -51,6 +69,9 @@ class ExportState {
       statusMessage: statusMessage ?? this.statusMessage,
       result: clearResult ? null : result ?? this.result,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      capabilityIssue: clearError
+          ? null
+          : capabilityIssue ?? this.capabilityIssue,
       renderProgress: clearRenderProgress
           ? null
           : renderProgress ?? this.renderProgress,

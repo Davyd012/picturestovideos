@@ -87,6 +87,7 @@ class ResolveMediaTrackClipsUseCase {
       final tagline = parts.length >= 3 ? parts[2] : '';
       final sourcePath = parts.length >= 4 ? parts[3] : '';
       return MediaTrackClipPayload(
+        clipId: 'legacy-${event.time.inMicroseconds}',
         mediaId: title,
         title: title,
         tagline: tagline,

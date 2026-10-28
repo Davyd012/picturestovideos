@@ -25,13 +25,17 @@ class SelectionActionBar extends ConsumerWidget {
               runSpacing: 12,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Chip(label: Text('${selectedItems.length} selected')),
+                Chip(
+                  label: Text(
+                    context.l10n.librarySelectedCount(selectedItems.length),
+                  ),
+                ),
                 FilledButton.tonalIcon(
                   onPressed: selectedItems.isEmpty
                       ? null
                       : () => _stageSelected(ref),
                   icon: const Icon(Icons.playlist_add),
-                  label: const Text('Stage selected'),
+                  label: Text(context.l10n.libraryStageSelected),
                 ),
                 OutlinedButton.icon(
                   onPressed: selectedItems.isEmpty
@@ -48,7 +52,7 @@ class SelectionActionBar extends ConsumerWidget {
                     Icons.clear,
                     color: context.colors.onSurfaceVariant,
                   ),
-                  label: const Text('Clear selection'),
+                  label: Text(context.l10n.libraryClearSelection),
                 ),
               ],
             ),

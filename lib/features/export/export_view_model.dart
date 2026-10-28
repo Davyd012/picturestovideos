@@ -4,6 +4,8 @@ import 'package:picturestovideos/core/preview/application/build_preview_video_us
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/preview/domain/render_cancellation.dart';
+import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/export/export_repository.dart';
@@ -17,9 +19,11 @@ class ExportViewModel extends Notifier<ExportState> {
   static const _tag = 'ExportViewModel';
   static const _exportFrameRate = 30;
   int _renderSession = 0;
+  RenderCancellation? _cancellation;
 
   @override
   ExportState build() {
+    ref.onDispose(() => _cancellation?.cancel());
     ref.read(appLoggerProvider).info(_tag, 'Initializing export state');
     return const ExportState.initial();
   }
@@ -55,6 +59,7 @@ class ExportViewModel extends Notifier<ExportState> {
     }
 
     final renderSession = ++_renderSession;
+    final cancellation = _cancellation = RenderCancellation();
     state = state.copyWith(
       status: ExportStatus.rendering,
       statusMessage: 'Rendering 1080p MP4 export.',
@@ -77,10 +82,14 @@ class ExportViewModel extends Notifier<ExportState> {
               frameRate: _exportFrameRate,
               template: project.template,
               outputFileName: _outputFileName(project.name),
+              audioMix: project.audioMix,
+              audioSourceDuration: project.audioDuration,
             ),
             onProgress: (progress) =>
                 _renderProgressChanged(renderSession, progress),
+            cancellation: cancellation,
           );
+      cancellation.throwIfCancelled();
       if (renderSession != _renderSession) {
         return;
       }
@@ -95,6 +104,13 @@ class ExportViewModel extends Notifier<ExportState> {
       if (renderSession != _renderSession) {
         return;
       }
+      if (error is RenderCancelled || cancellation.isCancelled) {
+        state = const ExportState(
+          status: ExportStatus.cancelled,
+          statusMessage: 'Export cancelled',
+        );
+        return;
+      }
       ref
           .read(appLoggerProvider)
           .error(_tag, error, stackTrace, message: 'Export render failed');
@@ -102,8 +118,20 @@ class ExportViewModel extends Notifier<ExportState> {
         status: ExportStatus.failure,
         statusMessage: _userMessageFor(error),
         errorMessage: _userMessageFor(error),
+        capabilityIssue: error is RenderCapabilityException
+            ? error.issue
+            : null,
       );
     }
+  }
+
+  void cancelRender() {
+    if (!state.isRendering || state.isCancelling) return;
+    _cancellation?.cancel();
+    state = state.copyWith(
+      status: ExportStatus.cancelling,
+      statusMessage: 'Cancelling export',
+    );
   }
 
   Future<void> saveToGallery() async {

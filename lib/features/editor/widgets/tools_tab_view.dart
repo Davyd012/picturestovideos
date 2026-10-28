@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
-import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
+import 'package:picturestovideos/core/timeline/domain/pacing_suggestion_summary.dart';
+import 'package:picturestovideos/core/timeline/application/build_project_timeline_use_case.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
+import 'package:picturestovideos/features/projects/saved_projects_view_model.dart';
+import 'package:picturestovideos/features/editor/widgets/pacing_selector.dart';
+import 'package:picturestovideos/features/editor/widgets/music_settings_card.dart';
+import 'package:picturestovideos/features/editor/widgets/video_template_selector.dart';
+import 'package:picturestovideos/features/playback/playback_view_model.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
+import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 
 class ToolsTabView extends ConsumerWidget {
   const ToolsTabView({
@@ -28,6 +37,9 @@ class ToolsTabView extends ConsumerWidget {
     required this.onDeleteMarker,
     required this.onDeleteMarkerAtCurrentPoint,
     required this.onClearMarkers,
+    this.renderCapabilities,
+    this.gateRenderCapabilities = false,
+    this.capabilityProbeFailed = false,
     super.key,
   });
 
@@ -46,6 +58,9 @@ class ToolsTabView extends ConsumerWidget {
   final VoidCallback onDeleteMarker;
   final VoidCallback onDeleteMarkerAtCurrentPoint;
   final VoidCallback onClearMarkers;
+  final RenderCapabilities? renderCapabilities;
+  final bool gateRenderCapabilities;
+  final bool capabilityProbeFailed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,44 +72,82 @@ class ToolsTabView extends ConsumerWidget {
           (track) => track.id == 'track-markers' && track.events.isNotEmpty,
         ) ??
         false;
+    final pacingEstimate = canAutoSync && project != null
+        ? ref
+              .read(buildProjectTimelineUseCaseProvider)
+              .call(
+                beatMap: beatMap!,
+                events: events,
+                selectedMedia: selectedMedia,
+                selectedImageFits: selectedImageFits,
+                template: selectedTemplate,
+                previousProject: project!,
+                audioDuration: project!.audioDuration ?? audioDuration,
+                pacing: project!.pacing,
+              )
+        : null;
+    final pacingSummary = pacingEstimate == null || project == null
+        ? null
+        : PacingSuggestionSummary.compare(project!, pacingEstimate);
+    final committedClipCount =
+        project?.tracks
+            .where((track) => track.id == 'track-media')
+            .expand((track) => track.events)
+            .where((event) => event.payload is MediaTrackClipPayload)
+            .length ??
+        0;
+    final templateClipCount = selectedMedia.length > committedClipCount
+        ? selectedMedia.length
+        : committedClipCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        OutlinedButton.icon(
+          onPressed:
+              project == null ||
+                  ref.watch(savedProjectsViewModelProvider).isLoading
+              ? null
+              : () async {
+                  final saved = await ref
+                      .read(savedProjectsViewModelProvider.notifier)
+                      .saveCurrent();
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        saved
+                            ? context.l10n.projectSaved
+                            : context.l10n.projectSaveFailed,
+                      ),
+                    ),
+                  );
+                },
+          icon: const Icon(Icons.save_outlined),
+          label: Text(context.l10n.saveProject),
+        ),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: selectedTemplate.id,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.auto_awesome_mosaic_outlined),
-                    labelText: 'Video preset',
-                  ),
-                  items: [
-                    for (final template in VideoTemplates.all)
-                      DropdownMenuItem(
-                        value: template.id,
-                        child: Text(template.name),
-                      ),
-                  ],
-                  onChanged: (id) {
-                    if (id == null) {
-                      return;
-                    }
-                    ref
-                        .read(timelineViewModelProvider.notifier)
-                        .templateSelected(VideoTemplates.byId(id));
-                  },
+                VideoTemplateSelector(
+                  selectedTemplate: selectedTemplate,
+                  renderCapabilities: renderCapabilities,
+                  gateRenderCapabilities: gateRenderCapabilities,
+                  capabilityProbeFailed: capabilityProbeFailed,
+                  clipCount: templateClipCount,
+                  onTemplateSelected: ref
+                      .read(timelineViewModelProvider.notifier)
+                      .templateSelected,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<VideoTemplateAspectRatio>(
                   initialValue: selectedTemplate.aspectRatio,
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.aspect_ratio_outlined),
-                    labelText: 'Aspect ratio',
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.aspect_ratio_outlined),
+                    labelText: context.l10n.aspectRatio,
                   ),
                   items: [
                     for (final ratio in VideoTemplateAspectRatio.values)
@@ -112,25 +165,66 @@ class ToolsTabView extends ConsumerWidget {
                         .aspectRatioSelected(ratio);
                   },
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  selectedTemplate.description,
-                  style: context.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Chip(label: Text(selectedTemplate.aspectRatio.label)),
-                    Chip(label: Text(_clipDurationLabel(selectedTemplate))),
-                    Chip(label: Text(selectedTemplate.transition.name)),
-                  ],
-                ),
               ],
             ),
           ),
         ),
+        if (project != null)
+          PacingSelector(
+            value: project!.pacing,
+            duration: pacingEstimate == null
+                ? null
+                : _sequenceDuration(pacingEstimate),
+            suggestionSummary: pacingSummary,
+            hasManualEdits: project!.hasManualEdits,
+            onChanged: ref
+                .read(timelineViewModelProvider.notifier)
+                .pacingSelected,
+            onApply: canAutoSync
+                ? () => ref
+                      .read(timelineViewModelProvider.notifier)
+                      .applyPacingSuggestion(
+                        beatMap: beatMap!,
+                        events: events,
+                        selectedMedia: selectedMedia,
+                        selectedImageFits: selectedImageFits,
+                        audioDuration: project!.audioDuration ?? audioDuration,
+                      )
+                : null,
+            onUndo: ref
+                .read(timelineViewModelProvider.notifier)
+                .undoPacingSuggestion,
+          ),
+        if (project?.audioSourcePath != null)
+          MusicSettingsCard(
+            mix: project!.audioMix,
+            sourceDuration: project!.audioDuration,
+            onChanged: (mix) async {
+              ref.read(timelineViewModelProvider.notifier).audioMixChanged(mix);
+              final updated = ref
+                  .read(timelineViewModelProvider)
+                  .asData
+                  ?.value
+                  .project;
+              if (updated == null) return;
+              try {
+                await ref
+                    .read(playbackViewModelProvider.notifier)
+                    .preparePlayback(
+                      beatMap: updated.beatMap,
+                      audioSourcePath: updated.audioSourcePath,
+                      audioMix: updated.audioMix,
+                      videoDuration: updated.videoDuration,
+                    );
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(context.l10n.musicPlaybackFailed)),
+                  );
+                }
+              }
+            },
+          ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -150,20 +244,6 @@ class ToolsTabView extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: canAutoSync
-              ? () => ref
-                    .read(timelineViewModelProvider.notifier)
-                    .buildProjectTimeline(
-                      beatMap: beatMap!,
-                      events: events,
-                      selectedMedia: selectedMedia,
-                      selectedImageFits: selectedImageFits,
-                    )
-              : null,
-          icon: const Icon(Icons.sync),
-          label: const Text('Re-sync to markers'),
-        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -210,7 +290,16 @@ class ToolsTabView extends ConsumerWidget {
   }
 }
 
-String _clipDurationLabel(VideoTemplate template) {
-  final seconds = template.defaultSlideDuration.inMilliseconds / 1000;
-  return '${seconds.toStringAsFixed(seconds >= 2 ? 0 : 1)}s clips';
+Duration? _sequenceDuration(ProjectTimeline project) {
+  Duration? end;
+  for (final track in project.tracks) {
+    if (track.id != 'track-media') continue;
+    for (final event in track.events) {
+      final clip = event.payload;
+      if (clip is MediaTrackClipPayload && (end == null || clip.end > end)) {
+        end = clip.end;
+      }
+    }
+  }
+  return end;
 }

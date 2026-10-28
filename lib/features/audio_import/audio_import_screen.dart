@@ -15,6 +15,7 @@ import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/event_system/event_system_view_model.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
@@ -43,7 +44,7 @@ class AudioImportScreen extends ConsumerWidget {
 
     return AppShellScaffold(
       currentRoute: AppRoutes.importAudio,
-      title: 'Import audio',
+      title: context.l10n.importAudioTitle,
       actions: [
         _StepIndicator(state: importState),
         Padding(
@@ -53,7 +54,7 @@ class AudioImportScreen extends ConsumerWidget {
                 ? () => context.appNavigator.goToAudioEditor()
                 : null,
             icon: const Icon(Icons.arrow_forward),
-            label: const Text('Open editor'),
+            label: Text(context.l10n.openEditor),
           ),
         ),
       ],
@@ -140,49 +141,26 @@ class _ImportAudioBody extends ConsumerWidget {
     WidgetRef ref, {
     required bool songOnly,
   }) async {
-    final controller = TextEditingController();
-    final navigator = Navigator.of(context);
-
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-            songOnly ? 'Select song from path' : 'Import WAV from path',
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: '/home/user/audio/track.wav',
-              labelText: 'Absolute audio path',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => navigator.pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                navigator.pop();
-                if (songOnly) {
-                  await ref
-                      .read(audioImportViewModelProvider.notifier)
-                      .selectSongOnlyFromPath(controller.text);
-                } else {
-                  await ref
-                      .read(audioImportViewModelProvider.notifier)
-                      .importAudioFromPath(controller.text);
-                }
-              },
-              child: Text(songOnly ? 'Select' : 'Import'),
-            ),
-          ],
+        return _ImportFromPathDialog(
+          songOnly: songOnly,
+          onSubmit: (path) async {
+            Navigator.of(dialogContext).pop();
+            if (songOnly) {
+              await ref
+                  .read(audioImportViewModelProvider.notifier)
+                  .selectSongOnlyFromPath(path);
+            } else {
+              await ref
+                  .read(audioImportViewModelProvider.notifier)
+                  .importAudioFromPath(path);
+            }
+          },
         );
       },
     );
-    controller.dispose();
   }
 
   Future<void> _confirmStopImport(BuildContext context, WidgetRef ref) async {
@@ -211,6 +189,59 @@ class _ImportAudioBody extends ConsumerWidget {
     if (shouldStop ?? false) {
       await ref.read(audioImportViewModelProvider.notifier).stopImport();
     }
+  }
+}
+
+class _ImportFromPathDialog extends StatefulWidget {
+  const _ImportFromPathDialog({required this.songOnly, required this.onSubmit});
+
+  final bool songOnly;
+  final Future<void> Function(String path) onSubmit;
+
+  @override
+  State<_ImportFromPathDialog> createState() => _ImportFromPathDialogState();
+}
+
+class _ImportFromPathDialogState extends State<_ImportFromPathDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(
+        widget.songOnly
+            ? context.l10n.selectSongFromPath
+            : context.l10n.importWavFromPath,
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: '/home/user/audio/track.wav',
+          labelText: context.l10n.absoluteAudioPath,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(context.l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: () => widget.onSubmit(_controller.text),
+          child: Text(
+            widget.songOnly
+                ? context.l10n.selectAction
+                : context.l10n.importAction,
+          ),
+        ),
+      ],
+    );
   }
 }
 

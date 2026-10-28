@@ -255,6 +255,7 @@ class VideoTemplate {
     required this.overlayStyle,
     required this.frameStyle,
     required this.transition,
+    this.moreMovementByDefault = false,
   });
 
   final String id;
@@ -268,6 +269,7 @@ class VideoTemplate {
   final VideoTemplateOverlayStyle overlayStyle;
   final VideoTemplateFrameStyle frameStyle;
   final VideoTemplateTransition transition;
+  final bool moreMovementByDefault;
 
   Map<String, Object?> toJson() {
     return {
@@ -282,6 +284,7 @@ class VideoTemplate {
       'overlayStyle': overlayStyle.jsonValue,
       'frameStyle': frameStyle.jsonValue,
       'transition': transition.jsonValue,
+      'moreMovementByDefault': moreMovementByDefault,
     };
   }
 
@@ -312,6 +315,7 @@ class VideoTemplate {
       transition: VideoTemplateTransition.fromJson(
         json['transition'] as String?,
       ),
+      moreMovementByDefault: json['moreMovementByDefault'] as bool? ?? false,
     );
   }
 
@@ -327,6 +331,7 @@ class VideoTemplate {
     VideoTemplateOverlayStyle? overlayStyle,
     VideoTemplateFrameStyle? frameStyle,
     VideoTemplateTransition? transition,
+    bool? moreMovementByDefault,
   }) {
     return VideoTemplate(
       id: id ?? this.id,
@@ -340,6 +345,8 @@ class VideoTemplate {
       overlayStyle: overlayStyle ?? this.overlayStyle,
       frameStyle: frameStyle ?? this.frameStyle,
       transition: transition ?? this.transition,
+      moreMovementByDefault:
+          moreMovementByDefault ?? this.moreMovementByDefault,
     );
   }
 }

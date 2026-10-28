@@ -7,7 +7,9 @@ import 'package:picturestovideos/features/home/home_state.dart';
 import 'package:picturestovideos/features/home/home_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
+import 'package:picturestovideos/features/projects/saved_projects_section.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -18,20 +20,19 @@ class HomeScreen extends ConsumerWidget {
 
     return AppShellScaffold(
       currentRoute: AppRoutes.home,
-      title: 'Home',
+      title: context.l10n.homeTitle,
       actions: [
         IconButton(
           onPressed: () => ref.read(homeViewModelProvider.notifier).refresh(),
           icon: const Icon(Icons.refresh),
-          tooltip: 'Refresh saved media',
+          tooltip: context.l10n.refreshSavedMedia,
         ),
       ],
       body: switch (homeAsync) {
         AsyncLoading<HomeState>() => const Center(
           child: CircularProgressIndicator(),
         ),
-        AsyncError<HomeState>(:final error) => _HomeErrorView(
-          error: error,
+        AsyncError<HomeState>() => _HomeErrorView(
           onRetry: () => ref.read(homeViewModelProvider.notifier).refresh(),
         ),
         AsyncData<HomeState>(:final value) => _HomeBody(state: value),
@@ -50,17 +51,28 @@ class _HomeBody extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('Saved media', style: context.textTheme.headlineMedium),
+        const SavedProjectsSection(),
+        const SizedBox(height: 32),
+        Text(context.l10n.savedMedia, style: context.textTheme.headlineMedium),
         const SizedBox(height: 8),
         Text(
-          'Reopen saved audio markers and pair them with new image selections.',
+          context.l10n.savedMediaDescription,
           style: context.textTheme.bodyLarge?.copyWith(
             color: context.colors.onSurfaceVariant,
           ),
         ),
-        if (state.statusMessage != null) ...[
+        if (state.statusCode != null) ...[
           const SizedBox(height: 16),
-          _StatusMessage(message: state.statusMessage!),
+          _StatusMessage(
+            message: switch (state.statusCode!) {
+              HomeStatusCode.missingAudioPath => context.l10n.missingAudioPath,
+              HomeStatusCode.missingAudioFile => context.l10n.missingAudioAt(
+                state.statusPath ?? '',
+              ),
+              HomeStatusCode.openAudioFailed =>
+                context.l10n.savedAudioOpenFailed,
+            },
+          ),
         ],
         const SizedBox(height: 24),
         _AudioSection(
@@ -86,16 +98,16 @@ class _AudioSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeader(
-          title: 'Saved audio',
-          countLabel: '${presets.length} saved',
+          title: context.l10n.savedAudio,
+          countLabel: context.l10n.savedCount(presets.length),
           icon: Icons.audio_file_outlined,
         ),
         const SizedBox(height: 12),
         if (presets.isEmpty)
           _EmptySavedMediaCard(
             icon: Icons.audio_file_outlined,
-            title: 'No saved audio yet',
-            message: 'Save markers from the editor to reuse them here.',
+            title: context.l10n.noSavedAudio,
+            message: context.l10n.saveMarkersForReuse,
           )
         else
           for (final preset in presets) ...[
@@ -136,16 +148,16 @@ class _ImageSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SectionHeader(
-          title: 'Saved assets',
-          countLabel: '${assets.length} saved',
+          title: context.l10n.savedAssets,
+          countLabel: context.l10n.savedCount(assets.length),
           icon: Icons.image_outlined,
         ),
         const SizedBox(height: 12),
         if (assets.isEmpty)
           _EmptySavedMediaCard(
             icon: Icons.image_outlined,
-            title: 'No saved assets yet',
-            message: 'Import images in the Library to list them here.',
+            title: context.l10n.noSavedAssets,
+            message: context.l10n.importImagesToLibrary,
           )
         else
           for (final asset in assets) ...[
@@ -202,9 +214,10 @@ class _SavedAudioCard extends StatelessWidget {
         title: Text(preset.sourceName),
         subtitle: Text(
           [
-            '${preset.markerCount} marker${preset.markerCount == 1 ? '' : 's'}',
-            _formatDuration(preset.duration),
-            _formatDate(preset.updatedAt),
+            context.l10n.markerCount(preset.markerCount),
+            _formatDuration(context, preset.duration),
+            MaterialLocalizations.of(context)
+                .formatMediumDate(preset.updatedAt),
             if (path != null && path.isNotEmpty) path,
           ].join(' - '),
           maxLines: 2,
@@ -213,7 +226,7 @@ class _SavedAudioCard extends StatelessWidget {
         trailing: FilledButton.tonalIcon(
           onPressed: isOpeningAudio ? null : onOpen,
           icon: const Icon(Icons.folder_open),
-          label: const Text('Open'),
+          label: Text(context.l10n.open),
         ),
       ),
     );
@@ -233,8 +246,9 @@ class _SavedImageCard extends StatelessWidget {
         title: Text(asset.fileName),
         subtitle: Text(
           [
-            _formatSize(asset.byteLength),
-            _formatDate(asset.importedOn),
+            _formatSize(context, asset.byteLength),
+            MaterialLocalizations.of(context)
+                .formatMediumDate(asset.importedOn),
             asset.sourcePath,
           ].join(' - '),
           maxLines: 2,
@@ -296,9 +310,8 @@ class _EmptySavedMediaCard extends StatelessWidget {
 }
 
 class _HomeErrorView extends StatelessWidget {
-  const _HomeErrorView({required this.error, required this.onRetry});
+  const _HomeErrorView({required this.onRetry});
 
-  final Object error;
   final VoidCallback onRetry;
 
   @override
@@ -312,20 +325,14 @@ class _HomeErrorView extends StatelessWidget {
             Icon(Icons.error_outline, size: 40, color: context.colors.error),
             const SizedBox(height: 16),
             Text(
-              'Saved media could not load',
+              context.l10n.savedMediaLoadFailed,
               style: context.textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error.toString(),
-              style: context.textTheme.bodyMedium,
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
+              label: Text(context.l10n.tryAgain),
             ),
           ],
         ),
@@ -334,38 +341,18 @@ class _HomeErrorView extends StatelessWidget {
   }
 }
 
-String _formatDate(DateTime value) {
-  const monthLabels = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  final month = monthLabels[value.month - 1];
-  final day = value.day.toString().padLeft(2, '0');
-  return '$month $day, ${value.year}';
-}
-
-String _formatDuration(Duration duration) {
+String _formatDuration(BuildContext context, Duration duration) {
   if (duration <= Duration.zero) {
-    return 'Unknown duration';
+    return context.l10n.unknownDuration;
   }
   final minutes = duration.inMinutes.remainder(60).toString();
   final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
 }
 
-String _formatSize(int byteLength) {
+String _formatSize(BuildContext context, int byteLength) {
   if (byteLength <= 0) {
-    return 'Unknown size';
+    return context.l10n.unknownSize;
   }
   if (byteLength < 1024 * 1024) {
     return '${(byteLength / 1024).toStringAsFixed(1)} KB';

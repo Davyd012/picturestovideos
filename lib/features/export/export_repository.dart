@@ -15,7 +15,7 @@ abstract interface class ExportRepository {
 }
 
 class DeviceExportRepository implements ExportRepository {
-  const DeviceExportRepository({required AppLogger logger}) : _logger = logger;
+  const DeviceExportRepository({required this._logger});
 
   final AppLogger _logger;
 

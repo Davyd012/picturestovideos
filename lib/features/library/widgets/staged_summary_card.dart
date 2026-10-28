@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class StagedSummaryCard extends ConsumerWidget {
@@ -25,15 +26,22 @@ class StagedSummaryCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Ready for editor', style: context.textTheme.titleMedium),
+            Text(
+              context.l10n.libraryReadyForEditor,
+              style: context.textTheme.titleMedium,
+            ),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                Chip(label: Text('Imported: $importedCount')),
-                Chip(label: Text('Visible: $visibleCount')),
-                Chip(label: Text('Staged: $stagedCount')),
+                Chip(
+                  label: Text(context.l10n.libraryImportedCount(importedCount)),
+                ),
+                Chip(
+                  label: Text(context.l10n.libraryVisibleCount(visibleCount)),
+                ),
+                Chip(label: Text(context.l10n.libraryStagedCount(stagedCount))),
               ],
             ),
             const SizedBox(height: 12),
@@ -46,24 +54,24 @@ class StagedSummaryCard extends ConsumerWidget {
                       .read(libraryViewModelProvider.notifier)
                       .pickImages,
                   icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text('Import more'),
+                  label: Text(context.l10n.libraryImportMore),
                 ),
                 FilledButton.tonalIcon(
                   onPressed: ref
                       .read(libraryViewModelProvider.notifier)
                       .reviewStagedOpened,
                   icon: const Icon(Icons.drag_indicator),
-                  label: const Text('Review staged'),
+                  label: Text(context.l10n.libraryReviewStaged),
                 ),
                 FilledButton.icon(
                   onPressed: () => context.appNavigator.goToAudioEditor(),
                   icon: const Icon(Icons.tune),
-                  label: const Text('Open editor'),
+                  label: Text(context.l10n.openEditorCount(stagedCount)),
                 ),
                 OutlinedButton.icon(
                   onPressed: () => context.appNavigator.goToDownload(),
                   icon: const Icon(Icons.download_outlined),
-                  label: const Text('Go to export'),
+                  label: Text(context.l10n.libraryGoToExport),
                 ),
               ],
             ),

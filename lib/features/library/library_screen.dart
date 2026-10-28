@@ -6,6 +6,7 @@ import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/features/library/widgets/library_browse_view.dart';
 import 'package:picturestovideos/features/library/widgets/staged_images_screen.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -18,7 +19,7 @@ class LibraryScreen extends ConsumerWidget {
 
     return AppShellScaffold(
       currentRoute: AppRoutes.library,
-      title: 'Library',
+      title: context.l10n.navLibrary,
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 16),
@@ -27,7 +28,9 @@ class LibraryScreen extends ConsumerWidget {
                 ? () => context.appNavigator.goToAudioEditor()
                 : null,
             icon: const Icon(Icons.tune),
-            label: Text('Open editor (${editorSelection.selectedCount})'),
+            label: Text(
+              context.l10n.openEditorCount(editorSelection.selectedCount),
+            ),
           ),
         ),
       ],

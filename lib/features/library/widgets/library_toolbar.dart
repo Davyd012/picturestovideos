@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
+import 'package:picturestovideos/features/library/widgets/library_status_message.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class LibraryToolbar extends ConsumerWidget {
@@ -19,6 +22,8 @@ class LibraryToolbar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(libraryViewModelProvider);
     final viewModel = ref.read(libraryViewModelProvider.notifier);
+    final folderPathsUnavailable =
+        defaultTargetPlatform == TargetPlatform.android;
 
     return Card.outlined(
       child: Padding(
@@ -29,9 +34,9 @@ class LibraryToolbar extends ConsumerWidget {
             TextField(
               enabled: !state.isImporting,
               onChanged: viewModel.searchChanged,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                hintText: 'Search images, folders, or dates',
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: context.l10n.librarySearchHint,
               ),
             ),
             const SizedBox(height: 16),
@@ -44,16 +49,19 @@ class LibraryToolbar extends ConsumerWidget {
                   FilterChip(
                     selected: state.selectedFilter == filter,
                     onSelected: (_) => viewModel.filterSelected(filter),
-                    label: Text(_filterLabel(filter)),
+                    label: Text(_filterLabel(context, filter)),
                   ),
                 const SizedBox(width: 8),
                 DropdownMenu<LibrarySortOrder>(
                   initialSelection: state.sortOrder,
                   leadingIcon: const Icon(Icons.sort),
-                  label: const Text('Sort'),
+                  label: Text(context.l10n.librarySort),
                   dropdownMenuEntries: [
                     for (final order in LibrarySortOrder.values)
-                      DropdownMenuEntry(value: order, label: _sortLabel(order)),
+                      DropdownMenuEntry(
+                        value: order,
+                        label: _sortLabel(context, order),
+                      ),
                   ],
                   onSelected: (order) {
                     if (order == null) {
@@ -69,20 +77,35 @@ class LibraryToolbar extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                Chip(label: Text('Imported: ${state.totalCount}')),
-                Chip(label: Text('Visible: $visibleCount')),
-                Chip(label: Text('Staged: $stagedCount')),
+                Chip(
+                  label: Text(
+                    context.l10n.libraryImportedCount(state.totalCount),
+                  ),
+                ),
+                Chip(
+                  label: Text(context.l10n.libraryVisibleCount(visibleCount)),
+                ),
+                Chip(label: Text(context.l10n.libraryStagedCount(stagedCount))),
               ],
             ),
             const SizedBox(height: 16),
             TextField(
               enabled: !state.isImporting,
               onChanged: viewModel.folderPathChanged,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.folder_open_outlined),
-                hintText: 'Paste folder path',
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.folder_open_outlined),
+                hintText: folderPathsUnavailable
+                    ? null
+                    : context.l10n.pasteFolderPath,
               ),
             ),
+            if (folderPathsUnavailable) ...[
+              const SizedBox(height: 8),
+              Text(
+                context.l10n.folderPathUnavailableOnAndroid,
+                style: context.textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
@@ -91,14 +114,14 @@ class LibraryToolbar extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: state.isImporting ? null : viewModel.pickImages,
                   icon: const Icon(Icons.add_photo_alternate_outlined),
-                  label: const Text('Import more'),
+                  label: Text(context.l10n.libraryImportMore),
                 ),
                 OutlinedButton.icon(
-                  onPressed: state.isImporting
+                  onPressed: state.isImporting || folderPathsUnavailable
                       ? null
                       : viewModel.importImagesFromFolderPath,
                   icon: const Icon(Icons.drive_folder_upload_outlined),
-                  label: const Text('Import folder'),
+                  label: Text(context.l10n.importFolder),
                 ),
                 FilledButton.tonalIcon(
                   onPressed:
@@ -112,7 +135,7 @@ class LibraryToolbar extends ConsumerWidget {
                             )
                             .addAllMedia(state.items),
                   icon: const Icon(Icons.playlist_add_check),
-                  label: const Text('Stage all imported'),
+                  label: Text(context.l10n.libraryStageAllImported),
                 ),
               ],
             ),
@@ -129,9 +152,12 @@ class LibraryToolbar extends ConsumerWidget {
                 ),
               ),
             ],
-            if (state.statusMessage != null) ...[
+            if (state.importStatus != null) ...[
               const SizedBox(height: 16),
-              Text(state.statusMessage!, style: context.textTheme.bodyMedium),
+              LibraryStatusMessage(
+                status: state.importStatus,
+                count: state.statusItemCount,
+              ),
             ],
           ],
         ),
@@ -139,21 +165,21 @@ class LibraryToolbar extends ConsumerWidget {
     );
   }
 
-  String _filterLabel(LibraryFilter filter) {
+  String _filterLabel(BuildContext context, LibraryFilter filter) {
     return switch (filter) {
-      LibraryFilter.all => 'All',
-      LibraryFilter.recent => 'Recent',
-      LibraryFilter.staged => 'Staged',
-      LibraryFilter.favorites => 'Favorites',
+      LibraryFilter.all => context.l10n.libraryFilterAll,
+      LibraryFilter.recent => context.l10n.libraryFilterRecent,
+      LibraryFilter.staged => context.l10n.libraryFilterStaged,
+      LibraryFilter.favorites => context.l10n.libraryFilterFavorites,
     };
   }
 
-  String _sortLabel(LibrarySortOrder order) {
+  String _sortLabel(BuildContext context, LibrarySortOrder order) {
     return switch (order) {
-      LibrarySortOrder.newest => 'Newest',
-      LibrarySortOrder.oldest => 'Oldest',
-      LibrarySortOrder.name => 'Name',
-      LibrarySortOrder.fileSize => 'File size',
+      LibrarySortOrder.newest => context.l10n.librarySortNewest,
+      LibrarySortOrder.oldest => context.l10n.librarySortOldest,
+      LibrarySortOrder.name => context.l10n.librarySortByName,
+      LibrarySortOrder.fileSize => context.l10n.librarySortByFileSize,
     };
   }
 }

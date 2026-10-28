@@ -6,19 +6,22 @@ class HomeState {
     required this.audioPresets,
     required this.imageAssets,
     required this.isOpeningAudio,
-    required this.statusMessage,
+    required this.statusCode,
+    required this.statusPath,
   });
 
   const HomeState.initial()
     : audioPresets = const [],
       imageAssets = const [],
       isOpeningAudio = false,
-      statusMessage = null;
+      statusCode = null,
+      statusPath = null;
 
   final List<AudioMarkerPreset> audioPresets;
   final List<SavedImageAsset> imageAssets;
   final bool isOpeningAudio;
-  final String? statusMessage;
+  final HomeStatusCode? statusCode;
+  final String? statusPath;
 
   bool get hasSavedAudio => audioPresets.isNotEmpty;
   bool get hasSavedImages => imageAssets.isNotEmpty;
@@ -28,16 +31,18 @@ class HomeState {
     List<AudioMarkerPreset>? audioPresets,
     List<SavedImageAsset>? imageAssets,
     bool? isOpeningAudio,
-    String? statusMessage,
-    bool clearStatusMessage = false,
+    HomeStatusCode? statusCode,
+    String? statusPath,
+    bool clearStatus = false,
   }) {
     return HomeState(
       audioPresets: audioPresets ?? this.audioPresets,
       imageAssets: imageAssets ?? this.imageAssets,
       isOpeningAudio: isOpeningAudio ?? this.isOpeningAudio,
-      statusMessage: clearStatusMessage
-          ? null
-          : statusMessage ?? this.statusMessage,
+      statusCode: clearStatus ? null : statusCode ?? this.statusCode,
+      statusPath: clearStatus ? null : statusPath ?? this.statusPath,
     );
   }
 }
+
+enum HomeStatusCode { missingAudioPath, missingAudioFile, openAudioFailed }

@@ -35,6 +35,8 @@ abstract interface class AudioPlayerRepository {
 
   Future<void> pause();
 
+  Future<void> setVolume(double volume);
+
   Future<void> seek(Duration position);
 
   Future<void> step(Duration delta);
@@ -143,6 +145,10 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   }
 
   @override
+  Future<void> setVolume(double volume) =>
+      _player.setVolume(volume.clamp(0.0, 1.0));
+
+  @override
   Future<void> play() async {
     if (!hasLoadedSource) {
       _logger.warning(
@@ -222,6 +228,7 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
   bool _isPlaying = false;
   bool _isCompleted = false;
   int _loadCount = 0;
+  double _volume = 1;
 
   @override
   Duration get currentPosition => _currentPosition;
@@ -270,6 +277,11 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
   }
 
   @override
+  Future<void> setVolume(double volume) async {
+    _volume = volume.clamp(0.0, 1.0);
+  }
+
+  @override
   Future<void> play() async {
     if (_isCompleted) {
       await reload();
@@ -308,4 +320,5 @@ class ManualAudioPlayerRepository implements AudioPlayerRepository {
   bool get isPlaying => _isPlaying;
 
   int get loadCount => _loadCount;
+  double get volume => _volume;
 }

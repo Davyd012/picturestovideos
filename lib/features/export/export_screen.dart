@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
+import 'package:picturestovideos/core/composition/domain/video_composition.dart';
+import 'package:picturestovideos/core/preview/data/render_capability_repository.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
@@ -15,6 +18,7 @@ import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
@@ -28,6 +32,7 @@ class ExportScreen extends ConsumerWidget {
     final playbackState = ref.watch(playbackViewModelProvider);
     final importState = ref.watch(audioImportViewModelProvider);
     final exportState = ref.watch(exportViewModelProvider);
+    final capabilityState = ref.watch(renderCapabilitiesProvider);
 
     final project = timelineState.asData?.value.project;
     final beatMap = _resolvedBeatMap(
@@ -36,14 +41,42 @@ class ExportScreen extends ConsumerWidget {
       playbackState: playbackState,
     );
     final playback = playbackState.asData?.value;
-    final audioSourcePath = importState.asData?.value.source?.path;
+    final audioSourcePath = project == null
+        ? importState.asData?.value.source?.path
+        : project.audioSourcePath;
     final exportClips = project == null
         ? const <MediaTrackClipPayload>[]
         : ref
               .read(resolvePreviewClipsUseCaseProvider)
               .call(beatMap: project.beatMap, project: project);
     final hasExportableClips = exportClips.isNotEmpty;
-    final canRender = hasExportableClips && !exportState.isRendering;
+    final renderCapabilityIssue =
+        capabilityState.asData == null || project == null
+        ? null
+        : capabilityState.asData!.value
+              .issuesFor(
+                VideoComposition.fromProject(
+                  project: project,
+                  committedClips: exportClips,
+                  width: project.template.aspectRatio.exportWidth,
+                  height: project.template.aspectRatio.exportHeight,
+                  frameRate: 30,
+                  audioSourcePath: audioSourcePath,
+                ),
+              )
+              .firstOrNull;
+    final capabilityMessage = capabilityState.isLoading
+        ? context.l10n.exportCapabilityChecking
+        : capabilityState.hasError
+        ? context.l10n.exportCapabilityProbeFailed
+        : renderCapabilityIssue == null
+        ? null
+        : _capabilityMessage(context, renderCapabilityIssue);
+    final capabilityAllowsRender = capabilityMessage == null;
+    final canRender =
+        hasExportableClips &&
+        capabilityAllowsRender &&
+        !exportState.isRendering;
 
     return AppShellScaffold(
       currentRoute: AppRoutes.download,
@@ -84,7 +117,12 @@ class ExportScreen extends ConsumerWidget {
                         beatMap: beatMap,
                         playback: playback,
                         hasExportableClips: hasExportableClips,
+                        capabilityAllowsRender: capabilityAllowsRender,
+                        capabilityMessage: capabilityMessage,
                         exportState: exportState,
+                        onCancel: () => ref
+                            .read(exportViewModelProvider.notifier)
+                            .cancelRender(),
                         onRender: () => ref
                             .read(exportViewModelProvider.notifier)
                             .renderExport(
@@ -119,7 +157,11 @@ class ExportScreen extends ConsumerWidget {
                   beatMap: beatMap,
                   playback: playback,
                   hasExportableClips: hasExportableClips,
+                  capabilityAllowsRender: capabilityAllowsRender,
+                  capabilityMessage: capabilityMessage,
                   exportState: exportState,
+                  onCancel: () =>
+                      ref.read(exportViewModelProvider.notifier).cancelRender(),
                   onRender: () => ref
                       .read(exportViewModelProvider.notifier)
                       .renderExport(
@@ -180,7 +222,10 @@ class _ExportMainColumn extends StatelessWidget {
     required this.playback,
     required this.exportState,
     required this.hasExportableClips,
+    required this.capabilityAllowsRender,
+    required this.capabilityMessage,
     required this.onRender,
+    required this.onCancel,
     required this.onSave,
     required this.onShare,
   });
@@ -190,7 +235,10 @@ class _ExportMainColumn extends StatelessWidget {
   final PlaybackState? playback;
   final ExportState exportState;
   final bool hasExportableClips;
+  final bool capabilityAllowsRender;
+  final String? capabilityMessage;
   final VoidCallback onRender;
+  final VoidCallback onCancel;
   final VoidCallback onSave;
   final VoidCallback onShare;
 
@@ -211,7 +259,10 @@ class _ExportMainColumn extends StatelessWidget {
           beatMap: beatMap,
           exportState: exportState,
           hasExportableClips: hasExportableClips,
+          capabilityAllowsRender: capabilityAllowsRender,
+          capabilityMessage: capabilityMessage,
           onRender: onRender,
+          onCancel: onCancel,
           onSave: onSave,
         ),
         const SizedBox(height: 24),
@@ -282,6 +333,8 @@ class _PreviewSummaryCard extends StatelessWidget {
                             Text(
                               !hasExportableClips
                                   ? 'Add timed image clips before exporting the final output.'
+                                  : exportState.isFailure
+                                  ? _failureMessage(context, exportState)
                                   : exportState.statusMessage,
                               style: context.textTheme.bodyLarge,
                             ),
@@ -339,7 +392,10 @@ class _ExportActionCard extends StatelessWidget {
     required this.beatMap,
     required this.exportState,
     required this.hasExportableClips,
+    required this.capabilityAllowsRender,
+    required this.capabilityMessage,
     required this.onRender,
+    required this.onCancel,
     required this.onSave,
   });
 
@@ -347,7 +403,10 @@ class _ExportActionCard extends StatelessWidget {
   final BeatMap? beatMap;
   final ExportState exportState;
   final bool hasExportableClips;
+  final bool capabilityAllowsRender;
+  final String? capabilityMessage;
   final VoidCallback onRender;
+  final VoidCallback onCancel;
   final VoidCallback onSave;
 
   @override
@@ -356,6 +415,7 @@ class _ExportActionCard extends StatelessWidget {
     final canRender =
         project != null &&
         hasExportableClips &&
+        capabilityAllowsRender &&
         !exportState.isRendering &&
         !exportState.isSaving &&
         !exportState.isSharing;
@@ -368,6 +428,16 @@ class _ExportActionCard extends StatelessWidget {
           children: [
             Text('Finalize output', style: context.textTheme.titleLarge),
             const SizedBox(height: 16),
+            if (capabilityMessage != null) ...[
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  capabilityMessage!,
+                  style: context.textTheme.bodyMedium,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             Wrap(
               spacing: 16,
               runSpacing: 16,
@@ -377,6 +447,16 @@ class _ExportActionCard extends StatelessWidget {
                   icon: const Icon(Icons.movie_creation_outlined),
                   label: Text(exportState.isRendering ? 'Rendering' : 'Render'),
                 ),
+                if (exportState.isRendering)
+                  OutlinedButton.icon(
+                    onPressed: exportState.isCancelling ? null : onCancel,
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: Text(
+                      exportState.isCancelling
+                          ? context.l10n.cancellingExport
+                          : context.l10n.cancelExport,
+                    ),
+                  ),
                 FilledButton.tonalIcon(
                   onPressed: exportState.canSave ? onSave : null,
                   icon: const Icon(Icons.download),
@@ -386,6 +466,7 @@ class _ExportActionCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (exportState.isCancelled) Text(context.l10n.exportCancelled),
             const SizedBox(height: 12),
             Text(
               '${details.fileSizeLabel} • ${details.codecLabel}',
@@ -394,7 +475,7 @@ class _ExportActionCard extends StatelessWidget {
             if (exportState.isFailure) ...[
               const SizedBox(height: 12),
               Text(
-                exportState.errorMessage ?? exportState.statusMessage,
+                _failureMessage(context, exportState),
                 style: context.textTheme.bodyMedium?.copyWith(
                   color: context.colors.error,
                 ),
@@ -427,6 +508,26 @@ class _ExportActionCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _failureMessage(BuildContext context, ExportState state) {
+  return state.capabilityIssue == null
+      ? state.errorMessage ?? context.l10n.exportFailed
+      : _capabilityMessage(context, state.capabilityIssue!);
+}
+
+String _capabilityMessage(BuildContext context, RenderCapabilityIssue issue) {
+  return switch (issue) {
+    RenderCapabilityIssue.unsupportedPlatform =>
+      context.l10n.exportUnsupportedPlatform,
+    RenderCapabilityIssue.missingFfmpeg => context.l10n.exportMissingFfmpeg,
+    RenderCapabilityIssue.probeFailed =>
+      context.l10n.exportCapabilityProbeFailed,
+    RenderCapabilityIssue.missingFilter => context.l10n.exportMissingFilter,
+    RenderCapabilityIssue.missingEncoder => context.l10n.exportMissingEncoder,
+    RenderCapabilityIssue.missingMuxer => context.l10n.exportMissingMuxer,
+    RenderCapabilityIssue.missingFont => context.l10n.exportMissingFont,
+  };
 }
 
 class _ExportProgressPanel extends StatelessWidget {

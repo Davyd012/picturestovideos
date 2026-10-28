@@ -1,10 +1,17 @@
 import 'dart:typed_data';
 import 'dart:io';
+
 import 'package:flutter/gestures.dart';
 
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
+import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
+import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
+import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_captions_editor.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
@@ -20,6 +27,18 @@ class ClipsTabView extends StatelessWidget {
     required this.onApplyImageFitToAll,
     required this.onMoveMediaToPosition,
     required this.onOpenTimeline,
+    this.timelineClips = const [],
+    this.onCaptionChanged,
+    this.onMotionChanged,
+    this.onTransitionChanged,
+    this.template,
+    this.snapToMarkers = true,
+    this.onTimingChanged,
+    this.onCaptionSettingsChanged,
+    this.onFramingChanged,
+    this.renderCapabilities,
+    this.gateRenderCapabilities = false,
+    this.capabilityProbeFailed = false,
     super.key,
   });
 
@@ -34,6 +53,36 @@ class ClipsTabView extends StatelessWidget {
   final ValueChanged<VideoTemplateImageFit> onApplyImageFitToAll;
   final void Function(String mediaId, int position) onMoveMediaToPosition;
   final VoidCallback onOpenTimeline;
+  final List<MediaTrackClipPayload> timelineClips;
+  final void Function(String clipId, String title, String supportingLine)?
+  onCaptionChanged;
+  final void Function(
+    String clipId,
+    ClipMotionPreset? preset,
+    ClipMotionIntensity? intensity,
+  )?
+  onMotionChanged;
+  final void Function(
+    String clipId,
+    ClipTransitionType? type,
+    Duration duration,
+  )?
+  onTransitionChanged;
+  final VideoTemplate? template;
+  final bool snapToMarkers;
+  final void Function(String clipId, Duration? duration, bool snap)?
+  onTimingChanged;
+  final void Function(String clipId, CaptionSettings settings)?
+  onCaptionSettingsChanged;
+  final void Function(
+    String clipId,
+    VideoTemplateImageFit fit,
+    ImageCropTransform crop,
+  )?
+  onFramingChanged;
+  final RenderCapabilities? renderCapabilities;
+  final bool gateRenderCapabilities;
+  final bool capabilityProbeFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +91,21 @@ class ClipsTabView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (onCaptionChanged != null)
+          ClipCaptionsEditor(
+            clips: timelineClips,
+            onCaptionChanged: onCaptionChanged!,
+            onMotionChanged: onMotionChanged,
+            onTransitionChanged: onTransitionChanged,
+            template: template,
+            snapToMarkers: snapToMarkers,
+            onTimingChanged: onTimingChanged,
+            onCaptionSettingsChanged: onCaptionSettingsChanged,
+            onFramingChanged: onFramingChanged,
+            renderCapabilities: renderCapabilities,
+            gateRenderCapabilities: gateRenderCapabilities,
+            capabilityProbeFailed: capabilityProbeFailed,
+          ),
         Text(
           'Queued image clips (${clips.length})',
           style: context.textTheme.titleMedium,

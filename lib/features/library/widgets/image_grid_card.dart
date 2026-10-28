@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class ImageGridCard extends ConsumerWidget {
@@ -80,7 +81,11 @@ class ImageGridCard extends ConsumerWidget {
                   FilledButton.tonalIcon(
                     onPressed: () => _toggleStaged(ref),
                     icon: Icon(isStaged ? Icons.check : Icons.add),
-                    label: Text(isStaged ? 'Staged' : 'Stage'),
+                    label: Text(
+                      isStaged
+                          ? context.l10n.libraryStaged
+                          : context.l10n.libraryStage,
+                    ),
                   ),
                 ],
               ),
@@ -156,7 +161,9 @@ class _StatusBadge extends StatelessWidget {
     return Chip(
       visualDensity: VisualDensity.compact,
       avatar: Icon(isStaged ? Icons.check : Icons.image_outlined),
-      label: Text(isStaged ? 'Staged' : 'Ready'),
+      label: Text(
+        isStaged ? context.l10n.libraryStaged : context.l10n.libraryReady,
+      ),
     );
   }
 }

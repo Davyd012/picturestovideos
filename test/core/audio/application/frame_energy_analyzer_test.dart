@@ -27,8 +27,8 @@ void main() {
       expect(frames[0].time, Duration.zero);
       expect(frames[1].time, const Duration(milliseconds: 250));
       expect(frames[2].time, const Duration(milliseconds: 500));
-      expect(frames[0].energy, 2);
-      expect(frames[1].energy, 1);
+      expect(frames[0].energy, 1);
+      expect(frames[1].energy, closeTo(0.70710678, 0.0001));
       expect(frames[2].energy, 0);
       expect(frames[3].energy, 0);
     });
@@ -53,7 +53,7 @@ void main() {
 
       expect(frames.length, 2);
       expect(frames[0].energy, 1);
-      expect(frames[1].energy, closeTo(0.25, 0.0001));
+      expect(frames[1].energy, closeTo(0.5, 0.0001));
     });
   });
 }

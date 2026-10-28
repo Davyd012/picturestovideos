@@ -2,6 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/editor_preview_frame.dart';
+import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
+import 'package:picturestovideos/core/composition/domain/composition_evaluator.dart';
+import 'package:picturestovideos/core/composition/domain/video_composition.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 
 final resolveEditorPreviewFrameUseCaseProvider =
@@ -19,6 +23,7 @@ class ResolveEditorPreviewFrameUseCase {
   });
 
   final ResolvePreviewClipsUseCase _resolvePreviewClipsUseCase;
+  static const _evaluator = CompositionEvaluator();
 
   EditorPreviewFrame call({
     required BeatMap? beatMap,
@@ -37,36 +42,46 @@ class ResolveEditorPreviewFrameUseCase {
       return const EditorPreviewFrame.empty();
     }
 
-    var activeIndex = clips.length - 1;
-    for (var index = 0; index < clips.length; index++) {
-      final clip = clips[index];
-      final isWithin = currentTime >= clip.start && currentTime < clip.end;
-      if (isWithin || currentTime < clip.start) {
-        activeIndex = index;
-        break;
-      }
+    final composition = VideoComposition.fromProject(
+      project: project,
+      committedClips: clips,
+      width: project.template.aspectRatio.previewWidth,
+      height: project.template.aspectRatio.previewHeight,
+      frameRate: 30,
+    ).quantizedForOutput();
+    final evaluated = _evaluator.evaluate(composition, currentTime);
+    if (evaluated.layers.isEmpty) {
+      return const EditorPreviewFrame.empty();
     }
-
-    final activeClip = clips[activeIndex];
-    final nextClip = activeIndex + 1 < clips.length
+    final activeClip = evaluated.layers.last.clip.toPayload();
+    final activeIndex = clips.indexWhere(
+      (clip) => clip.clipId == activeClip.clipId,
+    );
+    final nextClip = activeIndex >= 0 && activeIndex + 1 < clips.length
         ? clips[activeIndex + 1]
         : null;
-    final span = activeClip.end - activeClip.start;
-    final elapsed = currentTime - activeClip.start;
-    final progress = span <= Duration.zero
-        ? 0.0
-        : ((elapsed.inMicroseconds / span.inMicroseconds).clamp(
-            0.0,
-            1.0,
-          )).toDouble();
+    final progress = evaluated.layers.last.progress;
+    ClipTransition? transition;
+    MediaTrackClipPayload? outgoing;
+    MediaTrackClipPayload? incoming;
+    if (evaluated.layers.length == 2) {
+      outgoing = evaluated.layers.first.clip.toPayload();
+      incoming = evaluated.layers.last.clip.toPayload();
+      transition = ClipTransition.between(outgoing, incoming, project.template);
+    }
 
     return EditorPreviewFrame(
-      currentTime: currentTime,
+      currentTime: evaluated.time,
       activeIndex: activeIndex,
       progress: progress,
       clips: clips,
       activeClip: activeClip,
       nextClip: nextClip,
+      transition: transition,
+      transitionOutgoing: outgoing,
+      transitionIncoming: incoming,
+      transitionProgress: evaluated.transitionProgress,
+      compositionFrame: evaluated,
     );
   }
 }

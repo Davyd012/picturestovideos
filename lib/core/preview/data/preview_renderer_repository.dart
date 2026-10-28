@@ -4,6 +4,7 @@ import 'package:picturestovideos/core/preview/data/preview_renderer_repository_f
     as preview_renderer_factory;
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
+import 'package:picturestovideos/core/preview/domain/render_cancellation.dart';
 
 final previewRendererRepositoryProvider = Provider<PreviewRendererRepository>(
   (ref) => preview_renderer_factory.createPreviewRendererRepository(
@@ -15,5 +16,6 @@ abstract class PreviewRendererRepository {
   Future<BuildPreviewVideoResult> buildPreviewVideo(
     BuildPreviewVideoRequest request, {
     BuildPreviewVideoProgressCallback? onProgress,
+    RenderCancellation? cancellation,
   });
 }

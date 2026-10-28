@@ -170,7 +170,7 @@ class TimelineTabView extends StatelessWidget {
   List<BeatEvent> _projectMarkerEvents(ProjectTimeline project) {
     for (final track in project.tracks) {
       if (track.id == 'track-markers') {
-        return track.events;
+        return track.events.where((event) => !event.time.isNegative).toList();
       }
     }
     return const [];

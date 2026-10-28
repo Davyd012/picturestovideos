@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
+import 'package:picturestovideos/features/library/widgets/library_status_message.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class LibraryEmptyState extends ConsumerWidget {
   const LibraryEmptyState({
@@ -17,6 +20,8 @@ class LibraryEmptyState extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(libraryViewModelProvider);
     final viewModel = ref.read(libraryViewModelProvider.notifier);
+    final folderPathsUnavailable =
+        defaultTargetPlatform == TargetPlatform.android;
 
     return Card(
       elevation: 3,
@@ -34,10 +39,13 @@ class LibraryEmptyState extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
-            Text('Import images', style: context.textTheme.headlineSmall),
+            Text(
+              context.l10n.importImagesHeading,
+              style: context.textTheme.headlineSmall,
+            ),
             const SizedBox(height: 8),
             Text(
-              'Import images, stage the strongest frames, and send them into the beat-synced editor flow.',
+              context.l10n.libraryDescription,
               style: context.textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
@@ -45,20 +53,33 @@ class LibraryEmptyState extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                Chip(label: Text('Visible: $visibleCount')),
-                const Chip(label: Text('Imported: 0')),
-                Chip(label: Text('In editor: $selectedCount')),
+                Chip(
+                  label: Text(context.l10n.libraryVisibleCount(visibleCount)),
+                ),
+                Chip(label: Text(context.l10n.libraryImportedCount(0))),
+                Chip(
+                  label: Text(context.l10n.libraryInEditorCount(selectedCount)),
+                ),
               ],
             ),
             const SizedBox(height: 24),
             TextField(
-              enabled: !state.isImporting,
+              enabled: !state.isImporting && !folderPathsUnavailable,
               onChanged: viewModel.folderPathChanged,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 prefixIcon: Icon(Icons.folder_open_outlined),
-                hintText: 'Paste folder path',
+                hintText: folderPathsUnavailable
+                    ? null
+                    : context.l10n.pasteFolderPath,
               ),
             ),
+            if (folderPathsUnavailable) ...[
+              const SizedBox(height: 8),
+              Text(
+                context.l10n.folderPathUnavailableOnAndroid,
+                style: context.textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
@@ -67,14 +88,14 @@ class LibraryEmptyState extends ConsumerWidget {
                 FilledButton.icon(
                   onPressed: state.isImporting ? null : viewModel.pickImages,
                   icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('Pick images'),
+                  label: Text(context.l10n.pickImages),
                 ),
                 OutlinedButton.icon(
-                  onPressed: state.isImporting
+                  onPressed: state.isImporting || folderPathsUnavailable
                       ? null
                       : viewModel.importImagesFromFolderPath,
                   icon: const Icon(Icons.drive_folder_upload_outlined),
-                  label: const Text('Import folder'),
+                  label: Text(context.l10n.importFolder),
                 ),
               ],
             ),
@@ -91,9 +112,12 @@ class LibraryEmptyState extends ConsumerWidget {
                 ),
               ),
             ],
-            if (state.statusMessage != null) ...[
+            if (state.importStatus != null) ...[
               const SizedBox(height: 16),
-              Text(state.statusMessage!, style: context.textTheme.bodyMedium),
+              LibraryStatusMessage(
+                status: state.importStatus,
+                count: state.statusItemCount,
+              ),
             ],
           ],
         ),

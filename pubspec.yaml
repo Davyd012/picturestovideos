@@ -7,7 +7,9 @@ environment:
   sdk: ^3.13.0-34.0.dev
 
 dependencies:
+  characters: ^1.4.1
   audioplayers: ^6.6.0
+  crypto: ^3.0.7
   file_picker: ^11.0.2
   ffmpeg_kit_extended_flutter: ^0.5.7
   flutter:
@@ -26,6 +28,8 @@ dependencies:
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_native_splash: ^2.4.8

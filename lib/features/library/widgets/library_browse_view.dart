@@ -9,6 +9,7 @@ import 'package:picturestovideos/features/library/widgets/library_toolbar.dart';
 import 'package:picturestovideos/features/library/widgets/selection_action_bar.dart';
 import 'package:picturestovideos/features/library/widgets/staged_summary_card.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class LibraryBrowseView extends ConsumerWidget {
   const LibraryBrowseView({super.key});
@@ -43,14 +44,14 @@ class LibraryBrowseView extends ConsumerWidget {
                     slivers: [
                       SliverToBoxAdapter(
                         child: Text(
-                          'Image library',
+                          context.l10n.imageLibraryTitle,
                           style: context.textTheme.headlineMedium,
                         ),
                       ),
                       const SliverToBoxAdapter(child: SizedBox(height: 8)),
                       SliverToBoxAdapter(
                         child: Text(
-                          'Import images, stage the strongest frames, and send them into the beat-synced editor flow.',
+                          context.l10n.libraryDescription,
                           style: context.textTheme.bodyLarge,
                         ),
                       ),
@@ -133,10 +134,13 @@ class _NoMatchingImagesCard extends StatelessWidget {
               color: context.colors.primary,
             ),
             const SizedBox(height: 16),
-            Text('No matching images', style: context.textTheme.titleLarge),
+            Text(
+              context.l10n.libraryNoMatchingImages,
+              style: context.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              'Try another search, filter, or sort option.',
+              context.l10n.libraryTryDifferentSearch,
               style: context.textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),

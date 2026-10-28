@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 
 class AppShellScaffold extends StatelessWidget {
@@ -18,34 +19,34 @@ class AppShellScaffold extends StatelessWidget {
   final List<Widget> actions;
   final Widget? leading;
 
-  static const _destinations = <_ShellDestination>[
+  List<_ShellDestination> _destinations(BuildContext context) => [
     _ShellDestination(
       route: AppRoutes.home,
-      label: 'Home',
+      label: context.l10n.homeTitle,
       icon: Icons.home_outlined,
       selectedIcon: Icons.home,
     ),
     _ShellDestination(
       route: AppRoutes.importAudio,
-      label: 'Import',
+      label: context.l10n.navImport,
       icon: Icons.audio_file_outlined,
       selectedIcon: Icons.audio_file,
     ),
     _ShellDestination(
       route: AppRoutes.library,
-      label: 'Library',
+      label: context.l10n.navLibrary,
       icon: Icons.video_library_outlined,
       selectedIcon: Icons.video_library,
     ),
     _ShellDestination(
       route: AppRoutes.audioEditor,
-      label: 'Editor',
+      label: context.l10n.navEditor,
       icon: Icons.tune_outlined,
       selectedIcon: Icons.tune,
     ),
     _ShellDestination(
       route: AppRoutes.download,
-      label: 'Export',
+      label: context.l10n.navExport,
       icon: Icons.download_outlined,
       selectedIcon: Icons.download,
     ),
@@ -53,7 +54,8 @@ class AppShellScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = _selectedIndexFor(currentRoute);
+    final destinations = _destinations(context);
+    final selectedIndex = _selectedIndexFor(currentRoute, destinations);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -73,7 +75,7 @@ class AppShellScaffold extends StatelessWidget {
                         selectedIndex: selectedIndex,
                         labelType: NavigationRailLabelType.all,
                         destinations: [
-                          for (final destination in _destinations)
+                          for (final destination in destinations)
                             NavigationRailDestination(
                               icon: Icon(destination.icon),
                               selectedIcon: Icon(destination.selectedIcon),
@@ -83,7 +85,7 @@ class AppShellScaffold extends StatelessWidget {
                         onDestinationSelected: (index) {
                           _handleDestinationSelected(
                             context,
-                            _destinations[index].route,
+                            destinations[index].route,
                           );
                         },
                       ),
@@ -98,7 +100,7 @@ class AppShellScaffold extends StatelessWidget {
               : NavigationBar(
                   selectedIndex: selectedIndex,
                   destinations: [
-                    for (final destination in _destinations)
+                    for (final destination in destinations)
                       NavigationDestination(
                         icon: Icon(destination.icon),
                         selectedIcon: Icon(destination.selectedIcon),
@@ -108,7 +110,7 @@ class AppShellScaffold extends StatelessWidget {
                   onDestinationSelected: (index) {
                     _handleDestinationSelected(
                       context,
-                      _destinations[index].route,
+                      destinations[index].route,
                     );
                   },
                 ),
@@ -117,10 +119,8 @@ class AppShellScaffold extends StatelessWidget {
     );
   }
 
-  int _selectedIndexFor(String route) {
-    return _destinations.indexWhere(
-      (destination) => destination.route == route,
-    );
+  int _selectedIndexFor(String route, List<_ShellDestination> destinations) {
+    return destinations.indexWhere((destination) => destination.route == route);
   }
 
   void _handleDestinationSelected(BuildContext context, String route) {

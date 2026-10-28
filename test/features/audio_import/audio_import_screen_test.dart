@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/app.dart';
+import 'package:picturestovideos/app/localizations/app_localizations.dart';
 import 'package:picturestovideos/core/audio/application/analyze_audio_frames_use_case.dart';
 import 'package:picturestovideos/core/audio/application/beat_detector.dart';
 import 'package:picturestovideos/core/audio/application/decode_wav_audio_use_case.dart';
@@ -22,6 +24,7 @@ import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_detection_config.dart';
 import 'package:picturestovideos/core/audio/domain/selected_audio_file.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/features/audio_import/widgets/import_empty_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -31,12 +34,66 @@ void main() {
 
   testWidgets('app starts on the home saved media dashboard', (tester) async {
     await tester.pumpWidget(const ProviderScope(child: App()));
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     expect(find.text('Home'), findsAtLeastNWidgets(1));
     expect(find.text('Saved media'), findsOneWidget);
     expect(find.text('Saved audio'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Saved assets'), 300);
     expect(find.text('Saved assets'), findsOneWidget);
+  });
+
+  testWidgets('import empty state uses the selected locale', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('ru'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(
+          appBar: AppBar(title: const Text('Импорт аудио')),
+          body: ImportEmptyState(
+            onChooseFile: () {},
+            onSelectSongOnly: () {},
+            onImportFromPath: () {},
+            onSelectSongOnlyFromPath: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Импорт аудио'), findsOneWidget);
+    expect(find.text('Анализ WAV'), findsOneWidget);
+    expect(find.text('Выбрать только песню'), findsOneWidget);
+    expect(find.text('Песня по пути'), findsOneWidget);
+  });
+
+  testWidgets('closing the path dialog then changing tabs keeps app mounted', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(overrides: _audioImportOverrides(), child: const App()),
+    );
+    await _pumpApp(tester);
+    await tester.tap(find.text('Import'));
+    await _pumpApp(tester);
+    await tester.ensureVisible(find.text('WAV from path'));
+    await tester.tap(find.text('WAV from path'));
+    await _pumpApp(tester);
+    await tester.tap(find.text('Cancel'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Library'));
+    await _pumpApp(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Image library'), findsOneWidget);
   });
 
   testWidgets('import flow renders completed state and pipeline sheet', (
@@ -48,13 +105,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(overrides: _audioImportOverrides(), child: const App()),
     );
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     await tester.tap(find.text('Import'));
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     await tester.tap(find.text('Analyze WAV'));
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     expect(find.text('Import complete'), findsOneWidget);
     expect(find.text('beat.wav'), findsWidgets);
@@ -63,11 +120,19 @@ void main() {
 
     await tester.ensureVisible(find.text('View pipeline progress'));
     await tester.tap(find.text('View pipeline progress'));
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     expect(find.text('Pipeline progress'), findsOneWidget);
     expect(find.text('Beat detection'), findsOneWidget);
   });
+}
+
+Future<void> _pumpApp(WidgetTester tester) async {
+  // The app contains an indeterminate progress animation that prevents
+  // pumpAndSettle from returning even after the requested screen is ready.
+  await tester.pump();
+  await tester.pump(const Duration(seconds: 1));
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 dynamic _audioImportOverrides() {

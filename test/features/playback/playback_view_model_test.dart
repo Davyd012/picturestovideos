@@ -5,11 +5,92 @@ import 'package:picturestovideos/core/audio/application/synchronize_playback_use
 import 'package:picturestovideos/core/audio/data/audio_player_repository.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
+import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/audio/domain/playback_sync_result.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 
 void main() {
+  test(
+    'preview continues through silence when music ends before video',
+    () async {
+      final repository = ManualAudioPlayerRepository()
+        ..setSourceDuration(const Duration(milliseconds: 100));
+      final container = ProviderContainer(
+        overrides: [
+          audioPlayerRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(repository.dispose);
+      addTearDown(container.dispose);
+      await container.read(playbackViewModelProvider.future);
+      final vm = container.read(playbackViewModelProvider.notifier);
+      await vm.preparePlayback(
+        beatMap: const BeatMap(
+          beats: [],
+          bpm: 0,
+          averageBeatInterval: Duration.zero,
+        ),
+        audioSourcePath: 'short.wav',
+        videoDuration: const Duration(milliseconds: 400),
+      );
+      await vm.play();
+      repository.complete();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      final playing = container.read(playbackViewModelProvider).value!;
+      expect(playing.isPlaying, isTrue);
+      expect(
+        playing.currentTime,
+        greaterThan(const Duration(milliseconds: 100)),
+      );
+      await vm.pause();
+      expect(
+        container.read(playbackViewModelProvider).value!.isPlaying,
+        isFalse,
+      );
+    },
+  );
+  test(
+    'trimmed playback seeks in source time and applies fades in video time',
+    () async {
+      final repository = ManualAudioPlayerRepository()
+        ..setSourceDuration(const Duration(seconds: 10));
+      final container = ProviderContainer(
+        overrides: [
+          audioPlayerRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(repository.dispose);
+      await container.read(playbackViewModelProvider.future);
+      final vm = container.read(playbackViewModelProvider.notifier);
+      await vm.preparePlayback(
+        beatMap: const BeatMap(
+          beats: [],
+          bpm: 0,
+          averageBeatInterval: Duration.zero,
+        ),
+        audioSourcePath: 'music.wav',
+        audioMix: const AudioMix(
+          start: Duration(seconds: 2),
+          end: Duration(seconds: 6),
+          fadeIn: Duration(seconds: 1),
+          fadeOut: Duration(seconds: 1),
+        ),
+        videoDuration: const Duration(seconds: 4),
+      );
+      expect(repository.currentPosition, const Duration(seconds: 2));
+      expect(repository.volume, 0);
+      await vm.seek(const Duration(milliseconds: 500));
+      expect(repository.currentPosition, const Duration(milliseconds: 2500));
+      expect(repository.volume, closeTo(0.5, 0.001));
+      await vm.seek(const Duration(milliseconds: 3500));
+      expect(repository.currentPosition, const Duration(milliseconds: 5500));
+      expect(repository.volume, closeTo(0.5, 0.001));
+      await vm.restart();
+      expect(repository.currentPosition, const Duration(seconds: 2));
+    },
+  );
   test('preparePlayback exposes loaded source duration', () async {
     final repository = ManualAudioPlayerRepository()
       ..setSourceDuration(const Duration(minutes: 3, seconds: 42));
