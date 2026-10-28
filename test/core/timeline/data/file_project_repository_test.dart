@@ -236,6 +236,26 @@ void main() {
     expect(repository.lastLoadIssues.single.recoveredFromBackup, isFalse);
   });
 
+  test(
+    'newer schema project is preserved while valid projects still load',
+    () async {
+      await repository.save(_project('valid'));
+      final projectDirectory = Directory('${supportDirectory.path}/projects');
+      const futureDocument =
+          '{"schemaVersion":999,"id":"future","data":"keep"}';
+      final futureFile = File('${projectDirectory.path}/future.json');
+      await futureFile.writeAsString(futureDocument);
+
+      final reopened = await repository.loadAll();
+
+      expect(reopened.map((project) => project.id), ['valid']);
+      expect(repository.lastLoadIssues, hasLength(1));
+      expect(repository.lastLoadIssues.single.projectFile, 'future.json');
+      expect(repository.lastLoadIssues.single.recoveredFromBackup, isFalse);
+      expect(await futureFile.readAsString(), futureDocument);
+    },
+  );
+
   test('corrupt current file restores its previous valid generation', () async {
     await repository.save(_project('replaceable', name: 'Previous'));
     await repository.save(_project('replaceable', name: 'Current'));
