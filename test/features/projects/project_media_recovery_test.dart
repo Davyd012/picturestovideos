@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/core/audio/data/audio_file_picker.dart';
 import 'package:picturestovideos/core/audio/data/device_audio_repository.dart';
+import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
@@ -16,7 +17,9 @@ import 'package:picturestovideos/core/timeline/data/project_repository.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
+import 'package:picturestovideos/core/timeline/domain/sequence_pacing.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
+import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/image_file_picker.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
 import 'package:picturestovideos/features/projects/project_media_recovery.dart';
@@ -31,11 +34,14 @@ void main() {
       );
       final replacement = File('${dir.path}/replacement.jpg');
       final replacementAudio = File('${dir.path}/replacement.mp3');
+      final otherImage = File('${dir.path}/other.jpg');
       await replacement.writeAsBytes([1]);
       await replacementAudio.writeAsBytes([2]);
+      await otherImage.writeAsBytes([3]);
       addTearDown(() async {
         await replacement.delete();
         await replacementAudio.delete();
+        await otherImage.delete();
         await dir.delete(recursive: true);
       });
       const first = MediaTrackClipPayload(
@@ -75,11 +81,31 @@ void main() {
         name: 'Memory',
         audioSourcePath: 'missing-song.mp3',
         beatMap: const BeatMap(
-          beats: [],
-          bpm: 0,
-          averageBeatInterval: Duration(seconds: 1),
+          beats: [
+            Beat(time: Duration(seconds: 1), strength: 1),
+            Beat(time: Duration(seconds: 4), strength: 1),
+          ],
+          bpm: 120,
+          averageBeatInterval: Duration(seconds: 2),
         ),
+        audioDuration: const Duration(seconds: 12),
         tracks: [
+          const TimelineTrack(
+            id: 'track-markers',
+            name: 'Markers',
+            events: [
+              BeatEvent(
+                time: Duration(seconds: 1),
+                type: 'marker',
+                payload: 'First beat',
+              ),
+              BeatEvent(
+                time: Duration(seconds: 4),
+                type: 'marker',
+                payload: 'Second beat',
+              ),
+            ],
+          ),
           TimelineTrack(
             id: 'track-media',
             name: 'Images',
@@ -120,51 +146,141 @@ void main() {
       container
           .read(timelineViewModelProvider.notifier)
           .projectOpened(reopened);
+      final reorderedMedia = [
+        _mediaItem('other', 'Other', otherImage.path),
+        _mediaItem('photo', 'Photo', 'missing.jpg'),
+      ];
+      const beatMap = BeatMap(
+        beats: [
+          Beat(time: Duration(seconds: 1), strength: 1),
+          Beat(time: Duration(seconds: 4), strength: 1),
+        ],
+        bpm: 120,
+        averageBeatInterval: Duration(seconds: 2),
+      );
+      const markerEvents = [
+        BeatEvent(
+          time: Duration(seconds: 1),
+          type: 'marker',
+          payload: 'First beat',
+        ),
+        BeatEvent(
+          time: Duration(seconds: 4),
+          type: 'marker',
+          payload: 'Second beat',
+        ),
+      ];
+      final timeline = container.read(timelineViewModelProvider.notifier);
+      await timeline.buildProjectTimeline(
+        beatMap: beatMap,
+        events: markerEvents,
+        selectedMedia: reorderedMedia,
+        audioDuration: const Duration(seconds: 12),
+      );
+      var rebuilt = container.read(timelineViewModelProvider).value!.project!;
+      var rebuiltClips = rebuilt.tracks
+          .singleWhere((track) => track.id == 'track-media')
+          .events
+          .map((event) => event.payload as MediaTrackClipPayload)
+          .toList();
+      expect(rebuiltClips.map((clip) => clip.mediaId), [
+        'other',
+        'photo',
+        'photo',
+      ]);
+      expect(rebuiltClips.map((clip) => clip.clipId).skip(1), [
+        'first',
+        'second',
+      ]);
+      final balancedStarts = rebuiltClips.map((clip) => clip.start).toList();
+
+      timeline.pacingSelected(SequencePacing.energetic);
+      await timeline.applyPacingSuggestion(
+        beatMap: beatMap,
+        events: markerEvents,
+        selectedMedia: reorderedMedia,
+        selectedImageFits: const {},
+        audioDuration: const Duration(seconds: 12),
+      );
+      rebuilt = container.read(timelineViewModelProvider).value!.project!;
+      rebuiltClips = rebuilt.tracks
+          .singleWhere((track) => track.id == 'track-media')
+          .events
+          .map((event) => event.payload as MediaTrackClipPayload)
+          .toList();
+      expect(rebuilt.pacing, SequencePacing.energetic);
+      expect(rebuiltClips.map((clip) => clip.mediaId), [
+        'other',
+        'photo',
+        'photo',
+      ]);
+      expect(rebuiltClips.map((clip) => clip.clipId).skip(1), [
+        'first',
+        'second',
+      ]);
+      expect(rebuiltClips.map((clip) => clip.start), isNot(balancedStarts));
+      expect(rebuiltClips[1].cropTransform, first.cropTransform);
+      expect(rebuiltClips[2].cropTransform, second.cropTransform);
+      await repository.save(rebuilt);
+      final reopenedAfterPacing = (await repository.loadAll()).single;
+      container
+          .read(timelineViewModelProvider.notifier)
+          .projectOpened(reopenedAfterPacing);
       final missing = await container.read(
-        missingProjectMediaProvider(reopened).future,
+        missingProjectMediaProvider(reopenedAfterPacing).future,
       );
       expect(missing, hasLength(2));
       final missingImage = missing.singleWhere((item) => !item.isAudio);
       final missingAudio = missing.singleWhere((item) => item.isAudio);
 
       final recovery = container.read(projectMediaRecoveryProvider);
-      expect(await recovery.relink(project, missingImage), isTrue);
+      expect(await recovery.relink(reopenedAfterPacing, missingImage), isTrue);
       var updated = container.read(timelineViewModelProvider).value!.project!;
-      final clips = updated.tracks.single.events
+      final clips = updated.tracks
+          .singleWhere((track) => track.id == 'track-media')
+          .events
           .map((e) => e.payload as MediaTrackClipPayload)
           .toList();
-      expect(clips.map((c) => c.sourcePath), [
+      expect(clips.first.mediaId, 'other');
+      expect(clips.first.sourcePath, otherImage.path);
+      final repeatedClips = clips
+          .where((clip) => clip.mediaId == 'photo')
+          .toList();
+      expect(repeatedClips.map((c) => c.sourcePath), [
         replacement.path,
         replacement.path,
       ]);
-      expect(clips.map((c) => c.clipId), ['first', 'second']);
-      expect(clips.map((c) => c.caption), ['Memory', 'Second memory']);
-      expect(clips.map((c) => c.captionSupportingLine), [
+      expect(repeatedClips.map((c) => c.clipId), ['first', 'second']);
+      expect(repeatedClips.map((c) => c.caption), ['Memory', 'Second memory']);
+      expect(repeatedClips.map((c) => c.captionSupportingLine), [
         '',
         'Different occurrence',
       ]);
-      expect(clips.map((c) => c.imageFit), [
+      expect(repeatedClips.map((c) => c.imageFit), [
         VideoTemplateImageFit.cover,
         VideoTemplateImageFit.contain,
       ]);
-      expect(clips.map((c) => c.cropTransform), [
+      expect(repeatedClips.map((c) => c.cropTransform), [
         const ImageCropTransform(focalX: -0.7, focalY: 0.3, zoom: 1.5),
         const ImageCropTransform(focalX: 0.6, focalY: -0.4, zoom: 2),
       ]);
-      expect(clips.map((c) => c.motionOverride), [
+      expect(repeatedClips.map((c) => c.motionOverride), [
         ClipMotionPreset.gentlePan,
         ClipMotionPreset.slowZoomIn,
       ]);
-      expect(clips.map((c) => c.motionIntensity), [
+      expect(repeatedClips.map((c) => c.motionIntensity), [
         ClipMotionIntensity.subtle,
         ClipMotionIntensity.moreMovement,
       ]);
-      expect(clips.map((c) => c.useStyleMotionIntensity), [false, false]);
-      expect(clips.map((c) => c.transitionOverride), [
+      expect(repeatedClips.map((c) => c.useStyleMotionIntensity), [
+        false,
+        false,
+      ]);
+      expect(repeatedClips.map((c) => c.transitionOverride), [
         ClipTransitionType.dissolve,
         ClipTransitionType.slide,
       ]);
-      expect(clips.map((c) => c.transitionDuration), [
+      expect(repeatedClips.map((c) => c.transitionDuration), [
         const Duration(milliseconds: 800),
         const Duration(milliseconds: 1200),
       ]);
@@ -179,43 +295,53 @@ void main() {
       );
       await repository.save(updated);
       final reopenedAfterRelink = (await repository.loadAll()).single;
-      final persistedClips = reopenedAfterRelink.tracks.single.events
+      final persistedClips = reopenedAfterRelink.tracks
+          .singleWhere((track) => track.id == 'track-media')
+          .events
           .map((event) => event.payload as MediaTrackClipPayload)
           .toList();
-      expect(persistedClips.map((clip) => clip.clipId), ['first', 'second']);
-      expect(persistedClips.map((clip) => clip.sourcePath), [
+      expect(persistedClips.first.mediaId, 'other');
+      expect(persistedClips.first.sourcePath, otherImage.path);
+      final persistedRepeatedClips = persistedClips
+          .where((clip) => clip.mediaId == 'photo')
+          .toList();
+      expect(persistedRepeatedClips.map((clip) => clip.clipId), [
+        'first',
+        'second',
+      ]);
+      expect(persistedRepeatedClips.map((clip) => clip.sourcePath), [
         replacement.path,
         replacement.path,
       ]);
-      expect(persistedClips.map((clip) => clip.caption), [
+      expect(persistedRepeatedClips.map((clip) => clip.caption), [
         'Memory',
         'Second memory',
       ]);
-      expect(persistedClips.map((clip) => clip.imageFit), [
+      expect(persistedRepeatedClips.map((clip) => clip.imageFit), [
         VideoTemplateImageFit.cover,
         VideoTemplateImageFit.contain,
       ]);
-      expect(persistedClips.map((clip) => clip.cropTransform), [
+      expect(persistedRepeatedClips.map((clip) => clip.cropTransform), [
         const ImageCropTransform(focalX: -0.7, focalY: 0.3, zoom: 1.5),
         const ImageCropTransform(focalX: 0.6, focalY: -0.4, zoom: 2),
       ]);
-      expect(persistedClips.map((clip) => clip.captionSupportingLine), [
+      expect(persistedRepeatedClips.map((clip) => clip.captionSupportingLine), [
         '',
         'Different occurrence',
       ]);
-      expect(persistedClips.map((clip) => clip.motionOverride), [
+      expect(persistedRepeatedClips.map((clip) => clip.motionOverride), [
         ClipMotionPreset.gentlePan,
         ClipMotionPreset.slowZoomIn,
       ]);
-      expect(persistedClips.map((clip) => clip.motionIntensity), [
+      expect(persistedRepeatedClips.map((clip) => clip.motionIntensity), [
         ClipMotionIntensity.subtle,
         ClipMotionIntensity.moreMovement,
       ]);
-      expect(persistedClips.map((clip) => clip.transitionOverride), [
+      expect(persistedRepeatedClips.map((clip) => clip.transitionOverride), [
         ClipTransitionType.dissolve,
         ClipTransitionType.slide,
       ]);
-      expect(persistedClips.map((clip) => clip.transitionDuration), [
+      expect(persistedRepeatedClips.map((clip) => clip.transitionDuration), [
         const Duration(milliseconds: 800),
         const Duration(milliseconds: 1200),
       ]);
@@ -223,6 +349,19 @@ void main() {
     },
   );
 }
+
+LibraryMediaItem _mediaItem(String id, String title, String sourcePath) =>
+    LibraryMediaItem(
+      id: id,
+      title: title,
+      sizeLabel: '1 KB',
+      tagline: '',
+      importedOnLabel: 'Oct 28, 2026',
+      importedOn: DateTime(2026, 10, 28),
+      byteLength: 1,
+      thumbnailBytes: Uint8List(0),
+      sourcePath: sourcePath,
+    );
 
 class _ImagePicker implements ImageFilePicker {
   _ImagePicker(this.path);
