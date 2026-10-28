@@ -18,14 +18,18 @@ import 'package:picturestovideos/core/theme/app_theme.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_preview_card.dart';
 
+String? _parityTracePath;
+const _runFfmpegTests = bool.fromEnvironment('RUN_FFMPEG_TESTS');
+
 void main() {
   testWidgets(
     'desktop editing preview matches decoded export across framing cases',
     (tester) async {
-      _traceParity('test started', reset: true);
       final outputPrefix =
           '${Directory.systemTemp.path}/picturestovideos-desktop-parity-'
           '${DateTime.now().microsecondsSinceEpoch}';
+      _parityTracePath = '$outputPrefix-trace.log';
+      _traceParity('test started', reset: true);
       _traceParity('temp created');
       final landscape = _fixturePath('landscape.png');
       final portrait = _fixturePath('portrait.png');
@@ -68,6 +72,7 @@ void main() {
       final renderer = DesktopPreviewRendererRepository(
         logger: AppLogger(appTalker),
       );
+      final failures = <String>[];
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -129,6 +134,9 @@ void main() {
         );
         _traceParity('after pump ${parityCase.name}');
         for (var attempt = 0; attempt < 40; attempt++) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 50)),
+          );
           await tester.pump(const Duration(milliseconds: 50));
           if (tester.widget<RawImage>(find.byType(RawImage)).image != null) {
             break;
@@ -232,10 +240,18 @@ void main() {
             'Windows preview/export ${parityCase.name}: '
             'filter=$filterDifference, decoded=$encodedDifference',
           );
-          expect(filterDifference.mean, lessThanOrEqualTo(3));
-          expect(filterDifference.p99, lessThanOrEqualTo(16));
-          expect(encodedDifference.mean, lessThanOrEqualTo(3));
-          expect(encodedDifference.p99, lessThanOrEqualTo(16));
+          if (filterDifference.mean > 3 || filterDifference.p99 > 16) {
+            failures.add(
+              '${parityCase.name} filter=$filterDifference exceeds '
+              'MAE 3/255 or p99 16/255',
+            );
+          }
+          if (encodedDifference.mean > 3 || encodedDifference.p99 > 16) {
+            failures.add(
+              '${parityCase.name} decoded=$encodedDifference exceeds '
+              'MAE 3/255 or p99 16/255',
+            );
+          }
         } finally {
           final renderDirectory = Directory(
             File(rendered.outputPath).parent.path,
@@ -249,9 +265,11 @@ void main() {
           }
         }
       }
+      expect(failures, isEmpty, reason: failures.join('\n'));
     },
     skip:
-        Platform.environment['RUN_FFMPEG_TESTS'] != '1' || !Platform.isWindows,
+        (!_runFfmpegTests && Platform.environment['RUN_FFMPEG_TESTS'] != '1') ||
+        !Platform.isWindows,
   );
 }
 
@@ -259,7 +277,7 @@ String _fixturePath(String name) =>
     File('test/fixtures/generated/$name').absolute.path;
 
 void _traceParity(String message, {bool reset = false}) {
-  File('test/fixtures/.desktop_parity_trace').writeAsStringSync(
+  File(_parityTracePath!).writeAsStringSync(
     '$message\n',
     mode: reset ? FileMode.write : FileMode.append,
     flush: true,
