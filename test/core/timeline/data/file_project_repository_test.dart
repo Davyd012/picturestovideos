@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -101,6 +102,94 @@ void main() {
         ClipTransitionType.dissolve,
       );
       expect(repository.lastLoadIssues, isEmpty);
+    },
+  );
+
+  test(
+    'loads legacy schemas through the repository and reopens migrations',
+    () async {
+      const serializer = ProjectSerializer();
+      const legacyClip = MediaTrackClipPayload(
+        mediaId: 'same-photo',
+        title: 'photo.jpg',
+        tagline: 'Imported',
+        start: Duration.zero,
+        end: Duration(seconds: 2),
+        sourcePath: 'photo.jpg',
+        imageFit: VideoTemplateImageFit.cover,
+      );
+      final payload = legacyClip.toJson()
+        ..remove('clipId')
+        ..remove('caption')
+        ..remove('captionSupportingLine')
+        ..remove('captionSettings')
+        ..remove('cropTransform')
+        ..remove('motionIntensity')
+        ..remove('useStyleMotionIntensity')
+        ..remove('transitionOverride')
+        ..remove('transitionDurationMs');
+      final projectDirectory = Directory('${supportDirectory.path}/projects');
+      await projectDirectory.create(recursive: true);
+
+      for (
+        var version = 0;
+        version <= ProjectSerializer.currentSchemaVersion;
+        version++
+      ) {
+        final id = 'repository-legacy-$version';
+        final encodedId = base64Url.encode(utf8.encode(id)).replaceAll('=', '');
+        await File('${projectDirectory.path}/$encodedId.json').writeAsString(
+          jsonEncode({
+            'schemaVersion': version,
+            'id': id,
+            'name': id,
+            'beatMap': {
+              'beats': <Object?>[],
+              'bpm': 0,
+              'averageBeatIntervalMs': 1000,
+            },
+            'tracks': [
+              {
+                'id': 'track-media',
+                'name': 'Images',
+                'events': [
+                  {'timeMs': 0, 'type': 'image', 'payload': payload},
+                  {'timeMs': 2000, 'type': 'image', 'payload': payload},
+                ],
+              },
+            ],
+          }),
+        );
+      }
+
+      final migrated = await repository.loadAll();
+      expect(migrated, hasLength(ProjectSerializer.currentSchemaVersion + 1));
+      for (final project in migrated) {
+        final clips = project.tracks.single.events
+            .map((event) => event.payload as MediaTrackClipPayload)
+            .toList();
+        expect(clips.map((clip) => clip.clipId).toSet(), hasLength(2));
+        expect(clips.map((clip) => clip.caption), ['photo.jpg', 'photo.jpg']);
+        await repository.save(project);
+      }
+
+      final reopened = await repository.loadAll();
+      final reopenedAgain = await repository.loadAll();
+      expect(reopenedAgain, hasLength(migrated.length));
+      for (final project in reopened) {
+        final firstIds = project.tracks.single.events
+            .map((event) => (event.payload as MediaTrackClipPayload).clipId)
+            .toList();
+        final secondIds = reopenedAgain
+            .singleWhere((candidate) => candidate.id == project.id)
+            .tracks
+            .single
+            .events
+            .map((event) => (event.payload as MediaTrackClipPayload).clipId)
+            .toList();
+        expect(secondIds, firstIds, reason: project.id);
+        expect(firstIds.toSet(), hasLength(2), reason: project.id);
+      }
     },
   );
 
