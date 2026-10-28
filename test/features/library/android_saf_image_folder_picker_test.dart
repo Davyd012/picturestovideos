@@ -48,4 +48,19 @@ void main() {
 
     expect(await AndroidSafImageFolderPicker().pickImagesFromFolder(), isEmpty);
   });
+
+  test('removes imported source paths through the native channel', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      expect(call.method, 'removeImportedImages');
+      expect(call.arguments, {
+        'paths': ['/app/imported_images/a.png', '/app/imported_images/b.jpg'],
+      });
+      return null;
+    });
+
+    await AndroidSafImageFolderPicker().removeImportedImages({
+      '/app/imported_images/a.png',
+      '/app/imported_images/b.jpg',
+    });
+  });
 }

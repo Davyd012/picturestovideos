@@ -292,6 +292,9 @@ class _FakeImageImportRepository implements ImageImportRepository {
     if (error != null) throw error!;
     return assets;
   }
+
+  @override
+  Future<void> removeImportedImages(Set<String> sourcePaths) async {}
 }
 
 class _MemorySavedImageAssetRepository implements SavedImageAssetRepository {

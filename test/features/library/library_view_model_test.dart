@@ -234,28 +234,27 @@ void main() {
     'removeImportedImages clears persistence and staged selection',
     () async {
       final savedRepository = _MemorySavedImageAssetRepository();
+      final importRepository = _FakeImageImportRepository(
+        assets: [
+          ImportedImageAsset(
+            id: '/tmp/first.png',
+            fileName: 'First.png',
+            sourcePath: '/tmp/first.png',
+            bytes: Uint8List.fromList([1]),
+            importedOn: DateTime(2026),
+          ),
+          ImportedImageAsset(
+            id: '/tmp/second.png',
+            fileName: 'Second.png',
+            sourcePath: '/tmp/second.png',
+            bytes: Uint8List.fromList([2]),
+            importedOn: DateTime(2026),
+          ),
+        ],
+      );
       final container = ProviderContainer(
         overrides: [
-          imageImportRepositoryProvider.overrideWithValue(
-            _FakeImageImportRepository(
-              assets: [
-                ImportedImageAsset(
-                  id: '/tmp/first.png',
-                  fileName: 'First.png',
-                  sourcePath: '/tmp/first.png',
-                  bytes: Uint8List.fromList([1]),
-                  importedOn: DateTime(2026),
-                ),
-                ImportedImageAsset(
-                  id: '/tmp/second.png',
-                  fileName: 'Second.png',
-                  sourcePath: '/tmp/second.png',
-                  bytes: Uint8List.fromList([2]),
-                  importedOn: DateTime(2026),
-                ),
-              ],
-            ),
-          ),
+          imageImportRepositoryProvider.overrideWithValue(importRepository),
           savedImageAssetRepositoryProvider.overrideWithValue(savedRepository),
         ],
       );
@@ -283,6 +282,9 @@ void main() {
       expect((await savedRepository.loadAll()).map((asset) => asset.id), [
         '/tmp/second.png',
       ]);
+      expect(importRepository.removedPaths, [
+        {'/tmp/first.png'},
+      ]);
     },
   );
 }
@@ -299,10 +301,11 @@ class _FakeImageFilePicker implements ImageFilePicker {
 }
 
 class _FakeImageImportRepository implements ImageImportRepository {
-  const _FakeImageImportRepository({required this.assets, this.error});
+  _FakeImageImportRepository({required this.assets, this.error});
 
   final List<ImportedImageAsset> assets;
   final Object? error;
+  final List<Set<String>> removedPaths = [];
 
   @override
   Future<List<ImportedImageAsset>> pickImages() async {
@@ -322,6 +325,11 @@ class _FakeImageImportRepository implements ImageImportRepository {
   Future<List<ImportedImageAsset>> importImagesFromFolderPicker() async {
     if (error != null) throw error!;
     return assets;
+  }
+
+  @override
+  Future<void> removeImportedImages(Set<String> sourcePaths) async {
+    removedPaths.add(Set.unmodifiable(sourcePaths));
   }
 }
 

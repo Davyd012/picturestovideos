@@ -48,6 +48,7 @@ abstract interface class ImageImportRepository {
     String folderPath,
   );
   Future<List<ImportedImageAsset>> importImagesFromFolderPicker();
+  Future<void> removeImportedImages(Set<String> sourcePaths);
 }
 
 class DeviceImageImportRepository implements ImageImportRepository {
@@ -129,6 +130,12 @@ class DeviceImageImportRepository implements ImageImportRepository {
       );
     }
     return _reverseWithImportOrder(assets);
+  }
+
+  @override
+  Future<void> removeImportedImages(Set<String> sourcePaths) async {
+    if (!Platform.isAndroid || sourcePaths.isEmpty) return;
+    await _folderPicker?.removeImportedImages(sourcePaths);
   }
 
   @override

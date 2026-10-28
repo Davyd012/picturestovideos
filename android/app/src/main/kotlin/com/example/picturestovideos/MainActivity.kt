@@ -25,25 +25,47 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
             .setMethodCallHandler { call, result ->
-                if (call.method != "pickImagesFromFolder") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
-                if (pendingFolderResult != null) {
-                    result.error("picker_busy", "A folder picker is already open.", null)
-                    return@setMethodCallHandler
-                }
-                pendingFolderResult = result
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                try {
-                    startActivityForResult(intent, requestCode)
-                } catch (error: Exception) {
-                    pendingFolderResult = null
-                    result.error("picker_unavailable", error.message, null)
+                when (call.method) {
+                    "pickImagesFromFolder" -> {
+                        if (pendingFolderResult != null) {
+                            result.error("picker_busy", "A folder picker is already open.", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingFolderResult = result
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        try {
+                            startActivityForResult(intent, requestCode)
+                        } catch (error: Exception) {
+                            pendingFolderResult = null
+                            result.error("picker_unavailable", error.message, null)
+                        }
+                    }
+                    "removeImportedImages" -> removeImportedImages(call.argument("paths") ?: emptyList(), result)
+                    else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun removeImportedImages(paths: List<String>, result: MethodChannel.Result) {
+        executor.execute {
+            try {
+                val importDirectory = File(filesDir, "imported_images").canonicalFile
+                for (path in paths) {
+                    val file = File(path).canonicalFile
+                    if (file.parentFile != importDirectory || !file.exists()) continue
+                    if (!file.delete()) {
+                        throw IllegalStateException("Could not remove an imported image.")
+                    }
+                }
+                mainHandler.post { result.success(null) }
+            } catch (error: Exception) {
+                mainHandler.post {
+                    result.error("import_cleanup_failed", error.message, null)
+                }
+            }
+        }
     }
 
     @Deprecated("Deprecated in Android API; retained for FlutterActivity result forwarding")

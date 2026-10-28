@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
 import 'package:picturestovideos/core/media/domain/saved_image_asset.dart';
+import 'package:picturestovideos/core/timeline/data/project_repository.dart';
 import 'package:picturestovideos/features/library/image_import_repository.dart';
+import 'package:picturestovideos/features/library/imported_image_cleanup_policy.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
+import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 final libraryViewModelProvider =
     NotifierProvider.autoDispose<LibraryViewModel, LibraryState>(
@@ -111,7 +114,39 @@ class LibraryViewModel extends Notifier<LibraryState> {
       clearStatusMessage: true,
     );
     try {
+      var pathsToClean = itemIds;
+      if (Platform.isAndroid) {
+        try {
+          pathsToClean = await _pathsNotUsedByProjects(itemIds);
+        } catch (error, stackTrace) {
+          ref
+              .read(appLoggerProvider)
+              .error(
+                _tag,
+                error,
+                stackTrace,
+                message: 'Checking project references before cleanup failed',
+              );
+          pathsToClean = const {};
+        }
+      }
       await ref.read(savedImageAssetRepositoryProvider).removeAll(itemIds);
+      if (pathsToClean.isNotEmpty) {
+        try {
+          await ref
+              .read(imageImportRepositoryProvider)
+              .removeImportedImages(pathsToClean);
+        } catch (error, stackTrace) {
+          ref
+              .read(appLoggerProvider)
+              .error(
+                _tag,
+                error,
+                stackTrace,
+                message: 'Cleaning up removed image files failed',
+              );
+        }
+      }
       ref
           .read(editorMediaSelectionViewModelProvider.notifier)
           .removeAllMedia(itemIds);
@@ -198,6 +233,23 @@ class LibraryViewModel extends Notifier<LibraryState> {
       return LibraryError.folderNotFound;
     }
     return LibraryError.folderReadFailed;
+  }
+
+  Future<Set<String>> _pathsNotUsedByProjects(Set<String> itemIds) async {
+    final assets = await ref.read(savedImageAssetRepositoryProvider).loadAll();
+    final projectRepository = ref.read(projectRepositoryProvider);
+    final savedProjects = await projectRepository.loadAll();
+    if (projectRepository.lastLoadIssues.isNotEmpty) return const {};
+    final currentProject = ref
+        .read(timelineViewModelProvider)
+        .asData
+        ?.value
+        .project;
+    return unusedImportedImagePaths(
+      assets: assets,
+      removedIds: itemIds,
+      projects: [...savedProjects, ?currentProject],
+    );
   }
 
   List<LibraryMediaItem> _mergeItems(List<ImportedImageAsset> importedAssets) {

@@ -49,6 +49,13 @@ class AndroidSafImageFolderPicker {
     return List.unmodifiable(files);
   }
 
+  Future<void> removeImportedImages(Set<String> sourcePaths) async {
+    if (sourcePaths.isEmpty) return;
+    await _channel.invokeMethod<void>('removeImportedImages', {
+      'paths': sourcePaths.toList(growable: false),
+    });
+  }
+
   String _extension(String name) {
     final dotIndex = name.lastIndexOf('.');
     return dotIndex < 0 ? '' : name.substring(dotIndex + 1).toLowerCase();
