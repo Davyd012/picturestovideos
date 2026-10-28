@@ -10,6 +10,9 @@ import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
+import 'package:picturestovideos/core/timeline/data/file_project_repository.dart';
+import 'package:picturestovideos/core/timeline/data/project_repository.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -33,7 +36,7 @@ void main() {
       addTearDown(() async {
         await replacement.delete();
         await replacementAudio.delete();
-        await dir.delete();
+        await dir.delete(recursive: true);
       });
       const first = MediaTrackClipPayload(
         clipId: 'first',
@@ -95,8 +98,15 @@ void main() {
           ),
         ],
       );
+      final repository = FileProjectRepository(
+        serializer: const ProjectSerializer(),
+        supportDirectory: () async => dir,
+      );
+      await repository.save(project);
+      final reopened = (await repository.loadAll()).single;
       final container = ProviderContainer(
         overrides: [
+          projectRepositoryProvider.overrideWithValue(repository),
           imageFilePickerProvider.overrideWithValue(
             _ImagePicker(replacement.path),
           ),
@@ -107,9 +117,11 @@ void main() {
       );
       addTearDown(container.dispose);
       await container.read(timelineViewModelProvider.future);
-      container.read(timelineViewModelProvider.notifier).projectOpened(project);
+      container
+          .read(timelineViewModelProvider.notifier)
+          .projectOpened(reopened);
       final missing = await container.read(
-        missingProjectMediaProvider(project).future,
+        missingProjectMediaProvider(reopened).future,
       );
       expect(missing, hasLength(2));
       final missingImage = missing.singleWhere((item) => !item.isAudio);
@@ -165,6 +177,49 @@ void main() {
         await container.read(missingProjectMediaProvider(updated).future),
         isEmpty,
       );
+      await repository.save(updated);
+      final reopenedAfterRelink = (await repository.loadAll()).single;
+      final persistedClips = reopenedAfterRelink.tracks.single.events
+          .map((event) => event.payload as MediaTrackClipPayload)
+          .toList();
+      expect(persistedClips.map((clip) => clip.clipId), ['first', 'second']);
+      expect(persistedClips.map((clip) => clip.sourcePath), [
+        replacement.path,
+        replacement.path,
+      ]);
+      expect(persistedClips.map((clip) => clip.caption), [
+        'Memory',
+        'Second memory',
+      ]);
+      expect(persistedClips.map((clip) => clip.imageFit), [
+        VideoTemplateImageFit.cover,
+        VideoTemplateImageFit.contain,
+      ]);
+      expect(persistedClips.map((clip) => clip.cropTransform), [
+        const ImageCropTransform(focalX: -0.7, focalY: 0.3, zoom: 1.5),
+        const ImageCropTransform(focalX: 0.6, focalY: -0.4, zoom: 2),
+      ]);
+      expect(persistedClips.map((clip) => clip.captionSupportingLine), [
+        '',
+        'Different occurrence',
+      ]);
+      expect(persistedClips.map((clip) => clip.motionOverride), [
+        ClipMotionPreset.gentlePan,
+        ClipMotionPreset.slowZoomIn,
+      ]);
+      expect(persistedClips.map((clip) => clip.motionIntensity), [
+        ClipMotionIntensity.subtle,
+        ClipMotionIntensity.moreMovement,
+      ]);
+      expect(persistedClips.map((clip) => clip.transitionOverride), [
+        ClipTransitionType.dissolve,
+        ClipTransitionType.slide,
+      ]);
+      expect(persistedClips.map((clip) => clip.transitionDuration), [
+        const Duration(milliseconds: 800),
+        const Duration(milliseconds: 1200),
+      ]);
+      expect(reopenedAfterRelink.audioSourcePath, replacementAudio.path);
     },
   );
 }
