@@ -13,6 +13,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import java.util.UUID
 
 class MainActivity : FlutterActivity() {
     private val channelName = "picturestovideos/android_saf_folder"
@@ -108,42 +109,83 @@ class MainActivity : FlutterActivity() {
         )
         val cursor = contentResolver.query(childrenUri, projection, null, null, null)
             ?: throw IllegalStateException("The selected folder could not be read.")
-        cursor.use { rows ->
-            val imported = mutableListOf<Map<String, Any>>()
-            val importDirectory = File(filesDir, "imported_images").apply { mkdirs() }
-            while (rows.moveToNext()) {
-                val mimeType = rows.string(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) continue
-                val name = rows.string(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                    ?: continue
-                if (name.substringAfterLast('.', "").lowercase() !in
-                    setOf("jpg", "jpeg", "png", "webp")
-                ) continue
+        val importDirectory = File(filesDir, "imported_images").apply { mkdirs() }
+        importDirectory.listFiles()
+            ?.filter { it.isDirectory && it.name.startsWith(".pending-") }
+            ?.forEach { it.deleteRecursively() }
+        val stagingDirectory = File(importDirectory, ".pending-${UUID.randomUUID()}")
+        if (!stagingDirectory.mkdirs()) {
+            cursor.close()
+            throw IllegalStateException("Could not prepare the image import.")
+        }
+        val stagedFiles = mutableListOf<Pair<File, File>>()
+        val stagedByDestination = mutableMapOf<File, File>()
+        val committedFiles = mutableListOf<File>()
+        try {
+            val imported = cursor.use { rows ->
+                val results = mutableListOf<Map<String, Any>>()
+                while (rows.moveToNext()) {
+                    val mimeType = rows.string(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) continue
+                    val name = rows.string(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                        ?: continue
+                    if (name.substringAfterLast('.', "").lowercase() !in
+                        setOf("jpg", "jpeg", "png", "webp")
+                    ) continue
 
-                val documentId = rows.string(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                    ?: continue
-                val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
-                val destination = File(
-                    importDirectory,
-                    "${sha256(fileUri.toString())}_${safeName(name)}",
-                )
-                contentResolver.openInputStream(fileUri).use { input ->
-                    if (input == null) throw IllegalStateException("Could not read $name.")
-                    destination.outputStream().use { output -> input.copyTo(output) }
+                    val documentId = rows.string(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                        ?: continue
+                    val fileUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+                    val destination = File(
+                        importDirectory,
+                        "${sha256(fileUri.toString())}_${safeName(name)}",
+                    )
+                    var stagedFile: File? = null
+                    if (!destination.exists()) {
+                        stagedFile = stagedByDestination[destination]
+                        if (stagedFile == null) {
+                            val newStagedFile = File(stagingDirectory, destination.name)
+                            contentResolver.openInputStream(fileUri).use { input ->
+                                if (input == null) throw IllegalStateException("Could not read $name.")
+                                newStagedFile.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            stagedFile = newStagedFile
+                            stagedByDestination[destination] = newStagedFile
+                            stagedFiles.add(newStagedFile to destination)
+                        }
+                    }
+                    val reportedSize = rows.long(DocumentsContract.Document.COLUMN_SIZE)
+                    val modifiedOn = rows.long(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                    val actualSize = when {
+                        reportedSize > 0 -> reportedSize
+                        destination.exists() -> destination.length()
+                        else -> stagedFile?.length() ?: 0L
+                    }
+                    val result = mutableMapOf<String, Any>(
+                        "name" to name,
+                        "path" to destination.absolutePath,
+                        "size" to actualSize,
+                    )
+                    if (modifiedOn > 0) result["modifiedOn"] = modifiedOn
+                    results.add(result)
                 }
-                val reportedSize = rows.long(DocumentsContract.Document.COLUMN_SIZE)
-                val modifiedOn = rows.long(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                val result = mutableMapOf<String, Any>(
-                    "name" to name,
-                    "path" to destination.absolutePath,
-                    "size" to if (reportedSize > 0) reportedSize else destination.length(),
-                )
-                if (modifiedOn > 0) result["modifiedOn"] = modifiedOn
-                imported.add(result)
+                results
             }
-            return imported.sortedBy {
-                (it["name"] as String).lowercase()
+
+            for ((stagedFile, destination) in stagedFiles) {
+                if (!stagedFile.renameTo(destination)) {
+                    throw IllegalStateException("Could not finish importing images.")
+                }
+                committedFiles.add(destination)
             }
+            return imported.sortedBy { (it["name"] as String).lowercase() }
+        } catch (error: Exception) {
+            for (file in committedFiles.asReversed()) {
+                if (file.exists()) file.delete()
+            }
+            throw error
+        } finally {
+            stagingDirectory.deleteRecursively()
         }
     }
 
