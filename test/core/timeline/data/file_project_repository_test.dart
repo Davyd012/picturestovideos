@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -108,7 +107,6 @@ void main() {
   test(
     'loads legacy schemas through the repository and reopens migrations',
     () async {
-      const serializer = ProjectSerializer();
       const legacyClip = MediaTrackClipPayload(
         mediaId: 'same-photo',
         title: 'photo.jpg',
