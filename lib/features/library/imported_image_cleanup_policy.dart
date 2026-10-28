@@ -7,13 +7,27 @@ Set<String> unusedImportedImagePaths({
   required Set<String> removedIds,
   required Iterable<ProjectTimeline> projects,
 }) {
-  final candidates = {
+  final removedPaths = {
     for (final asset in assets)
       if (removedIds.contains(asset.id)) asset.sourcePath,
   };
-  if (candidates.isEmpty) return const {};
+  return unreferencedImportedImagePaths(
+    candidates: removedPaths,
+    retainedAssets: assets.where((asset) => !removedIds.contains(asset.id)),
+    projects: projects,
+  );
+}
+
+Set<String> unreferencedImportedImagePaths({
+  required Iterable<String> candidates,
+  required Iterable<SavedImageAsset> retainedAssets,
+  required Iterable<ProjectTimeline> projects,
+}) {
+  final candidatePaths = candidates.toSet();
+  if (candidatePaths.isEmpty) return const {};
 
   final referencedPaths = <String>{};
+  referencedPaths.addAll(retainedAssets.map((asset) => asset.sourcePath));
   for (final project in projects) {
     for (final track in project.tracks) {
       for (final event in track.events) {
@@ -24,5 +38,5 @@ Set<String> unusedImportedImagePaths({
       }
     }
   }
-  return candidates.difference(referencedPaths);
+  return candidatePaths.difference(referencedPaths);
 }
