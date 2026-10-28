@@ -91,8 +91,10 @@ class LibraryEmptyState extends ConsumerWidget {
                   label: Text(context.l10n.pickImages),
                 ),
                 OutlinedButton.icon(
-                  onPressed: state.isImporting || folderPathsUnavailable
+                  onPressed: state.isImporting
                       ? null
+                      : folderPathsUnavailable
+                      ? viewModel.importImagesFromFolderPicker
                       : viewModel.importImagesFromFolderPath,
                   icon: const Icon(Icons.drive_folder_upload_outlined),
                   label: Text(context.l10n.importFolder),

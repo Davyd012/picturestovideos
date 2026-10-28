@@ -90,6 +90,39 @@ void main() {
     expect(state.isImporting, isFalse);
   });
 
+  test('importImagesFromFolderPicker stores imported items', () async {
+    final container = ProviderContainer(
+      overrides: [
+        imageImportRepositoryProvider.overrideWithValue(
+          _FakeImageImportRepository(
+            assets: [
+              ImportedImageAsset(
+                id: '/app/imported_images/photo.png',
+                fileName: 'Photo.png',
+                sourcePath: '/app/imported_images/photo.png',
+                byteLength: 12,
+                importedOn: DateTime(2026),
+              ),
+            ],
+          ),
+        ),
+        savedImageAssetRepositoryProvider.overrideWithValue(
+          _MemorySavedImageAssetRepository(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(libraryViewModelProvider.notifier)
+        .importImagesFromFolderPicker();
+
+    final state = container.read(libraryViewModelProvider);
+    expect(state.items.single.title, 'Photo.png');
+    expect(state.items.single.sourcePath, '/app/imported_images/photo.png');
+    expect(state.isImporting, isFalse);
+  });
+
   test('image import keeps large multi-select path-based', () async {
     final files = [
       for (var index = 0; index < 25; index++)
@@ -256,6 +289,11 @@ class _FakeImageImportRepository implements ImageImportRepository {
   Future<List<ImportedImageAsset>> importImagesFromFolderPath(
     String folderPath,
   ) async {
+    return assets;
+  }
+
+  @override
+  Future<List<ImportedImageAsset>> importImagesFromFolderPicker() async {
     return assets;
   }
 }

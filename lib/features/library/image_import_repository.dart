@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/features/library/android_saf_image_folder_picker.dart';
 import 'package:picturestovideos/features/library/image_file_picker.dart';
 import 'package:picturestovideos/features/library/system_image_file_picker.dart';
 
@@ -13,6 +14,7 @@ final imageFilePickerProvider = Provider<ImageFilePicker>(
 final imageImportRepositoryProvider = Provider<ImageImportRepository>(
   (ref) => DeviceImageImportRepository(
     filePicker: ref.watch(imageFilePickerProvider),
+    folderPicker: AndroidSafImageFolderPicker(),
     logger: ref.watch(appLoggerProvider),
   ),
 );
@@ -45,16 +47,19 @@ abstract interface class ImageImportRepository {
   Future<List<ImportedImageAsset>> importImagesFromFolderPath(
     String folderPath,
   );
+  Future<List<ImportedImageAsset>> importImagesFromFolderPicker();
 }
 
 class DeviceImageImportRepository implements ImageImportRepository {
   const DeviceImageImportRepository({
     required this._filePicker,
     required this._logger,
+    this._folderPicker,
   });
 
   final ImageFilePicker _filePicker;
   final AppLogger _logger;
+  final AndroidSafImageFolderPicker? _folderPicker;
 
   static const _supportedExtensions = {'jpg', 'jpeg', 'png', 'webp'};
 
@@ -73,9 +78,9 @@ class DeviceImageImportRepository implements ImageImportRepository {
         continue;
       }
 
-      DateTime? fileModifiedOn;
+      DateTime? fileModifiedOn = file.modifiedOn;
       final sourceFile = File(path);
-      if (await sourceFile.exists()) {
+      if (fileModifiedOn == null && await sourceFile.exists()) {
         fileModifiedOn = await sourceFile.lastModified();
       }
       assets.add(
@@ -91,6 +96,38 @@ class DeviceImageImportRepository implements ImageImportRepository {
       );
     }
 
+    return _reverseWithImportOrder(assets);
+  }
+
+  @override
+  Future<List<ImportedImageAsset>> importImagesFromFolderPicker() async {
+    final folderPicker = _folderPicker;
+    if (folderPicker == null) {
+      throw UnsupportedError('Folder selection is unavailable.');
+    }
+    _logger.info('ImageImportRepository', 'Opening Android folder picker');
+    final pickedFiles = await folderPicker.pickImagesFromFolder();
+    final importedOn = DateTime.now();
+    final assets = <ImportedImageAsset>[];
+    for (final file in pickedFiles) {
+      final path = file.path;
+      if (path == null || path.trim().isEmpty) {
+        continue;
+      }
+      if (!_isSupportedExtension(file.extension)) {
+        continue;
+      }
+      assets.add(
+        ImportedImageAsset(
+          id: path,
+          fileName: file.name,
+          sourcePath: path,
+          byteLength: file.size,
+          fileModifiedOn: file.modifiedOn,
+          importedOn: importedOn,
+        ),
+      );
+    }
     return _reverseWithImportOrder(assets);
   }
 

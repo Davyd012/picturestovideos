@@ -86,6 +86,15 @@ class LibraryViewModel extends Notifier<LibraryState> {
     );
   }
 
+  Future<void> importImagesFromFolderPicker() async {
+    await _importImages(
+      action: 'folder picker',
+      importCall: () => ref
+          .read(imageImportRepositoryProvider)
+          .importImagesFromFolderPicker(),
+    );
+  }
+
   void dismissMessages() {
     state = state.copyWith(clearError: true, clearStatusMessage: true);
   }

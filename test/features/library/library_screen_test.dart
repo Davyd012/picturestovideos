@@ -49,9 +49,7 @@ void main() {
     expect(find.text('Импортировать папку'), findsOneWidget);
   });
 
-  testWidgets('Android explains that images must use the photo picker', (
-    tester,
-  ) async {
+  testWidgets('Android offers the SAF folder picker', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       await tester.pumpWidget(
@@ -64,7 +62,7 @@ void main() {
 
       expect(
         find.text(
-          'На Android выбирайте фотографии через системный выбор. Импорт по пути к папке недоступен.',
+          'Выберите папку через системный выбор Android. Импортируются только поддерживаемые изображения из этой папки.',
         ),
         findsOneWidget,
       );
@@ -75,7 +73,7 @@ void main() {
               find.widgetWithText(OutlinedButton, 'Импортировать папку'),
             )
             .onPressed,
-        isNull,
+        isNotNull,
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -144,10 +142,10 @@ void main() {
     expect(find.text('Stage all imported'), findsOneWidget);
 
     final searchField = find.byWidgetPredicate(
-        (widget) =>
-            widget is TextField &&
-            widget.decoration?.hintText == 'Search images, folders, or dates',
-      );
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText == 'Search images, folders, or dates',
+    );
     expect(tester.widget<TextField>(searchField).enabled, isTrue);
     await tester.enterText(searchField, 'neon');
     await tester.pumpAndSettle();
@@ -257,6 +255,11 @@ class _FakeImageImportRepository implements ImageImportRepository {
   Future<List<ImportedImageAsset>> importImagesFromFolderPath(
     String folderPath,
   ) async {
+    return assets;
+  }
+
+  @override
+  Future<List<ImportedImageAsset>> importImagesFromFolderPicker() async {
     return assets;
   }
 }

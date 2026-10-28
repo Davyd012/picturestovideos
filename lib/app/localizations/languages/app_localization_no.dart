@@ -468,7 +468,7 @@ class AppLocalizationNo extends AppLocalizationEn {
   String get libraryNoNewImages => 'Ingen nye støttede bilder ble lagt til.';
   @override
   String get folderPathUnavailableOnAndroid =>
-      'På Android velger du bilder med bildevelgeren. Mappebaner er ikke tilgjengelige.';
+      'Velg en mappe med Androids mappevelger. Bare støttede bildefiler i mappen importeres.';
   @override
   String get libraryReadyForEditor => 'Klar for redigering';
   @override

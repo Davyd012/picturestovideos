@@ -469,7 +469,7 @@ class AppLocalizationEn extends AppLocalizations {
   String get libraryNoNewImages => 'No new supported images were added.';
   @override
   String get folderPathUnavailableOnAndroid =>
-      'On Android, choose images with the photo picker; folder paths are unavailable.';
+      'Choose a folder with the Android folder picker. Only supported image files in that folder are imported.';
   @override
   String get libraryReadyForEditor => 'Ready for editor';
   @override

@@ -7,6 +7,7 @@ class PickedImageFile {
     required this.size,
     required this.path,
     this.bytes,
+    this.modifiedOn,
   });
 
   final String name;
@@ -14,6 +15,7 @@ class PickedImageFile {
   final int size;
   final String? path;
   final Uint8List? bytes;
+  final DateTime? modifiedOn;
 }
 
 abstract interface class ImageFilePicker {

@@ -494,7 +494,7 @@ class AppLocalizationRu extends AppLocalizationEn {
       'Новые поддерживаемые фотографии не добавлены.';
   @override
   String get folderPathUnavailableOnAndroid =>
-      'На Android выбирайте фотографии через системный выбор. Импорт по пути к папке недоступен.';
+      'Выберите папку через системный выбор Android. Импортируются только поддерживаемые изображения из этой папки.';
   @override
   String get libraryReadyForEditor => 'Готово к редактированию';
   @override
