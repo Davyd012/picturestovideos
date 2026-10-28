@@ -111,6 +111,7 @@ void main() {
         'track-media',
       )!.map((event) => event.payload as MediaTrackClipPayload).toList();
       final firstId = clips()[0].clipId;
+      final otherId = clips()[1].clipId;
       final repeatedId = clips()[2].clipId;
       expect(firstId, isNotEmpty);
       expect(firstId, isNot(repeatedId));
@@ -151,6 +152,12 @@ void main() {
         events: markers,
         selectedMedia: [other, photo],
       );
+      expect(clips().map((clip) => clip.mediaId), ['two', 'one', 'one']);
+      expect(clips().map((clip) => clip.clipId), [
+        otherId,
+        firstId,
+        repeatedId,
+      ]);
       final retained = clips().singleWhere((clip) => clip.clipId == repeatedId);
       expect(retained.caption, 'Наше лето');
       expect(retained.captionSupportingLine, '2026');
@@ -183,6 +190,10 @@ void main() {
       );
       expect(retained.motionOverride, ClipMotionPreset.gentlePan);
       expect(retained.motionIntensity, ClipMotionIntensity.moreMovement);
+      expect(
+        clips().singleWhere((clip) => clip.clipId == firstId).cropTransform,
+        ImageCropTransform.centered,
+      );
       expect(
         clips().singleWhere((clip) => clip.clipId == firstId).caption,
         isEmpty,
