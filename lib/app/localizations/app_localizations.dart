@@ -221,6 +221,11 @@ abstract class AppLocalizations {
   String get libraryNoMatchingImages;
   String get libraryTryDifferentSearch;
   String get libraryNoNewImages;
+  String get libraryImportFailed;
+  String get libraryFolderPathRequired;
+  String get libraryFolderNotFound;
+  String get libraryFolderReadFailed;
+  String get libraryRemovalFailed;
   String get folderPathUnavailableOnAndroid;
   String get libraryReadyForEditor;
   String get libraryReviewStaged;

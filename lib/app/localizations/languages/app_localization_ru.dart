@@ -493,6 +493,21 @@ class AppLocalizationRu extends AppLocalizationEn {
   String get libraryNoNewImages =>
       'Новые поддерживаемые фотографии не добавлены.';
   @override
+  String get libraryImportFailed =>
+      'Не удалось импортировать фотографии. Проверьте файлы и попробуйте ещё раз.';
+  @override
+  String get libraryFolderPathRequired =>
+      'Укажите путь к папке перед импортом.';
+  @override
+  String get libraryFolderNotFound =>
+      'Не удалось найти или открыть папку. Проверьте путь и разрешения.';
+  @override
+  String get libraryFolderReadFailed =>
+      'Не удалось прочитать фотографии из выбранной папки. Проверьте доступ и попробуйте ещё раз.';
+  @override
+  String get libraryRemovalFailed =>
+      'Не удалось удалить импортированные фотографии. Попробуйте ещё раз.';
+  @override
   String get folderPathUnavailableOnAndroid =>
       'Выберите папку через системный выбор Android. Импортируются только поддерживаемые изображения из этой папки.';
   @override

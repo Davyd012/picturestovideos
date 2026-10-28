@@ -123,6 +123,29 @@ void main() {
     expect(state.isImporting, isFalse);
   });
 
+  test('blank folder path maps to a typed localized error', () async {
+    final container = ProviderContainer(
+      overrides: [
+        imageImportRepositoryProvider.overrideWithValue(
+          _FakeImageImportRepository(
+            assets: const [],
+            error: const FormatException('sensitive platform detail'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(libraryViewModelProvider.notifier)
+        .importImagesFromFolderPath();
+
+    expect(
+      container.read(libraryViewModelProvider).error,
+      LibraryError.folderPathRequired,
+    );
+  });
+
   test('image import keeps large multi-select path-based', () async {
     final files = [
       for (var index = 0; index < 25; index++)
@@ -276,12 +299,14 @@ class _FakeImageFilePicker implements ImageFilePicker {
 }
 
 class _FakeImageImportRepository implements ImageImportRepository {
-  const _FakeImageImportRepository({required this.assets});
+  const _FakeImageImportRepository({required this.assets, this.error});
 
   final List<ImportedImageAsset> assets;
+  final Object? error;
 
   @override
   Future<List<ImportedImageAsset>> pickImages() async {
+    if (error != null) throw error!;
     return assets;
   }
 
@@ -289,11 +314,13 @@ class _FakeImageImportRepository implements ImageImportRepository {
   Future<List<ImportedImageAsset>> importImagesFromFolderPath(
     String folderPath,
   ) async {
+    if (error != null) throw error!;
     return assets;
   }
 
   @override
   Future<List<ImportedImageAsset>> importImagesFromFolderPicker() async {
+    if (error != null) throw error!;
     return assets;
   }
 }

@@ -80,6 +80,31 @@ void main() {
     }
   });
 
+  testWidgets('library errors are localized and hide exception details', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: _overrides(error: StateError('native internal detail')),
+        child: const _LibraryTestApp(locale: Locale('ru')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Импортировать папку'));
+    await tester.tap(find.text('Импортировать папку'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Не удалось импортировать фотографии. Проверьте файлы и попробуйте ещё раз.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('native internal detail'), findsNothing);
+  });
+
   testWidgets('populated library toolbar and import status are localized', (
     tester,
   ) async {
@@ -213,10 +238,11 @@ class _LibraryTestApp extends StatelessWidget {
   }
 }
 
-dynamic _overrides() {
+dynamic _overrides({Object? error}) {
   return [
     imageImportRepositoryProvider.overrideWithValue(
       _FakeImageImportRepository(
+        error: error,
         assets: [
           ImportedImageAsset(
             id: '/tmp/neon.png',
@@ -242,12 +268,14 @@ dynamic _overrides() {
 }
 
 class _FakeImageImportRepository implements ImageImportRepository {
-  const _FakeImageImportRepository({required this.assets});
+  const _FakeImageImportRepository({required this.assets, this.error});
 
   final List<ImportedImageAsset> assets;
+  final Object? error;
 
   @override
   Future<List<ImportedImageAsset>> pickImages() async {
+    if (error != null) throw error!;
     return assets;
   }
 
@@ -255,11 +283,13 @@ class _FakeImageImportRepository implements ImageImportRepository {
   Future<List<ImportedImageAsset>> importImagesFromFolderPath(
     String folderPath,
   ) async {
+    if (error != null) throw error!;
     return assets;
   }
 
   @override
   Future<List<ImportedImageAsset>> importImagesFromFolderPicker() async {
+    if (error != null) throw error!;
     return assets;
   }
 }

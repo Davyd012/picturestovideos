@@ -6,6 +6,14 @@ enum LibrarySortOrder { newest, oldest, name, fileSize }
 
 enum LibraryImportStatus { noNewImages, imagesAdded, imagesRemoved }
 
+enum LibraryError {
+  importFailed,
+  folderPathRequired,
+  folderNotFound,
+  folderReadFailed,
+  removeFailed,
+}
+
 class LibraryState {
   const LibraryState({
     required this.query,
@@ -16,7 +24,7 @@ class LibraryState {
     required this.sortOrder,
     required this.isReviewingStaged,
     required this.isImporting,
-    required this.errorMessage,
+    required this.error,
     required this.importStatus,
     required this.statusItemCount,
   });
@@ -30,7 +38,7 @@ class LibraryState {
       sortOrder = LibrarySortOrder.newest,
       isReviewingStaged = false,
       isImporting = false,
-      errorMessage = null,
+      error = null,
       importStatus = null,
       statusItemCount = 0;
 
@@ -42,7 +50,7 @@ class LibraryState {
   final LibrarySortOrder sortOrder;
   final bool isReviewingStaged;
   final bool isImporting;
-  final String? errorMessage;
+  final LibraryError? error;
   final LibraryImportStatus? importStatus;
   final int statusItemCount;
 
@@ -112,7 +120,7 @@ class LibraryState {
     LibrarySortOrder? sortOrder,
     bool? isReviewingStaged,
     bool? isImporting,
-    String? errorMessage,
+    LibraryError? error,
     LibraryImportStatus? importStatus,
     int? statusItemCount,
     bool clearError = false,
@@ -127,7 +135,7 @@ class LibraryState {
       sortOrder: sortOrder ?? this.sortOrder,
       isReviewingStaged: isReviewingStaged ?? this.isReviewingStaged,
       isImporting: isImporting ?? this.isImporting,
-      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      error: clearError ? null : error ?? this.error,
       importStatus: clearStatusMessage
           ? null
           : importStatus ?? this.importStatus,

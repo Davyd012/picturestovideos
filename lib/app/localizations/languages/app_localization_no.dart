@@ -467,6 +467,21 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get libraryNoNewImages => 'Ingen nye støttede bilder ble lagt til.';
   @override
+  String get libraryImportFailed =>
+      'Kunne ikke importere bilder. Kontroller filene og prøv igjen.';
+  @override
+  String get libraryFolderPathRequired =>
+      'Oppgi en mappebane før du importerer.';
+  @override
+  String get libraryFolderNotFound =>
+      'Fant eller åpnet ikke mappen. Kontroller banen og tilgangen.';
+  @override
+  String get libraryFolderReadFailed =>
+      'Kunne ikke lese bilder fra den valgte mappen. Kontroller tilgangen og prøv igjen.';
+  @override
+  String get libraryRemovalFailed =>
+      'Kunne ikke fjerne importerte bilder. Prøv igjen.';
+  @override
   String get folderPathUnavailableOnAndroid =>
       'Velg en mappe med Androids mappevelger. Bare støttede bildefiler i mappen importeres.';
   @override

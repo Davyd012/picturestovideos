@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
+import 'package:picturestovideos/features/library/widgets/library_error_message.dart';
 import 'package:picturestovideos/features/library/widgets/library_status_message.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
@@ -145,14 +146,9 @@ class LibraryToolbar extends ConsumerWidget {
               const SizedBox(height: 16),
               const LinearProgressIndicator(),
             ],
-            if (state.errorMessage != null) ...[
+            if (state.error != null) ...[
               const SizedBox(height: 16),
-              Text(
-                state.errorMessage!,
-                style: context.textTheme.bodyMedium?.copyWith(
-                  color: context.colors.error,
-                ),
-              ),
+              LibraryErrorMessage(error: state.error),
             ],
             if (state.importStatus != null) ...[
               const SizedBox(height: 16),

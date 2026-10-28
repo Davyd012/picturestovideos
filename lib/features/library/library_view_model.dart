@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/core/media/data/shared_preferences_saved_image_asset_repository.dart';
@@ -133,7 +135,7 @@ class LibraryViewModel extends Notifier<LibraryState> {
           );
       state = state.copyWith(
         isImporting: false,
-        errorMessage: error.toString(),
+        error: LibraryError.removeFailed,
       );
     }
   }
@@ -179,10 +181,23 @@ class LibraryViewModel extends Notifier<LibraryState> {
           );
       state = state.copyWith(
         isImporting: false,
-        errorMessage: error.toString(),
+        error: _importErrorFor(error, action),
         clearStatusMessage: true,
       );
     }
+  }
+
+  LibraryError _importErrorFor(Object error, String action) {
+    if (action != 'folder path') {
+      return LibraryError.importFailed;
+    }
+    if (error is FormatException) {
+      return LibraryError.folderPathRequired;
+    }
+    if (error is FileSystemException) {
+      return LibraryError.folderNotFound;
+    }
+    return LibraryError.folderReadFailed;
   }
 
   List<LibraryMediaItem> _mergeItems(List<ImportedImageAsset> importedAssets) {

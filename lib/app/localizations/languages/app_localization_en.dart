@@ -468,6 +468,21 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get libraryNoNewImages => 'No new supported images were added.';
   @override
+  String get libraryImportFailed =>
+      'Images could not be imported. Check the files and try again.';
+  @override
+  String get libraryFolderPathRequired =>
+      'Enter a folder path before importing.';
+  @override
+  String get libraryFolderNotFound =>
+      'That folder could not be found or opened. Check the path and permissions.';
+  @override
+  String get libraryFolderReadFailed =>
+      'Images could not be read from the selected folder. Check access and try again.';
+  @override
+  String get libraryRemovalFailed =>
+      'Imported images could not be removed. Try again.';
+  @override
   String get folderPathUnavailableOnAndroid =>
       'Choose a folder with the Android folder picker. Only supported image files in that folder are imported.';
   @override
