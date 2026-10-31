@@ -25,6 +25,51 @@ import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 void main() {
   test(
+    'appending queue preserves edited clips and ignores duplicates',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container.read(timelineViewModelProvider.future);
+      final vm = container.read(timelineViewModelProvider.notifier);
+      final one = _mediaItem('one', 'one.jpg');
+      final two = _mediaItem('two', 'two.jpg');
+      expect(
+        vm.appendQueuedMedia(
+          items: [one],
+          imageFits: const {},
+          cropTransforms: const {},
+        ),
+        1,
+      );
+      final first =
+          _trackEvents(
+                container.read(timelineViewModelProvider).value!.project,
+                'track-media',
+              )!.single.payload
+              as MediaTrackClipPayload;
+      vm.captionChanged(
+        clipId: first.clipId,
+        caption: 'Edited',
+        supportingLine: '',
+      );
+      expect(
+        vm.appendQueuedMedia(
+          items: [one, two, two],
+          imageFits: const {},
+          cropTransforms: const {},
+        ),
+        1,
+      );
+      final clips = _trackEvents(
+        container.read(timelineViewModelProvider).value!.project,
+        'track-media',
+      )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+      expect(clips.map((clip) => clip.mediaId), ['one', 'two']);
+      expect(clips.first.caption, 'Edited');
+      expect(clips.last.start, clips.first.end);
+    },
+  );
+  test(
     'style selection preserves aspect ratio and explicit clip choices',
     () async {
       final container = ProviderContainer();

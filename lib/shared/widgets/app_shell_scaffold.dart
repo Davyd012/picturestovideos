@@ -11,6 +11,7 @@ class AppShellScaffold extends StatelessWidget {
     super.key,
     this.actions = const [],
     this.leading,
+    this.hideMobileNavigation = false,
   });
 
   final String currentRoute;
@@ -18,6 +19,7 @@ class AppShellScaffold extends StatelessWidget {
   final Widget body;
   final List<Widget> actions;
   final Widget? leading;
+  final bool hideMobileNavigation;
 
   List<_ShellDestination> _destinations(BuildContext context) => [
     _ShellDestination(
@@ -95,7 +97,8 @@ class AppShellScaffold extends StatelessWidget {
                   )
                 : body,
           ),
-          bottomNavigationBar: showRail
+          bottomNavigationBar:
+              showRail || (hideMobileNavigation && constraints.maxWidth < 600)
               ? null
               : NavigationBar(
                   selectedIndex: selectedIndex,

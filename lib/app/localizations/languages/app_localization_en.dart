@@ -2,6 +2,53 @@ import 'package:picturestovideos/app/localizations/app_localizations.dart';
 
 class AppLocalizationEn extends AppLocalizations {
   @override
+  String get editorTimeline => 'Timeline';
+  @override
+  String get editorMarkers => 'Markers';
+  @override
+  String get editorTools => 'Tools';
+  @override
+  String get editorSave => 'Save';
+  @override
+  String get editorDiscardChanges => 'Discard unsaved changes?';
+  @override
+  String get editorOutputRatio => 'Video aspect ratio';
+  @override
+  String get editorClips => 'Clips';
+  @override
+  String get editorQueue => 'Queue';
+  @override
+  String get editorQueueTitle => 'Queued images';
+  @override
+  String get editorSelectAll => 'Select all';
+  @override
+  String editorAddSelected(int count) => 'Add selected ($count)';
+  @override
+  String get editorImageSettings => 'Image settings';
+  @override
+  String get editorDisplayDuration => 'Display duration';
+  @override
+  String get editorOptionalCaption => 'Caption (optional)';
+  @override
+  String get editorSmoothAnimation => 'Apply smooth animation';
+  @override
+  String get editorFit => 'Fit';
+  @override
+  String get editorFill => 'Fill';
+  @override
+  String get editorMore => 'More';
+  @override
+  String get editorText => 'Text';
+  @override
+  String get editorSpeed => 'Speed';
+  @override
+  String get editorCrop => 'Crop';
+  @override
+  String editorAddedCount(int count) => 'Added $count images';
+  @override
+  String get editorAlreadyOnTimeline =>
+      'Selected images are already on the timeline';
+  @override
   String get cropZoom => 'Zoom';
   @override
   String get cropHorizontal => 'Horizontal position';

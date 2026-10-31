@@ -2,6 +2,53 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_en
 
 class AppLocalizationNo extends AppLocalizationEn {
   @override
+  String get editorTimeline => 'Tidslinje';
+  @override
+  String get editorMarkers => 'Markører';
+  @override
+  String get editorTools => 'Verktøy';
+  @override
+  String get editorSave => 'Lagre';
+  @override
+  String get editorDiscardChanges => 'Forkaste ulagrede endringer?';
+  @override
+  String get editorOutputRatio => 'Videoformat';
+  @override
+  String get editorClips => 'Klipp';
+  @override
+  String get editorQueue => 'Kø';
+  @override
+  String get editorQueueTitle => 'Bilder i kø';
+  @override
+  String get editorSelectAll => 'Velg alle';
+  @override
+  String editorAddSelected(int count) => 'Legg til valgte ($count)';
+  @override
+  String get editorImageSettings => 'Bildeinnstillinger';
+  @override
+  String get editorDisplayDuration => 'Visningsvarighet';
+  @override
+  String get editorOptionalCaption => 'Bildetekst (valgfritt)';
+  @override
+  String get editorSmoothAnimation => 'Bruk myk animasjon';
+  @override
+  String get editorFit => 'Tilpass';
+  @override
+  String get editorFill => 'Fyll';
+  @override
+  String get editorMore => 'Mer';
+  @override
+  String get editorText => 'Tekst';
+  @override
+  String get editorSpeed => 'Hastighet';
+  @override
+  String get editorCrop => 'Beskjær';
+  @override
+  String editorAddedCount(int count) => 'La til $count bilder';
+  @override
+  String get editorAlreadyOnTimeline =>
+      'De valgte bildene er allerede på tidslinjen';
+  @override
   String get cropZoom => 'Zoom';
   @override
   String get cropHorizontal => 'Vannrett plassering';

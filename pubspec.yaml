@@ -8,7 +8,6 @@ environment:
 
 dependencies:
   characters: ^1.4.1
-  audioplayers: ^6.6.0
   crypto: ^3.0.7
   file_picker: ^11.0.2
   ffmpeg_kit_extended_flutter: ^0.5.7
@@ -57,6 +56,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 ffmpeg_kit_extended_config:
+  # Export uses video filters and audio streams; the base bundle omits them.
   type: "video"
   gpl: false
   small: true

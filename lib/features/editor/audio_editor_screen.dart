@@ -19,7 +19,9 @@ import 'package:picturestovideos/features/beat_map/beat_map_state.dart';
 import 'package:picturestovideos/features/beat_map/beat_map_view_model.dart';
 import 'package:picturestovideos/features/editor/editor_preview_view_model.dart';
 import 'package:picturestovideos/features/editor/editor_tab_state.dart';
+import 'package:picturestovideos/features/editor/editor_tab_label.dart';
 import 'package:picturestovideos/features/editor/editor_tab_view_model.dart';
+import 'package:picturestovideos/features/editor/mobile_editor_screen.dart';
 import 'package:picturestovideos/features/editor/widgets/clips_tab_view.dart';
 import 'package:picturestovideos/features/editor/widgets/editor_section_tab_bar.dart';
 import 'package:picturestovideos/features/editor/widgets/markers_tab_view.dart';
@@ -96,145 +98,170 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
             .call(beatMap: project.beatMap, project: project)
             .isNotEmpty;
 
-    return AppShellScaffold(
-      currentRoute: AppRoutes.audioEditor,
-      title: 'Video editor',
-      leading: IconButton(
-        onPressed: () => context.appNavigator.maybePop(),
-        icon: const Icon(Icons.arrow_back),
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: FilledButton.icon(
-            onPressed: !hasExportableClips
-                ? null
-                : () => context.appNavigator.goToDownload(),
-            icon: const Icon(Icons.download_outlined),
-            label: const Text('Export'),
-          ),
-        ),
-      ],
-      body: selectedTab == EditorTab.clips
-          ? LayoutBuilder(
-              builder: (context, constraints) {
-                final previewHeight = (constraints.maxHeight * 0.30).clamp(
-                  144.0,
-                  240.0,
-                );
-                return Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      if (project != null)
-                        ProjectMediaRecoveryCard(project: project),
-                      SizedBox(
-                        height: previewHeight,
-                        child: MobileEditorPreviewCard(
-                          beatMap: beatMap,
-                          project: project,
-                          playback: playback,
-                          previewState: previewState,
-                          audioSourcePath:
-                              project?.audioSourcePath ??
-                              importedAudio?.source?.path,
-                          compact: true,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      EditorSectionTabBar(
-                        selectedTab: selectedTab,
-                        onTabSelected: (tab) => ref
-                            .read(editorTabViewModelProvider.notifier)
-                            .tabSelected(tab),
-                      ),
-                      PlaybackControls(
-                        beatMap: beatMap,
-                        playback: playback,
-                        audioSourcePath: project == null
-                            ? importedAudio?.source?.path
-                            : project.audioSourcePath,
-                        audioMix: project?.audioMix ?? const AudioMix(),
-                        videoDuration: project?.videoDuration,
-                      ),
-                      Expanded(
-                        child: _EditorTabBody(
-                          selectedTab: selectedTab,
-                          beatMap: beatMap,
-                          timeline: timeline,
-                          playback: playback,
-                          events: events,
-                          eventState: eventState,
-                          selectedMedia: mediaSelection.selectedMedia,
-                          selectedImageFits: mediaSelection.selectedImageFits,
-                          selectedCropTransforms:
-                              mediaSelection.selectedCropTransforms,
-                          audioDuration:
-                              importedAudio?.audioData?.duration ??
-                              playback?.sourceDuration,
-                          audioData: importedAudio?.audioData,
-                          audioSource: importedAudio?.source,
-                          audioSourcePath: project == null
-                              ? importedAudio?.source?.path
-                              : project.audioSourcePath,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            )
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (project != null) ProjectMediaRecoveryCard(project: project),
-                MobileEditorPreviewCard(
-                  beatMap: beatMap,
-                  project: project,
-                  playback: playback,
-                  previewState: previewState,
-                  audioSourcePath:
-                      project?.audioSourcePath ?? importedAudio?.source?.path,
-                ),
-                const SizedBox(height: 12),
-                EditorSectionTabBar(
-                  selectedTab: selectedTab,
-                  onTabSelected: (tab) => ref
-                      .read(editorTabViewModelProvider.notifier)
-                      .tabSelected(tab),
-                ),
-                const SizedBox(height: 12),
-                PlaybackControls(
-                  beatMap: beatMap,
-                  playback: playback,
-                  audioSourcePath: project == null
-                      ? importedAudio?.source?.path
-                      : project.audioSourcePath,
-                  audioMix: project?.audioMix ?? const AudioMix(),
-                  videoDuration: project?.videoDuration,
-                ),
-                const SizedBox(height: 16),
-                _EditorTabBody(
-                  selectedTab: selectedTab,
-                  beatMap: beatMap,
-                  timeline: timeline,
-                  playback: playback,
-                  events: events,
-                  eventState: eventState,
-                  selectedMedia: mediaSelection.selectedMedia,
-                  selectedImageFits: mediaSelection.selectedImageFits,
-                  selectedCropTransforms: mediaSelection.selectedCropTransforms,
-                  audioDuration:
-                      importedAudio?.audioData?.duration ??
-                      playback?.sourceDuration,
-                  audioData: importedAudio?.audioData,
-                  audioSource: importedAudio?.source,
-                  audioSourcePath: project == null
-                      ? importedAudio?.source?.path
-                      : project.audioSourcePath,
-                ),
-              ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return MobileEditorScreen(
+            project: project,
+            beatMap: beatMap,
+            playback: playback,
+            audioPath: project?.audioSourcePath ?? importedAudio?.source?.path,
+            queueCount: mediaSelection.selectedMedia.length,
+            canExport: hasExportableClips,
+            openAdvanced: (tab) => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              useSafeArea: true,
+              builder: (_) => _AdvancedEditorSheet(tab: tab),
             ),
+          );
+        }
+        return AppShellScaffold(
+          currentRoute: AppRoutes.audioEditor,
+          hideMobileNavigation: true,
+          title: 'Video editor',
+          leading: IconButton(
+            onPressed: () => context.appNavigator.maybePop(),
+            icon: const Icon(Icons.arrow_back),
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: FilledButton.icon(
+                onPressed: !hasExportableClips
+                    ? null
+                    : () => context.appNavigator.goToDownload(),
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('Export'),
+              ),
+            ),
+          ],
+          body: selectedTab == EditorTab.clips
+              ? LayoutBuilder(
+                  builder: (context, constraints) {
+                    final previewHeight = (constraints.maxHeight * 0.30).clamp(
+                      144.0,
+                      240.0,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          if (project != null)
+                            ProjectMediaRecoveryCard(project: project),
+                          SizedBox(
+                            height: previewHeight,
+                            child: MobileEditorPreviewCard(
+                              beatMap: beatMap,
+                              project: project,
+                              playback: playback,
+                              previewState: previewState,
+                              audioSourcePath:
+                                  project?.audioSourcePath ??
+                                  importedAudio?.source?.path,
+                              compact: true,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          EditorSectionTabBar(
+                            selectedTab: selectedTab,
+                            onTabSelected: (tab) => ref
+                                .read(editorTabViewModelProvider.notifier)
+                                .tabSelected(tab),
+                          ),
+                          PlaybackControls(
+                            beatMap: beatMap,
+                            playback: playback,
+                            audioSourcePath: project == null
+                                ? importedAudio?.source?.path
+                                : project.audioSourcePath,
+                            audioMix: project?.audioMix ?? const AudioMix(),
+                            videoDuration: project?.videoDuration,
+                          ),
+                          Expanded(
+                            child: _EditorTabBody(
+                              selectedTab: selectedTab,
+                              beatMap: beatMap,
+                              timeline: timeline,
+                              playback: playback,
+                              events: events,
+                              eventState: eventState,
+                              selectedMedia: mediaSelection.selectedMedia,
+                              selectedImageFits:
+                                  mediaSelection.selectedImageFits,
+                              selectedCropTransforms:
+                                  mediaSelection.selectedCropTransforms,
+                              audioDuration:
+                                  importedAudio?.audioData?.duration ??
+                                  playback?.sourceDuration,
+                              audioData: importedAudio?.audioData,
+                              audioSource: importedAudio?.source,
+                              audioSourcePath: project == null
+                                  ? importedAudio?.source?.path
+                                  : project.audioSourcePath,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (project != null)
+                      ProjectMediaRecoveryCard(project: project),
+                    MobileEditorPreviewCard(
+                      beatMap: beatMap,
+                      project: project,
+                      playback: playback,
+                      previewState: previewState,
+                      audioSourcePath:
+                          project?.audioSourcePath ??
+                          importedAudio?.source?.path,
+                    ),
+                    const SizedBox(height: 12),
+                    EditorSectionTabBar(
+                      selectedTab: selectedTab,
+                      onTabSelected: (tab) => ref
+                          .read(editorTabViewModelProvider.notifier)
+                          .tabSelected(tab),
+                    ),
+                    const SizedBox(height: 12),
+                    PlaybackControls(
+                      beatMap: beatMap,
+                      playback: playback,
+                      audioSourcePath: project == null
+                          ? importedAudio?.source?.path
+                          : project.audioSourcePath,
+                      audioMix: project?.audioMix ?? const AudioMix(),
+                      videoDuration: project?.videoDuration,
+                    ),
+                    const SizedBox(height: 16),
+                    _EditorTabBody(
+                      selectedTab: selectedTab,
+                      beatMap: beatMap,
+                      timeline: timeline,
+                      playback: playback,
+                      events: events,
+                      eventState: eventState,
+                      selectedMedia: mediaSelection.selectedMedia,
+                      selectedImageFits: mediaSelection.selectedImageFits,
+                      selectedCropTransforms:
+                          mediaSelection.selectedCropTransforms,
+                      audioDuration:
+                          importedAudio?.audioData?.duration ??
+                          playback?.sourceDuration,
+                      audioData: importedAudio?.audioData,
+                      audioSource: importedAudio?.source,
+                      audioSourcePath: project == null
+                          ? importedAudio?.source?.path
+                          : project.audioSourcePath,
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 
@@ -285,6 +312,56 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
       return stateBeatMap;
     }
     return null;
+  }
+}
+
+class _AdvancedEditorSheet extends ConsumerWidget {
+  const _AdvancedEditorSheet({required this.tab});
+  final EditorTab tab;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final timeline = ref.watch(timelineViewModelProvider).asData?.value;
+    final playback = ref.watch(playbackViewModelProvider).asData?.value;
+    final imported = ref.watch(audioImportViewModelProvider).asData?.value;
+    final media = ref.watch(editorMediaSelectionViewModelProvider);
+    final events = ref.watch(eventSystemViewModelProvider);
+    final beatMap =
+        timeline?.project?.beatMap ??
+        playback?.beatMap ??
+        ref.watch(beatMapViewModelProvider).asData?.value.beatMap;
+    final body = _EditorTabBody(
+      selectedTab: tab,
+      beatMap: beatMap,
+      timeline: timeline,
+      playback: playback,
+      events: events.asData?.value.events ?? const [],
+      eventState: events,
+      selectedMedia: media.selectedMedia,
+      selectedImageFits: media.selectedImageFits,
+      selectedCropTransforms: media.selectedCropTransforms,
+      audioDuration: imported?.audioData?.duration ?? playback?.sourceDuration,
+      audioData: imported?.audioData,
+      audioSource: imported?.source,
+      audioSourcePath:
+          timeline?.project?.audioSourcePath ?? imported?.source?.path,
+    );
+    return FractionallySizedBox(
+      heightFactor: 0.95,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(editorTabLabel(context, tab)),
+          leading: const CloseButton(),
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: tab == EditorTab.clips
+                ? body
+                : SingleChildScrollView(child: body),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -58,6 +58,11 @@ class AppNavigator {
         : pushNamed<T>(AppRoutes.audioEditor);
   }
 
+  Future<T?> goToEditorQueue<T extends Object?>() =>
+      pushNamed<T>(AppRoutes.editorQueue);
+  Future<T?> goToImageSettings<T extends Object?>(String clipId) =>
+      pushNamed<T>(AppRoutes.imageSettings, arguments: clipId);
+
   Future<T?> goToDownload<T extends Object?>({bool replace = false}) {
     return replace
         ? replaceNamed<T, Object?>(AppRoutes.download)

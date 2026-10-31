@@ -257,6 +257,74 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     );
   }
 
+  /// Appends queued media that is not already represented on the timeline.
+  /// Existing clips and their edits are left untouched.
+  int appendQueuedMedia({
+    required List<LibraryMediaItem> items,
+    required Map<String, VideoTemplateImageFit> imageFits,
+    required Map<String, ImageCropTransform> cropTransforms,
+  }) {
+    if (items.isEmpty) return 0;
+    final current = _currentState;
+    final project =
+        current.project ??
+        ProjectTimeline(
+          id: newClipId(),
+          name: 'Picture To Videos Project',
+          beatMap: _manualBeatMap(null),
+          tracks: const [],
+          template: current.selectedTemplate,
+        );
+    final track =
+        _trackById(project.tracks, 'track-media') ??
+        const TimelineTrack(id: 'track-media', name: 'Images', events: []);
+    final existing = track.events
+        .map((event) => event.payload)
+        .whereType<MediaTrackClipPayload>()
+        .toList();
+    final ids = existing.map((clip) => clip.mediaId).toSet();
+    final events = [...track.events];
+    var start = existing.fold<Duration>(
+      Duration.zero,
+      (end, clip) => clip.end > end ? clip.end : end,
+    );
+    var added = 0;
+    for (final item in items) {
+      if (!ids.add(item.id)) continue;
+      final end = start + current.selectedTemplate.defaultSlideDuration;
+      final clip = MediaTrackClipPayload(
+        clipId: newClipId(),
+        mediaId: item.id,
+        title: item.title,
+        tagline: item.tagline,
+        start: start,
+        end: end,
+        sourcePath: item.sourcePath,
+        imageFit: imageFits[item.id] ?? current.selectedTemplate.imageFit,
+        cropTransform: cropTransforms[item.id] ?? ImageCropTransform.centered,
+      );
+      events.add(BeatEvent(time: start, type: 'image', payload: clip));
+      start = end;
+      added++;
+    }
+    if (added == 0) return 0;
+    final updated = project.copyWith(
+      hasManualEdits: true,
+      tracks: List.unmodifiable([
+        for (final entry in project.tracks)
+          if (entry.id != 'track-media') entry,
+        track.copyWith(events: List.unmodifiable(events)),
+      ]),
+    );
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+    return added;
+  }
+
   void pacingSelected(SequencePacing pacing) {
     final currentState = _currentState;
     final project = currentState.project;

@@ -5,7 +5,6 @@
 import FlutterMacOS
 import Foundation
 
-import audioplayers_darwin
 import ffmpeg_kit_extended_flutter
 import file_picker
 import gal
@@ -17,7 +16,6 @@ import shared_preferences_foundation
 import wakelock_plus
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  AudioplayersDarwinPlugin.register(with: registry.registrar(forPlugin: "AudioplayersDarwinPlugin"))
   FfmpegKitExtendedFlutterPlugin.register(with: registry.registrar(forPlugin: "FfmpegKitExtendedFlutterPlugin"))
   FilePickerPlugin.register(with: registry.registrar(forPlugin: "FilePickerPlugin"))
   GalPlugin.register(with: registry.registrar(forPlugin: "GalPlugin"))

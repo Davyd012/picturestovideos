@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/gestures.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
@@ -120,73 +122,100 @@ class ClipsTabView extends StatelessWidget {
               capabilityProbeFailed: capabilityProbeFailed,
             ),
           ),
-        ExpansionTile(
-          title: Text(context.l10n.queuedImages(selectedMedia.length)),
-          subtitle: Text(context.l10n.queuedImagesPurpose),
-          children: [
-            ExpansionTile(
-              title: Text(context.l10n.bulkImageTools),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 600) {
+              return ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(context.l10n.queuedImages(selectedMedia.length)),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  builder: (context) => _QueueWorkspace(
+                    items: selectedMedia,
+                    imageFits: selectedImageFits,
+                    cropTransforms: selectedCropTransforms,
+                    onImageFitSelected: onImageFitSelected,
+                    onCropTransformChanged: onCropTransformChanged,
+                    onApplyImageFitToAll: onApplyImageFitToAll,
+                    onMoveMediaToPosition: onMoveMediaToPosition,
+                  ),
+                ),
+              );
+            }
+            return ExpansionTile(
+              title: Text(context.l10n.queuedImages(selectedMedia.length)),
+              subtitle: Text(context.l10n.queuedImagesPurpose),
               children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                ExpansionTile(
+                  title: Text(context.l10n.bulkImageTools),
                   children: [
-                    TextButton.icon(
-                      onPressed: selectedMedia.isEmpty
-                          ? null
-                          : () => onApplyImageFitToAll(
-                              VideoTemplateImageFit.cover,
-                            ),
-                      icon: const Icon(Icons.crop),
-                      label: Text(context.l10n.cropAll),
-                    ),
-                    TextButton.icon(
-                      onPressed: selectedMedia.isEmpty
-                          ? null
-                          : () => onApplyImageFitToAll(
-                              VideoTemplateImageFit.contain,
-                            ),
-                      icon: const Icon(Icons.fit_screen),
-                      label: Text(context.l10n.fullImageForAll),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: selectedMedia.isEmpty
+                              ? null
+                              : () => onApplyImageFitToAll(
+                                  VideoTemplateImageFit.cover,
+                                ),
+                          icon: const Icon(Icons.crop),
+                          label: Text(context.l10n.cropAll),
+                        ),
+                        TextButton.icon(
+                          onPressed: selectedMedia.isEmpty
+                              ? null
+                              : () => onApplyImageFitToAll(
+                                  VideoTemplateImageFit.contain,
+                                ),
+                          icon: const Icon(Icons.fit_screen),
+                          label: Text(context.l10n.fullImageForAll),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+                if (selectedMedia.isNotEmpty)
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    itemCount: selectedMedia.length,
+                    onReorderItem: onReorderMedia,
+                    itemBuilder: (context, index) {
+                      final item = selectedMedia[index];
+                      return Padding(
+                        key: ValueKey(item.id),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _ClipListItem(
+                          item: item,
+                          index: index,
+                          canReorder: selectedMedia.length > 1,
+                          imageFit: _imageFitFor(item.id),
+                          onImageFitSelected: (imageFit) =>
+                              onImageFitSelected(item.id, imageFit),
+                          cropTransform:
+                              selectedCropTransforms[item.id] ??
+                              ImageCropTransform.centered,
+                          onCropTransformChanged: (transform) =>
+                              onCropTransformChanged(item.id, transform),
+                          itemCount: selectedMedia.length,
+                          onMoveToPosition: (position) =>
+                              onMoveMediaToPosition(item.id, position),
+                        ),
+                      );
+                    },
+                  ),
               ],
-            ),
-            if (selectedMedia.isNotEmpty)
-              ReorderableListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                buildDefaultDragHandles: false,
-                itemCount: selectedMedia.length,
-                onReorderItem: onReorderMedia,
-                itemBuilder: (context, index) {
-                  final item = selectedMedia[index];
-                  return Padding(
-                    key: ValueKey(item.id),
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _ClipListItem(
-                      item: item,
-                      index: index,
-                      canReorder: selectedMedia.length > 1,
-                      imageFit: _imageFitFor(item.id),
-                      onImageFitSelected: (imageFit) =>
-                          onImageFitSelected(item.id, imageFit),
-                      cropTransform:
-                          selectedCropTransforms[item.id] ??
-                          ImageCropTransform.centered,
-                      onCropTransformChanged: (transform) =>
-                          onCropTransformChanged(item.id, transform),
-                      itemCount: selectedMedia.length,
-                      onMoveToPosition: (position) =>
-                          onMoveMediaToPosition(item.id, position),
-                    ),
-                  );
-                },
-              ),
-          ],
+            );
+          },
         ),
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
           children: [
             OutlinedButton.icon(
               onPressed: selectedMedia.isEmpty ? null : onOpenTimeline,
@@ -207,6 +236,159 @@ class ClipsTabView extends StatelessWidget {
 
   VideoTemplateImageFit _imageFitFor(String mediaId) {
     return selectedImageFits[mediaId] ?? VideoTemplateImageFit.cover;
+  }
+}
+
+class _QueueWorkspace extends ConsumerWidget {
+  const _QueueWorkspace({
+    required this.items,
+    required this.imageFits,
+    required this.cropTransforms,
+    required this.onImageFitSelected,
+    required this.onCropTransformChanged,
+    required this.onApplyImageFitToAll,
+    required this.onMoveMediaToPosition,
+  });
+
+  final List<LibraryMediaItem> items;
+  final Map<String, VideoTemplateImageFit> imageFits;
+  final Map<String, ImageCropTransform> cropTransforms;
+  final void Function(String, VideoTemplateImageFit) onImageFitSelected;
+  final void Function(String, ImageCropTransform) onCropTransformChanged;
+  final ValueChanged<VideoTemplateImageFit> onApplyImageFitToAll;
+  final void Function(String, int) onMoveMediaToPosition;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final queue = ref.watch(editorMediaSelectionViewModelProvider);
+    final media = queue.selectedMedia;
+    return FractionallySizedBox(
+      heightFactor: 1,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: CloseButton(onPressed: () => Navigator.pop(context)),
+          title: Text(context.l10n.queuedImages(media.length)),
+          actions: [
+            PopupMenuButton<VideoTemplateImageFit>(
+              tooltip: context.l10n.bulkImageTools,
+              onSelected: onApplyImageFitToAll,
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: VideoTemplateImageFit.cover,
+                  child: Text(context.l10n.cropAll),
+                ),
+                PopupMenuItem(
+                  value: VideoTemplateImageFit.contain,
+                  child: Text(context.l10n.fullImageForAll),
+                ),
+              ],
+            ),
+          ],
+        ),
+        body: media.isEmpty
+            ? Center(child: Text(context.l10n.queuedImages(0)))
+            : GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: media.length,
+                itemBuilder: (context, index) {
+                  final item = media[index];
+                  return InkWell(
+                    key: ValueKey(item.id),
+                    onTap: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      useSafeArea: true,
+                      builder: (context) => SingleChildScrollView(
+                        padding: EdgeInsets.only(
+                          bottom: MediaQuery.viewInsetsOf(context).bottom,
+                        ),
+                        child: Column(
+                          children: [
+                            AspectRatio(
+                              aspectRatio: 16 / 9,
+                              child: _QueueThumbnail(
+                                item: item,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                            _ClipListItem(
+                              item: item,
+                              index: index,
+                              canReorder: false,
+                              itemCount: media.length,
+                              imageFit: queue.imageFitFor(item.id),
+                              cropTransform: queue.cropTransformFor(item.id),
+                              onImageFitSelected: (fit) =>
+                                  onImageFitSelected(item.id, fit),
+                              onCropTransformChanged: (crop) =>
+                                  onCropTransformChanged(item.id, crop),
+                              onMoveToPosition: (position) =>
+                                  onMoveMediaToPosition(item.id, position),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _QueueThumbnail(item: item),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: CircleAvatar(
+                              backgroundColor: context.colors.surface,
+                              foregroundColor: context.colors.onSurface,
+                              child: Text('${index + 1}'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
+class _QueueThumbnail extends StatelessWidget {
+  const _QueueThumbnail({required this.item, this.fit = BoxFit.cover});
+  final LibraryMediaItem item;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fallback(BuildContext context, Object error, StackTrace? stack) =>
+        ColoredBox(
+          color: context.colors.surfaceContainerHighest,
+          child: const Icon(Icons.broken_image_outlined),
+        );
+    if (item.thumbnailBytes.isNotEmpty) {
+      return Image.memory(
+        item.thumbnailBytes,
+        fit: fit,
+        cacheWidth: 400,
+        errorBuilder: fallback,
+      );
+    }
+    if (item.sourcePath.isNotEmpty) {
+      return Image.file(
+        File(item.sourcePath),
+        fit: fit,
+        cacheWidth: 400,
+        errorBuilder: fallback,
+      );
+    }
+    return fallback(context, StateError('Missing image'), null);
   }
 }
 

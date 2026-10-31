@@ -11,6 +11,22 @@ import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 void main() {
+  testWidgets('mobile editor keeps markers accessible from More', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      const ProviderScope(child: MaterialApp(home: AudioEditorScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('More'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Markers'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('beat markers'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('audio editor shows mobile editor defaults with no data', (
     tester,
   ) async {
@@ -22,9 +38,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Video editor'), findsOneWidget);
+    expect(find.text('Editor'), findsOneWidget);
     expect(find.text('Sequence preview'), findsOneWidget);
-    expect(find.byKey(const Key('editor-section-tab-bar')), findsOneWidget);
+    expect(find.text('Clips'), findsOneWidget);
+    expect(find.text('Queue'), findsOneWidget);
   });
 
   testWidgets('audio editor renders timeline details when data is loaded', (
@@ -87,7 +104,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sequence preview'), findsOneWidget);
-    expect(find.byKey(const Key('editor-section-tab-bar')), findsOneWidget);
-    expect(find.textContaining('120.0 BPM'), findsWidgets);
+    expect(find.text('Clips'), findsOneWidget);
+    expect(find.text('Queue'), findsOneWidget);
   });
 }

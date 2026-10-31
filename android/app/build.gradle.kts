@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -13,10 +15,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -42,6 +40,24 @@ android {
                 "proguard-rules.pro",
             )
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.fromTarget("17")
+    }
+}
+
+tasks.configureEach {
+    if (
+        name.startsWith("compileFlutterBuild") ||
+        name.endsWith("MinSdkCheck") ||
+        name.startsWith("assemble")
+    ) {
+        notCompatibleWithConfigurationCache(
+            "Flutter Gradle tasks are not compatible with Gradle configuration caching.",
+        )
     }
 }
 

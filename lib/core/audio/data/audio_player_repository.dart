@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 
 final audioPlayerRepositoryProvider = Provider<AudioPlayerRepository>((ref) {
@@ -48,24 +48,33 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   static const _loadTimeout = Duration(seconds: 8);
 
   AppAudioPlayerRepository({required this._logger}) {
-    _positionSubscription = _player.onPositionChanged.listen((position) {
+    _positionSubscription = _player.stream.position.listen((position) {
       _currentPosition = position;
       _controller.add(position);
     });
-    _completeSubscription = _player.onPlayerComplete.listen((_) {
-      _currentPosition = Duration.zero;
-      _isCompleted = true;
-      _controller.add(_currentPosition);
+    _durationSubscription = _player.stream.duration.listen((duration) {
+      _sourceDuration = duration > Duration.zero ? duration : null;
+    });
+    _completeSubscription = _player.stream.completed.listen((completed) {
+      if (completed) {
+        _currentPosition = Duration.zero;
+        _isCompleted = true;
+        _controller.add(_currentPosition);
+        _completeController.add(null);
+      }
     });
   }
 
-  final AudioPlayer _player = AudioPlayer();
+  final Player _player = Player();
   final StreamController<Duration> _controller =
       StreamController<Duration>.broadcast();
+  final StreamController<void> _completeController =
+      StreamController<void>.broadcast();
   final AppLogger _logger;
 
   StreamSubscription<Duration>? _positionSubscription;
-  StreamSubscription<void>? _completeSubscription;
+  StreamSubscription<Duration>? _durationSubscription;
+  StreamSubscription<bool>? _completeSubscription;
   Duration _currentPosition = Duration.zero;
   Duration? _sourceDuration;
   String? _loadedSourcePath;
@@ -88,13 +97,16 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   Stream<Duration> get positionStream => _controller.stream;
 
   @override
-  Stream<void> get completeStream => _player.onPlayerComplete;
+  Stream<void> get completeStream => _completeController.stream;
 
   @override
   Future<void> load(String? audioSourcePath) async {
     if (audioSourcePath == null || audioSourcePath.isEmpty) {
+      await _player.stop();
       _loadedSourcePath = null;
       _sourceDuration = null;
+      _currentPosition = Duration.zero;
+      _isCompleted = false;
       _logger.warning(
         'AudioPlayerRepository',
         'No audio source path available for playback',
@@ -112,7 +124,9 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
 
     await _player.stop();
     await _setSource(audioSourcePath);
-    _sourceDuration = await _player.getDuration();
+    _sourceDuration = _player.state.duration > Duration.zero
+        ? _player.state.duration
+        : null;
     _loadedSourcePath = audioSourcePath;
     _currentPosition = Duration.zero;
     _isCompleted = false;
@@ -132,7 +146,9 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
 
     await _player.stop();
     await _setSource(loadedSourcePath);
-    _sourceDuration = await _player.getDuration();
+    _sourceDuration = _player.state.duration > Duration.zero
+        ? _player.state.duration
+        : null;
     _currentPosition = Duration.zero;
     _isCompleted = false;
     _controller.add(_currentPosition);
@@ -146,7 +162,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
 
   @override
   Future<void> setVolume(double volume) =>
-      _player.setVolume(volume.clamp(0.0, 1.0));
+      _player.setVolume((volume.clamp(0.0, 1.0) * 100).toDouble());
 
   @override
   Future<void> play() async {
@@ -162,7 +178,7 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
       await seek(Duration.zero);
     }
     _logger.info('AudioPlayerRepository', 'Starting audio playback');
-    await _player.resume();
+    await _player.play();
   }
 
   @override
@@ -189,15 +205,17 @@ class AppAudioPlayerRepository implements AudioPlayerRepository {
   @override
   Future<void> dispose() async {
     await _positionSubscription?.cancel();
+    await _durationSubscription?.cancel();
     await _completeSubscription?.cancel();
     await _controller.close();
+    await _completeController.close();
     await _player.dispose();
   }
 
   Future<void> _setSource(String audioSourcePath) async {
     try {
       await _player
-          .setSource(DeviceFileSource(audioSourcePath))
+          .open(Media(Uri.file(audioSourcePath).toString()), play: false)
           .timeout(_loadTimeout);
     } on TimeoutException catch (error, stackTrace) {
       _loadedSourcePath = null;

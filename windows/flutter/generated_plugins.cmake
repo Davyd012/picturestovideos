@@ -3,7 +3,6 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  audioplayers_windows
   ffmpeg_kit_extended_flutter
   gal
   media_kit_libs_windows_video

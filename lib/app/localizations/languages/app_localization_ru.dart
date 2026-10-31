@@ -2,6 +2,53 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_en
 
 class AppLocalizationRu extends AppLocalizationEn {
   @override
+  String get editorTimeline => 'Таймлайн';
+  @override
+  String get editorMarkers => 'Маркеры';
+  @override
+  String get editorTools => 'Инструменты';
+  @override
+  String get editorSave => 'Сохранить';
+  @override
+  String get editorDiscardChanges => 'Отменить несохранённые изменения?';
+  @override
+  String get editorOutputRatio => 'Соотношение сторон видео';
+  @override
+  String get editorClips => 'Клипы';
+  @override
+  String get editorQueue => 'Очередь';
+  @override
+  String get editorQueueTitle => 'Изображения в очереди';
+  @override
+  String get editorSelectAll => 'Выбрать все';
+  @override
+  String editorAddSelected(int count) => 'Добавить выбранные ($count)';
+  @override
+  String get editorImageSettings => 'Настройки изображения';
+  @override
+  String get editorDisplayDuration => 'Длительность показа';
+  @override
+  String get editorOptionalCaption => 'Подпись (необязательно)';
+  @override
+  String get editorSmoothAnimation => 'Применить плавную анимацию';
+  @override
+  String get editorFit => 'Вписать';
+  @override
+  String get editorFill => 'Заполнить';
+  @override
+  String get editorMore => 'Ещё';
+  @override
+  String get editorText => 'Текст';
+  @override
+  String get editorSpeed => 'Скорость';
+  @override
+  String get editorCrop => 'Обрезать';
+  @override
+  String editorAddedCount(int count) => 'Добавлено изображений: $count';
+  @override
+  String get editorAlreadyOnTimeline =>
+      'Выбранные изображения уже на таймлайне';
+  @override
   String get cropZoom => 'Масштаб';
   @override
   String get cropHorizontal => 'Положение по горизонтали';
