@@ -18,12 +18,14 @@ final resolveEditorPreviewFrameUseCaseProvider =
     );
 
 class ResolveEditorPreviewFrameUseCase {
-  const ResolveEditorPreviewFrameUseCase({
-    required this._resolvePreviewClipsUseCase,
-  });
+  ResolveEditorPreviewFrameUseCase({required this._resolvePreviewClipsUseCase});
 
   final ResolvePreviewClipsUseCase _resolvePreviewClipsUseCase;
   static const _evaluator = CompositionEvaluator();
+  ProjectTimeline? _cachedProject;
+  BeatMap? _cachedBeatMap;
+  List<MediaTrackClipPayload>? _cachedClips;
+  VideoComposition? _cachedComposition;
 
   EditorPreviewFrame call({
     required BeatMap? beatMap,
@@ -34,21 +36,31 @@ class ResolveEditorPreviewFrameUseCase {
       return const EditorPreviewFrame.empty();
     }
 
-    final clips = _resolvePreviewClipsUseCase(
-      beatMap: beatMap,
-      project: project,
-    );
+    final cacheHit =
+        identical(project, _cachedProject) &&
+        identical(beatMap, _cachedBeatMap);
+    final clips = cacheHit
+        ? _cachedClips!
+        : _resolvePreviewClipsUseCase(beatMap: beatMap, project: project);
     if (clips.isEmpty) {
       return const EditorPreviewFrame.empty();
     }
 
-    final composition = VideoComposition.fromProject(
-      project: project,
-      committedClips: clips,
-      width: project.template.aspectRatio.previewWidth,
-      height: project.template.aspectRatio.previewHeight,
-      frameRate: 30,
-    ).quantizedForOutput();
+    final composition = cacheHit
+        ? _cachedComposition!
+        : VideoComposition.fromProject(
+            project: project,
+            committedClips: clips,
+            width: project.template.aspectRatio.previewWidth,
+            height: project.template.aspectRatio.previewHeight,
+            frameRate: 30,
+          ).quantizedForOutput();
+    if (!cacheHit) {
+      _cachedProject = project;
+      _cachedBeatMap = beatMap;
+      _cachedClips = clips;
+      _cachedComposition = composition;
+    }
     final evaluated = _evaluator.evaluate(composition, currentTime);
     if (evaluated.layers.isEmpty) {
       return const EditorPreviewFrame.empty();

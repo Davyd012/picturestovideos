@@ -27,7 +27,6 @@ void main() {
             home: MobileEditorScreen(
               project: null,
               beatMap: null,
-              playback: null,
               audioPath: null,
               queueCount: 56,
               canExport: false,

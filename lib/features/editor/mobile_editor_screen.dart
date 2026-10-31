@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
@@ -14,7 +16,6 @@ import 'package:picturestovideos/features/editor/editor_tab_label.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_controls.dart';
 import 'package:picturestovideos/features/editor/widgets/editor_filmstrip.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_preview_card.dart';
-import 'package:picturestovideos/features/playback/playback_state.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
@@ -26,7 +27,6 @@ class MobileEditorScreen extends ConsumerWidget {
     super.key,
     required this.project,
     required this.beatMap,
-    required this.playback,
     required this.audioPath,
     required this.queueCount,
     required this.canExport,
@@ -34,7 +34,6 @@ class MobileEditorScreen extends ConsumerWidget {
   });
   final ProjectTimeline? project;
   final BeatMap? beatMap;
-  final PlaybackState? playback;
   final String? audioPath;
   final int queueCount;
   final bool canExport;
@@ -47,25 +46,14 @@ class MobileEditorScreen extends ConsumerWidget {
         : ref
               .read(resolvePreviewClipsUseCaseProvider)
               .call(beatMap: project!.beatMap, project: project);
-    final frame = ref
-        .read(resolveEditorPreviewFrameUseCaseProvider)
-        .call(
-          beatMap: beatMap,
-          project: project,
-          currentTime: playback?.currentTime ?? Duration.zero,
-        );
     final selectedId = ref
         .watch(editorClipSelectionViewModelProvider)
         .selectedClipId;
     final selected = clips
         .where((clip) => clip.clipId == selectedId)
         .firstOrNull;
-    final duration =
-        project?.videoDuration ?? playback?.sourceDuration ?? Duration.zero;
-    final current = playback?.currentTime ?? Duration.zero;
-    final canPlay =
-        (audioPath?.isNotEmpty ?? false) ||
-        (playback?.hasLoadedAudioSource ?? false);
+    final duration = project?.videoDuration ?? Duration.zero;
+    final canPlay = audioPath?.isNotEmpty ?? false;
     Future<void> prepare() async => ref
         .read(playbackViewModelProvider.notifier)
         .preparePlayback(
@@ -142,10 +130,7 @@ class MobileEditorScreen extends ConsumerWidget {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          CompositionPreviewCanvas(
-                            frame: frame,
-                            template: project?.template,
-                          ),
+                          _AnimatedPreview(project: project, beatMap: beatMap),
                           Positioned(
                             left: 0,
                             bottom: 0,
@@ -183,15 +168,18 @@ class MobileEditorScreen extends ConsumerWidget {
                   ),
                 ),
                 EditorPlaybackBar(
-                  current: current,
                   duration: duration,
                   canPlay: canPlay,
-                  playing: playback?.isPlaying ?? false,
                   onSeek: (value) => seek(value),
                   onPlay: () async {
                     await prepare();
                     final vm = ref.read(playbackViewModelProvider.notifier);
-                    if (playback?.isPlaying ?? false) {
+                    if (ref
+                            .read(playbackViewModelProvider)
+                            .asData
+                            ?.value
+                            .isPlaying ??
+                        false) {
                       await vm.pause();
                     } else {
                       await vm.play();
@@ -229,13 +217,18 @@ class MobileEditorScreen extends ConsumerWidget {
                   child: EditorFilmstrip(
                     clips: clips,
                     selectedId: selectedId,
-                    current: current,
                     audioPath: audioPath,
                     onSelect: (clip) {
                       ref
                           .read(editorClipSelectionViewModelProvider.notifier)
                           .clipSelected(clip.clipId);
                       seek(clip.start);
+                    },
+                    onEditClip: (clip) {
+                      ref
+                          .read(editorClipSelectionViewModelProvider.notifier)
+                          .clipSelected(clip.clipId);
+                      context.appNavigator.goToImageSettings(clip.clipId);
                     },
                     onReorder: (oldIndex, newIndex) {
                       if (oldIndex < clips.length && newIndex < clips.length) {
@@ -296,12 +289,6 @@ class _FullscreenPreview extends ConsumerWidget {
   final BeatMap? beatMap;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final time =
-        ref.watch(playbackViewModelProvider).asData?.value.currentTime ??
-        Duration.zero;
-    final frame = ref
-        .read(resolveEditorPreviewFrameUseCaseProvider)
-        .call(beatMap: beatMap, project: project, currentTime: time);
     return Dialog.fullscreen(
       child: SafeArea(
         child: Stack(
@@ -309,15 +296,111 @@ class _FullscreenPreview extends ConsumerWidget {
             Center(
               child: AspectRatio(
                 aspectRatio: project?.template.aspectRatio.value ?? 16 / 9,
-                child: CompositionPreviewCanvas(
-                  frame: frame,
-                  template: project?.template,
-                ),
+                child: _AnimatedPreview(project: project, beatMap: beatMap),
               ),
             ),
             const Align(alignment: Alignment.topRight, child: CloseButton()),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AnimatedPreview extends ConsumerStatefulWidget {
+  const _AnimatedPreview({required this.project, required this.beatMap});
+
+  final ProjectTimeline? project;
+  final BeatMap? beatMap;
+
+  @override
+  ConsumerState<_AnimatedPreview> createState() => _AnimatedPreviewState();
+}
+
+class _AnimatedPreviewState extends ConsumerState<_AnimatedPreview>
+    with SingleTickerProviderStateMixin {
+  late final Ticker _ticker;
+  final Stopwatch _elapsed = Stopwatch();
+  Duration _anchor = Duration.zero;
+  Duration? _lastAudioTime;
+  Duration _displayTime = Duration.zero;
+  String? _preloadedPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker((_) {
+      if (!mounted) return;
+      setState(() => _displayTime = _anchor + _elapsed.elapsed);
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _elapsed.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final playback = ref.watch(playbackViewModelProvider).asData?.value;
+    final audioTime = playback?.currentTime ?? Duration.zero;
+    if (_lastAudioTime != audioTime || _lastAudioTime == null) {
+      _lastAudioTime = audioTime;
+      _anchor = audioTime;
+      _displayTime = audioTime;
+      if (_elapsed.isRunning) {
+        _elapsed
+          ..stop()
+          ..reset()
+          ..start();
+      }
+    }
+    if (playback?.isPlaying ?? false) {
+      if (!_ticker.isActive) {
+        _anchor = audioTime;
+        _displayTime = audioTime;
+        _elapsed
+          ..reset()
+          ..start();
+        _ticker.start();
+      }
+    } else if (_ticker.isActive) {
+      _ticker.stop();
+      _elapsed
+        ..stop()
+        ..reset();
+      _displayTime = audioTime;
+    }
+
+    final frame = ref
+        .read(resolveEditorPreviewFrameUseCaseProvider)
+        .call(
+          beatMap: widget.beatMap,
+          project: widget.project,
+          currentTime: _displayTime,
+        );
+    final nextPath = frame.nextClip?.sourcePath;
+    if (nextPath != null && nextPath.isNotEmpty && nextPath != _preloadedPath) {
+      _preloadedPath = nextPath;
+      final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+      final decodeWidth = (MediaQuery.sizeOf(context).width * pixelRatio)
+          .round()
+          .clamp(1, 1536);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _preloadedPath != nextPath) return;
+        final provider = ResizeImage(
+          FileImage(File(nextPath)),
+          width: decodeWidth,
+        );
+        precacheImage(provider, context);
+      });
+    }
+    return RepaintBoundary(
+      child: CompositionPreviewCanvas(
+        frame: frame,
+        template: widget.project?.template,
       ),
     );
   }

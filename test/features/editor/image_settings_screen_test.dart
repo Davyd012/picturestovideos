@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/commons/navigation/app_navigator.dart';
+import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/image_settings_screen.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
@@ -67,6 +69,49 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+  testWidgets('queued image settings save before timeline insertion', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final item = LibraryMediaItem(
+      id: 'pending',
+      title: 'pending.png',
+      tagline: '',
+      sizeLabel: '',
+      importedOnLabel: '',
+      importedOn: DateTime(2026),
+      byteLength: 0,
+      thumbnailBytes: Uint8List(0),
+      sourcePath: '',
+    );
+    container
+        .read(editorMediaSelectionViewModelProvider.notifier)
+        .addMedia(item);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          navigatorKey: AppNavigator.instance.navigatorKey,
+          home: ImageSettingsScreen(
+            args: const ImageSettingsRouteArgs.forQueuedMedia('pending'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fit'));
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    final selection = container.read(editorMediaSelectionViewModelProvider);
+    expect(selection.imageFitFor('pending'), VideoTemplateImageFit.contain);
+    expect(selection.selectedMedia, hasLength(1));
+  });
   testWidgets('image settings save edits to the selected clip', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

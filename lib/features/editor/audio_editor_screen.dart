@@ -74,7 +74,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
   Widget build(BuildContext context) {
     final beatMapState = ref.watch(beatMapViewModelProvider);
     final timelineState = ref.watch(timelineViewModelProvider);
-    final playbackState = ref.watch(playbackViewModelProvider);
     final eventState = ref.watch(eventSystemViewModelProvider);
     final importState = ref.watch(audioImportViewModelProvider);
     final mediaSelection = ref.watch(editorMediaSelectionViewModelProvider);
@@ -82,13 +81,11 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
     final selectedTab = ref.watch(editorTabViewModelProvider);
 
     final timeline = timelineState.asData?.value;
-    final playback = playbackState.asData?.value;
     final events = eventState.asData?.value.events ?? const <BeatEvent>[];
     final importedAudio = importState.asData?.value;
     final beatMap = _resolvedBeatMap(
       beatMapState: beatMapState,
       timelineState: timelineState,
-      playbackState: playbackState,
     );
     final project = timeline?.project;
     final hasExportableClips =
@@ -104,7 +101,6 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
           return MobileEditorScreen(
             project: project,
             beatMap: beatMap,
-            playback: playback,
             audioPath: project?.audioSourcePath ?? importedAudio?.source?.path,
             queueCount: mediaSelection.selectedMedia.length,
             canExport: hasExportableClips,
@@ -116,6 +112,8 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
             ),
           );
         }
+        final playbackState = ref.watch(playbackViewModelProvider);
+        final playback = playbackState.asData?.value;
         return AppShellScaffold(
           currentRoute: AppRoutes.audioEditor,
           hideMobileNavigation: true,
@@ -297,15 +295,10 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
   BeatMap? _resolvedBeatMap({
     required AsyncValue<BeatMapState> beatMapState,
     required AsyncValue<TimelineState> timelineState,
-    required AsyncValue<PlaybackState> playbackState,
   }) {
     final projectBeatMap = timelineState.asData?.value.project?.beatMap;
     if (projectBeatMap != null) {
       return projectBeatMap;
-    }
-    final playbackBeatMap = playbackState.asData?.value.beatMap;
-    if (playbackBeatMap != null && playbackBeatMap.beats.isNotEmpty) {
-      return playbackBeatMap;
     }
     final stateBeatMap = beatMapState.asData?.value.beatMap;
     if (stateBeatMap != null && stateBeatMap.beats.isNotEmpty) {

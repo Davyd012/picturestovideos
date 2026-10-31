@@ -5,7 +5,9 @@ import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.d
 import 'package:picturestovideos/features/editor/widgets/editor_filmstrip.dart';
 
 void main() {
-  testWidgets('filmstrip selects and reorders timeline clips', (tester) async {
+  testWidgets('filmstrip selects, edits and exposes drag handles', (
+    tester,
+  ) async {
     final clips = List.generate(
       2,
       (i) => MediaTrackClipPayload(
@@ -20,8 +22,7 @@ void main() {
       ),
     );
     String? selected;
-    int? from;
-    int? to;
+    String? edited;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -33,11 +34,9 @@ void main() {
               current: Duration.zero,
               audioPath: null,
               onSelect: (clip) => selected = clip.clipId,
+              onEditClip: (clip) => edited = clip.clipId,
               onAdd: () {},
-              onReorder: (a, b) {
-                from = a;
-                to = b;
-              },
+              onReorder: (_, _) {},
             ),
           ),
         ),
@@ -46,16 +45,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('0')));
     expect(selected, '0');
     await tester.pumpAndSettle();
-    final gesture = await tester.startGesture(
+    final editGesture = await tester.startGesture(
       tester.getCenter(find.byKey(const ValueKey('0'))),
     );
-    await tester.pump(const Duration(seconds: 1));
-    await gesture.moveTo(tester.getCenter(find.byKey(const ValueKey('1'))));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 600));
+    await editGesture.up();
     await tester.pumpAndSettle();
-    expect(from, 0);
-    expect(to, 1);
+    expect(edited, '0');
+    expect(find.byType(ReorderableDragStartListener), findsNWidgets(2));
   });
 }

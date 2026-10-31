@@ -1,90 +1,121 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/widgets/media_thumbnail.dart';
+import 'package:picturestovideos/features/playback/playback_view_model.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 String _time(Duration value) =>
     '${value.inMinutes.toString().padLeft(2, '0')}:${value.inSeconds.remainder(60).toString().padLeft(2, '0')}';
 
-class EditorFilmstrip extends StatelessWidget {
+class EditorFilmstrip extends ConsumerWidget {
   const EditorFilmstrip({
     super.key,
     required this.clips,
     required this.selectedId,
-    required this.current,
+    this.current,
     required this.audioPath,
     required this.onSelect,
+    required this.onEditClip,
     required this.onReorder,
     required this.onAdd,
   });
   final List<MediaTrackClipPayload> clips;
   final String? selectedId;
-  final Duration current;
+  final Duration? current;
   final String? audioPath;
   final ValueChanged<MediaTrackClipPayload> onSelect;
+  final ValueChanged<MediaTrackClipPayload> onEditClip;
   final void Function(int, int) onReorder;
   final VoidCallback onAdd;
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final activeCaption = clips
-          .where((clip) => clip.clipId == selectedId && clip.caption.isNotEmpty)
-          .firstOrNull;
-      return Column(
-        children: [
-          SizedBox(
-            height: math.min(120, constraints.maxHeight),
-            child: ReorderableListView.builder(
-              scrollDirection: Axis.horizontal,
-              buildDefaultDragHandles: false,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: clips.length + 1,
-              onReorderItem: onReorder,
-              itemBuilder: (context, index) {
-                if (index == clips.length) {
-                  return SizedBox(
-                    key: const ValueKey('add-clip'),
-                    width: 64,
-                    child: IconButton(
-                      onPressed: onAdd,
-                      icon: const Icon(Icons.add),
-                    ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Duration current =
+        this.current ??
+        ref.watch(
+          playbackViewModelProvider.select(
+            (state) => state.asData?.value.currentTime ?? Duration.zero,
+          ),
+        );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final activeCaption = clips
+            .where(
+              (clip) => clip.clipId == selectedId && clip.caption.isNotEmpty,
+            )
+            .firstOrNull;
+        return Column(
+          children: [
+            SizedBox(
+              height: math.min(120, constraints.maxHeight),
+              child: ReorderableListView.builder(
+                scrollDirection: Axis.horizontal,
+                buildDefaultDragHandles: false,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: clips.length + 1,
+                onReorderItem: onReorder,
+                itemBuilder: (context, index) {
+                  if (index == clips.length) {
+                    return SizedBox(
+                      key: const ValueKey('add-clip'),
+                      width: 64,
+                      child: IconButton(
+                        onPressed: onAdd,
+                        icon: const Icon(Icons.add),
+                      ),
+                    );
+                  }
+                  final clip = clips[index];
+                  final selected = clip.clipId == selectedId;
+                  final span = clip.end - clip.start;
+                  final width = (span.inMilliseconds / 1000 * 28).clamp(
+                    80.0,
+                    240.0,
                   );
-                }
-                final clip = clips[index];
-                final selected = clip.clipId == selectedId;
-                final span = clip.end - clip.start;
-                final width = (span.inMilliseconds / 1000 * 28).clamp(
-                  80.0,
-                  240.0,
-                );
-                final isPlayingClip =
-                    current >= clip.start &&
-                    current < clip.end &&
-                    span > Duration.zero;
-                final fraction = isPlayingClip
-                    ? (current - clip.start).inMilliseconds /
-                          span.inMilliseconds
-                    : 0.0;
-                return ReorderableDelayedDragStartListener(
-                  key: ValueKey(clip.clipId),
-                  index: index,
-                  child: Padding(
+                  final isPlayingClip =
+                      current >= clip.start &&
+                      current < clip.end &&
+                      span > Duration.zero;
+                  final fraction = isPlayingClip
+                      ? (current - clip.start).inMilliseconds /
+                            span.inMilliseconds
+                      : 0.0;
+                  return Padding(
+                    key: ValueKey(clip.clipId),
                     padding: const EdgeInsets.only(right: 8),
                     child: SizedBox(
                       width: width,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _time(clip.start),
-                            style: context.textTheme.labelSmall,
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _time(clip.start),
+                                  style: context.textTheme.labelSmall,
+                                ),
+                              ),
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Tooltip(
+                                  message: context.l10n.reorder,
+                                  child: Icon(
+                                    Icons.drag_handle,
+                                    size: 20,
+                                    color: context.colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           Expanded(
                             child: InkWell(
                               onTap: () => onSelect(clip),
+                              onLongPress: () => onEditClip(clip),
                               child: Container(
                                 decoration: BoxDecoration(
                                   border: Border.all(
@@ -134,24 +165,24 @@ class EditorFilmstrip extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-          if (audioPath != null &&
-              audioPath!.isNotEmpty &&
-              constraints.maxHeight >= 160)
-            _TrackLabel(
-              icon: Icons.music_note,
-              text: audioPath!.split(RegExp(r'[\\/]')).last,
-            ),
-          if (activeCaption != null && constraints.maxHeight >= 200)
-            _TrackLabel(icon: Icons.text_fields, text: activeCaption.caption),
-        ],
-      );
-    },
-  );
+            if (audioPath != null &&
+                audioPath!.isNotEmpty &&
+                constraints.maxHeight >= 160)
+              _TrackLabel(
+                icon: Icons.music_note,
+                text: audioPath!.split(RegExp(r'[\\/]')).last,
+              ),
+            if (activeCaption != null && constraints.maxHeight >= 200)
+              _TrackLabel(icon: Icons.text_fields, text: activeCaption.caption),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _TrackLabel extends StatelessWidget {

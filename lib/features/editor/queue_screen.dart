@@ -105,35 +105,8 @@ class QueueScreen extends ConsumerWidget {
                             onTap: () => ref
                                 .read(queueSelectionProvider.notifier)
                                 .toggle(item.id),
-                            onLongPress: () => showDialog<void>(
-                              context: context,
-                              builder: (context) => Dialog.fullscreen(
-                                child: SafeArea(
-                                  child: Stack(
-                                    children: [
-                                      Center(
-                                        child: InteractiveViewer(
-                                          child: MediaThumbnail(
-                                            path: item.sourcePath.isNotEmpty
-                                                ? item.sourcePath
-                                                : null,
-                                            item: item.sourcePath.isEmpty
-                                                ? item
-                                                : null,
-                                            fit: BoxFit.contain,
-                                            cacheWidth: null,
-                                          ),
-                                        ),
-                                      ),
-                                      const Align(
-                                        alignment: Alignment.topRight,
-                                        child: CloseButton(),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
+                            onLongPress: () => context.appNavigator
+                                .goToQueuedImageSettings(item.id),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: Stack(
@@ -169,6 +142,16 @@ class QueueScreen extends ConsumerWidget {
                                             : Icons.circle_outlined,
                                         size: 20,
                                       ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    bottom: 8,
+                                    right: 8,
+                                    child: IconButton.filledTonal(
+                                      tooltip: context.l10n.editClip,
+                                      onPressed: () => context.appNavigator
+                                          .goToQueuedImageSettings(item.id),
+                                      icon: const Icon(Icons.tune),
                                     ),
                                   ),
                                   if (order >= 0)

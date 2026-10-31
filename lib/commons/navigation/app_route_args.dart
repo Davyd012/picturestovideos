@@ -13,3 +13,11 @@ class PlannedScreenArgs {
   final int recommendedStartOrder;
   final String summary;
 }
+
+class ImageSettingsRouteArgs {
+  const ImageSettingsRouteArgs.forClip(this.clipId) : mediaId = null;
+  const ImageSettingsRouteArgs.forQueuedMedia(this.mediaId) : clipId = null;
+
+  final String? clipId;
+  final String? mediaId;
+}

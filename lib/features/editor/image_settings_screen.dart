@@ -7,17 +7,57 @@ import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/editor/widgets/clip_framing_fields.dart';
 import 'package:picturestovideos/features/editor/widgets/media_thumbnail.dart';
+import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 
 class ImageSettingsScreen extends ConsumerWidget {
-  const ImageSettingsScreen({required this.clipId, super.key});
-  final String clipId;
+  ImageSettingsScreen({String? clipId, ImageSettingsRouteArgs? args, super.key})
+    : args = args ?? ImageSettingsRouteArgs.forClip(clipId ?? '');
+  final ImageSettingsRouteArgs args;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (args.mediaId case final mediaId?) {
+      final selection = ref.watch(editorMediaSelectionViewModelProvider);
+      final media = selection.selectedMedia
+          .where((item) => item.id == mediaId)
+          .firstOrNull;
+      if (media == null) {
+        return Scaffold(
+          appBar: AppBar(),
+          body: Center(child: Text(context.l10n.noTimelineClips)),
+        );
+      }
+      final clip = MediaTrackClipPayload(
+        mediaId: media.id,
+        title: media.title,
+        tagline: media.tagline,
+        start: Duration.zero,
+        end: const Duration(seconds: 4),
+        sourcePath: media.sourcePath,
+        imageFit: selection.imageFitFor(media.id),
+        cropTransform: selection.cropTransformFor(media.id),
+      );
+      final ratio =
+          ref
+              .watch(timelineViewModelProvider)
+              .asData
+              ?.value
+              .selectedTemplate
+              .aspectRatio ??
+          VideoTemplateAspectRatio.landscape;
+      return _SettingsForm(
+        clip: clip,
+        ratio: ratio,
+        maxSeconds: 60,
+        initialMotion: false,
+        queuedMediaId: media.id,
+      );
+    }
     final timeline = ref.watch(timelineViewModelProvider).asData?.value;
     final project = timeline?.project;
     final clips = project == null
@@ -25,7 +65,7 @@ class ImageSettingsScreen extends ConsumerWidget {
         : ref
               .read(resolvePreviewClipsUseCaseProvider)
               .call(beatMap: project.beatMap, project: project);
-    final index = clips.indexWhere((clip) => clip.clipId == clipId);
+    final index = clips.indexWhere((clip) => clip.clipId == args.clipId);
     if (index < 0 || project == null) {
       return Scaffold(
         appBar: AppBar(),
@@ -46,6 +86,7 @@ class ImageSettingsScreen extends ConsumerWidget {
       initialMotion:
           clips[index].motionFor(project.template).preset !=
           ClipMotionPreset.none,
+      queuedMediaId: null,
     );
   }
 }
@@ -56,11 +97,13 @@ class _SettingsForm extends ConsumerStatefulWidget {
     required this.ratio,
     required this.maxSeconds,
     required this.initialMotion,
+    required this.queuedMediaId,
   });
   final MediaTrackClipPayload clip;
   final VideoTemplateAspectRatio ratio;
   final double maxSeconds;
   final bool initialMotion;
+  final String? queuedMediaId;
   @override
   ConsumerState<_SettingsForm> createState() => _SettingsFormState();
 }
@@ -116,7 +159,7 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       child: Scaffold(
         appBar: AppBar(
           leading: BackButton(onPressed: close),
-          title: Text(context.l10n.editorImageSettings),
+          title: Text(context.l10n.editClip),
         ),
         body: SafeArea(
           child: Column(
@@ -161,7 +204,8 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(context.l10n.editorOutputRatio),
+                            if (widget.queuedMediaId == null)
+                              Text(context.l10n.editorOutputRatio),
                             SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
@@ -185,21 +229,22 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                                       dirty = true;
                                     }),
                                   ),
-                                  for (final value in [
-                                    VideoTemplateAspectRatio.landscape,
-                                    VideoTemplateAspectRatio.square,
-                                    VideoTemplateAspectRatio.portrait,
-                                  ]) ...[
-                                    const SizedBox(width: 8),
-                                    ChoiceChip(
-                                      label: Text(value.label),
-                                      selected: ratio == value,
-                                      onSelected: (_) => setState(() {
-                                        ratio = value;
-                                        dirty = true;
-                                      }),
-                                    ),
-                                  ],
+                                  if (widget.queuedMediaId == null)
+                                    for (final value in [
+                                      VideoTemplateAspectRatio.landscape,
+                                      VideoTemplateAspectRatio.square,
+                                      VideoTemplateAspectRatio.portrait,
+                                    ]) ...[
+                                      const SizedBox(width: 8),
+                                      ChoiceChip(
+                                        label: Text(value.label),
+                                        selected: ratio == value,
+                                        onSelected: (_) => setState(() {
+                                          ratio = value;
+                                          dirty = true;
+                                        }),
+                                      ),
+                                    ],
                                 ],
                               ),
                             ),
@@ -212,70 +257,72 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    context.l10n.editorDisplayDuration,
+                    if (widget.queuedMediaId == null) ...[
+                      const SizedBox(height: 8),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      context.l10n.editorDisplayDuration,
+                                    ),
                                   ),
-                                ),
-                                Text('${duration.toStringAsFixed(1)} s'),
-                              ],
-                            ),
-                            Slider(
-                              min: 0.1,
-                              max: upper,
-                              value: duration.clamp(0.1, upper),
-                              onChanged: (value) => setState(() {
-                                duration = value;
-                                dirty = true;
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: TextField(
-                          controller: caption,
-                          maxLength: 100,
-                          decoration: InputDecoration(
-                            labelText: context.l10n.editorOptionalCaption,
-                            suffixIcon: IconButton(
-                              onPressed: () {
-                                caption.clear();
-                                setState(() => dirty = true);
-                              },
-                              icon: const Icon(Icons.clear),
-                            ),
+                                  Text('${duration.toStringAsFixed(1)} s'),
+                                ],
+                              ),
+                              Slider(
+                                min: 0.1,
+                                max: upper,
+                                value: duration.clamp(0.1, upper),
+                                onChanged: (value) => setState(() {
+                                  duration = value;
+                                  dirty = true;
+                                }),
+                              ),
+                            ],
                           ),
-                          onChanged: (_) => setState(() => dirty = true),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Card(
-                      child: SwitchListTile(
-                        secondary: const Icon(Icons.animation),
-                        title: Text(context.l10n.editorSmoothAnimation),
-                        value: motion,
-                        onChanged: (value) => setState(() {
-                          motion = value;
-                          dirty = true;
-                        }),
+                      const SizedBox(height: 8),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: TextField(
+                            controller: caption,
+                            maxLength: 100,
+                            decoration: InputDecoration(
+                              labelText: context.l10n.editorOptionalCaption,
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  caption.clear();
+                                  setState(() => dirty = true);
+                                },
+                                icon: const Icon(Icons.clear),
+                              ),
+                            ),
+                            onChanged: (_) => setState(() => dirty = true),
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Card(
+                        child: SwitchListTile(
+                          secondary: const Icon(Icons.animation),
+                          title: Text(context.l10n.editorSmoothAnimation),
+                          value: motion,
+                          onChanged: (value) => setState(() {
+                            motion = value;
+                            dirty = true;
+                          }),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -337,6 +384,22 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
   }
 
   void _save() {
+    if (widget.queuedMediaId case final mediaId?) {
+      final selection = ref.read(
+        editorMediaSelectionViewModelProvider.notifier,
+      );
+      if (fit != widget.clip.imageFit) {
+        selection.imageFitSelected(mediaId: mediaId, imageFit: fit);
+      }
+      if (crop != widget.clip.cropTransform) {
+        selection.cropTransformChanged(mediaId: mediaId, transform: crop);
+      }
+      setState(() => dirty = false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.appNavigator.maybePop();
+      });
+      return;
+    }
     final timeline = ref.read(timelineViewModelProvider.notifier);
     if (ratio != widget.ratio) timeline.aspectRatioSelected(ratio);
     if (fit != widget.clip.imageFit) {

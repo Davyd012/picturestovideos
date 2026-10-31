@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
 import 'package:picturestovideos/features/audio_import/audio_import_screen.dart';
 import 'package:picturestovideos/features/editor/audio_editor_screen.dart';
@@ -39,8 +40,12 @@ class ScreenFactory {
           builder: (_) => const QueueScreen(),
         );
       case AppRoutes.imageSettings:
-        final clipId = settings.arguments;
-        if (clipId is! String) {
+        final args = switch (settings.arguments) {
+          final ImageSettingsRouteArgs value => value,
+          final String clipId => ImageSettingsRouteArgs.forClip(clipId),
+          _ => null,
+        };
+        if (args == null || (args.clipId == null && args.mediaId == null)) {
           return _buildRoute(
             settings: settings,
             builder: (_) => _UnknownRouteScreen(routeName: settings.name),
@@ -48,7 +53,7 @@ class ScreenFactory {
         }
         return _buildRoute(
           settings: settings,
-          builder: (_) => ImageSettingsScreen(clipId: clipId),
+          builder: (_) => ImageSettingsScreen(args: args),
         );
       case AppRoutes.download:
         return _buildRoute(

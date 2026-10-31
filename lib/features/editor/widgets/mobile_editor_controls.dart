@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
@@ -44,29 +46,31 @@ class EditorWorkspaceTab extends StatelessWidget {
   );
 }
 
-class EditorPlaybackBar extends StatelessWidget {
+class EditorPlaybackBar extends ConsumerWidget {
   const EditorPlaybackBar({
     super.key,
-    required this.current,
     required this.duration,
     required this.canPlay,
-    required this.playing,
     required this.onSeek,
     required this.onPlay,
     required this.onFullscreen,
     required this.onVolume,
   });
-  final Duration current;
   final Duration duration;
   final bool canPlay;
-  final bool playing;
   final ValueChanged<Duration> onSeek;
   final VoidCallback onPlay;
   final VoidCallback onFullscreen;
   final VoidCallback onVolume;
   @override
-  Widget build(BuildContext context) {
-    final total = math.max(1, duration.inMilliseconds);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playback = ref.watch(playbackViewModelProvider).asData?.value;
+    final current = playback?.currentTime ?? Duration.zero;
+    final playing = playback?.isPlaying ?? false;
+    final resolvedDuration = duration > Duration.zero
+        ? duration
+        : playback?.sourceDuration ?? Duration.zero;
+    final total = math.max(1, resolvedDuration.inMilliseconds);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -74,7 +78,7 @@ class EditorPlaybackBar extends StatelessWidget {
           height: 20,
           child: Slider(
             value: (current.inMilliseconds / total).clamp(0.0, 1.0),
-            onChanged: duration > Duration.zero
+            onChanged: resolvedDuration > Duration.zero
                 ? (v) => onSeek(Duration(milliseconds: (v * total).round()))
                 : null,
           ),
@@ -86,7 +90,7 @@ class EditorPlaybackBar extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  '${_time(current)} / ${_time(duration)}',
+                  '${_time(current)} / ${_time(resolvedDuration)}',
                   style: context.textTheme.labelMedium,
                 ),
               ),
@@ -155,27 +159,32 @@ class EditorToolbar extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(8),
     child: Row(
-      children: [
-        _button(
-          context,
-          Icons.content_cut,
-          context.l10n.editorCrop,
-          enabled ? onSettings : null,
-        ),
-        _button(
-          context,
-          Icons.text_fields,
-          context.l10n.editorText,
-          enabled ? onSettings : null,
-        ),
-        _button(
-          context,
-          Icons.speed,
-          context.l10n.editorSpeed,
-          enabled ? onSettings : null,
-        ),
-        _button(context, Icons.more_horiz, context.l10n.editorMore, onMore),
-      ],
+      children: enabled
+          ? [
+              _button(context, Icons.tune, context.l10n.editClip, onSettings),
+              _button(context, Icons.crop, context.l10n.editorCrop, onSettings),
+              _button(
+                context,
+                Icons.more_horiz,
+                context.l10n.editorMore,
+                onMore,
+              ),
+            ]
+          : [
+              _button(
+                context,
+                Icons.text_fields,
+                context.l10n.editorText,
+                null,
+              ),
+              _button(context, Icons.speed, context.l10n.editorSpeed, null),
+              _button(
+                context,
+                Icons.more_horiz,
+                context.l10n.editorMore,
+                onMore,
+              ),
+            ],
     ),
   );
   Widget _button(

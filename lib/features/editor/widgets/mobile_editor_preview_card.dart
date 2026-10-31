@@ -278,34 +278,43 @@ class _PreviewSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = activeClip?.sourcePath;
     if (path != null && path.isNotEmpty) {
-      return ColoredBox(
-        color: context.colors.scrim,
-        child: Image.file(
-          File(path),
-          fit: activeClip?.imageFit == VideoTemplateImageFit.contain
-              ? BoxFit.contain
-              : BoxFit.cover,
-          alignment: Alignment(
-            activeClip!.cropTransform.focalX,
-            activeClip!.cropTransform.focalY,
-          ),
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (activeClip!.imageFit == VideoTemplateImageFit.contain) {
-              return child;
-            }
-            return Transform.scale(
-              scale: activeClip!.cropTransform.zoom,
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final decodeWidth =
+              (constraints.maxWidth * MediaQuery.devicePixelRatioOf(context))
+                  .round()
+                  .clamp(1, 1536);
+          return ColoredBox(
+            color: context.colors.scrim,
+            child: Image.file(
+              File(path),
+              cacheWidth: decodeWidth,
+              fit: activeClip?.imageFit == VideoTemplateImageFit.contain
+                  ? BoxFit.contain
+                  : BoxFit.cover,
               alignment: Alignment(
                 activeClip!.cropTransform.focalX,
                 activeClip!.cropTransform.focalY,
               ),
-              child: child,
-            );
-          },
-          errorBuilder: (context, error, stackTrace) {
-            return _FallbackPreview(title: activeClip?.title);
-          },
-        ),
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (activeClip!.imageFit == VideoTemplateImageFit.contain) {
+                  return child;
+                }
+                return Transform.scale(
+                  scale: activeClip!.cropTransform.zoom,
+                  alignment: Alignment(
+                    activeClip!.cropTransform.focalX,
+                    activeClip!.cropTransform.focalY,
+                  ),
+                  child: child,
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return _FallbackPreview(title: activeClip?.title);
+              },
+            ),
+          );
+        },
       );
     }
     return _FallbackPreview(title: activeClip?.title);
