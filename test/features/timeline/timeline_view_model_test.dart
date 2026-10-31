@@ -198,6 +198,27 @@ void main() {
         clips().singleWhere((clip) => clip.clipId == firstId).caption,
         isEmpty,
       );
+      vm.captionStyleAppliedToAll(
+        const CaptionSettings(
+          preset: CaptionStylePreset.bold,
+          sizeScale: 1.2,
+          backdrop: CaptionBackdrop.strongPanel,
+        ),
+      );
+      final styledClips = clips();
+      expect(styledClips.map((clip) => clip.clipId), [
+        otherId,
+        firstId,
+        repeatedId,
+      ]);
+      expect(styledClips[0].caption, isEmpty);
+      expect(styledClips[2].caption, 'Наше лето');
+      expect(styledClips[2].captionSettings.placement, CaptionPlacement.top);
+      expect(styledClips[2].captionSettings.startFraction, 0.25);
+      expect(
+        styledClips[2].captionSettings.backdrop,
+        CaptionBackdrop.strongPanel,
+      );
     },
   );
   test(

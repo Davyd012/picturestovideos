@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
@@ -7,6 +9,8 @@ import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 import 'package:picturestovideos/features/editor/widgets/clip_framing_fields.dart';
 import 'package:picturestovideos/features/editor/widgets/caption_settings_fields.dart';
+import 'package:picturestovideos/features/editor/widgets/caption_editor_preview.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_caption_list.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/features/editor/widgets/transition_editor_fields.dart';
@@ -26,6 +30,11 @@ class ClipCaptionsEditor extends StatelessWidget {
     this.snapToMarkers = true,
     this.onTimingChanged,
     this.onCaptionSettingsChanged,
+    this.onApplyStyleToAll,
+    this.onSelectClip,
+    this.onRemoveClip,
+    this.onMoveClip,
+    this.onReorderClip,
     this.onFramingChanged,
     this.renderCapabilities,
     this.gateRenderCapabilities = false,
@@ -54,6 +63,11 @@ class ClipCaptionsEditor extends StatelessWidget {
   onTimingChanged;
   final void Function(String clipId, CaptionSettings settings)?
   onCaptionSettingsChanged;
+  final ValueChanged<CaptionSettings>? onApplyStyleToAll;
+  final ValueChanged<MediaTrackClipPayload>? onSelectClip;
+  final ValueChanged<String>? onRemoveClip;
+  final bool Function(String clipId, int position)? onMoveClip;
+  final bool Function(String clipId, int position)? onReorderClip;
   final void Function(
     String clipId,
     VideoTemplateImageFit fit,
@@ -66,33 +80,13 @@ class ClipCaptionsEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (clips.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(context.l10n.clipCaptions, style: context.textTheme.titleMedium),
-        for (var index = 0; index < clips.length; index++)
-          Card.outlined(
-            child: ListTile(
-              title: Text(
-                context.l10n.clipNumber(index + 1, clips[index].title),
-              ),
-              subtitle: Text(
-                clips[index].caption.isEmpty
-                    ? context.l10n.noCaption
-                    : clips[index].caption,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: const Icon(Icons.edit_outlined),
-              onTap: () => _edit(
-                context,
-                clips[index],
-                index + 1 < clips.length ? clips[index + 1] : null,
-              ),
-            ),
-          ),
-      ],
+    return ClipCaptionList(
+      clips: clips,
+      onEdit: (clip, next) => _edit(context, clip, next),
+      onSelect: onSelectClip,
+      onRemove: onRemoveClip,
+      onMove: onMoveClip,
+      onReorder: onReorderClip,
     );
   }
 
@@ -115,6 +109,12 @@ class ClipCaptionsEditor extends StatelessWidget {
       3,
     );
     var snap = snapToMarkers;
+    var previewFraction = 0.5;
+    var captionSection = CaptionEditorSection.text;
+    final previewWidth = math.max(
+      0.0,
+      math.min(MediaQuery.sizeOf(context).width - 48, 560.0),
+    );
     final captionUnavailable = _featureUnavailableReason(
       context,
       supported:
@@ -175,25 +175,58 @@ class ClipCaptionsEditor extends StatelessWidget {
                       onSnapChanged: (value) =>
                           setDialogState(() => snap = value),
                     ),
-                  TextFormField(
-                    initialValue: title,
-                    maxLines: 2,
-                    enabled: captionUnavailable == null,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.captionTitle,
+                  if (captionSection == CaptionEditorSection.text)
+                    TextFormField(
+                      initialValue: title,
+                      maxLines: 2,
+                      enabled: captionUnavailable == null,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.captionTitle,
+                      ),
+                      onChanged: (value) => setDialogState(() => title = value),
                     ),
-                    onChanged: (value) => setDialogState(() => title = value),
-                  ),
-                  TextFormField(
-                    initialValue: supportingLine,
-                    maxLines: 2,
-                    enabled: captionUnavailable == null,
-                    decoration: InputDecoration(
-                      labelText: context.l10n.captionSupportingLine,
+                  if (captionSection == CaptionEditorSection.text)
+                    TextFormField(
+                      initialValue: supportingLine,
+                      maxLines: 2,
+                      enabled: captionUnavailable == null,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.captionSupportingLine,
+                      ),
+                      onChanged: (value) =>
+                          setDialogState(() => supportingLine = value),
                     ),
-                    onChanged: (value) =>
-                        setDialogState(() => supportingLine = value),
-                  ),
+                  if (template != null && onCaptionSettingsChanged != null) ...[
+                    const SizedBox(height: 16),
+                    CaptionEditorPreview(
+                      sourcePath: clip.sourcePath,
+                      title: title,
+                      supportingLine: supportingLine,
+                      settings: captionSettings,
+                      template: template!,
+                      clipDuration: initialDuration,
+                      previewTime: Duration(
+                        microseconds:
+                            (initialDuration.inMicroseconds * previewFraction)
+                                .round(),
+                      ),
+                      width: previewWidth,
+                    ),
+                    Text(
+                      context.l10n.captionTiming,
+                      style: context.textTheme.labelLarge,
+                    ),
+                    Slider(
+                      min: 0,
+                      max: 1,
+                      divisions: 100,
+                      value: previewFraction,
+                      semanticFormatterCallback: (value) =>
+                          '${(initialDuration.inSeconds * value).toStringAsFixed(1)} s',
+                      onChanged: (value) =>
+                          setDialogState(() => previewFraction = value),
+                    ),
+                  ],
                   if (onCaptionSettingsChanged != null && template != null)
                     Builder(
                       builder: (context) {
@@ -222,8 +255,16 @@ class ClipCaptionsEditor extends StatelessWidget {
                         );
                         return CaptionSettingsFields(
                           settings: captionSettings,
+                          section: captionSection,
+                          onSectionChanged: (section) =>
+                              setDialogState(() => captionSection = section),
                           overflow: layout.overflow,
                           shortReadingTime: layout.readingTimeIsShort(visible),
+                          clipDuration: clipDuration,
+                          supportsBackdrop:
+                              !gateRenderCapabilities ||
+                              (renderCapabilities?.supportsCaptionBackdrop ??
+                                  false),
                           enabled: captionUnavailable == null,
                           onChanged: (value) =>
                               setDialogState(() => captionSettings = value),
@@ -322,6 +363,31 @@ class ClipCaptionsEditor extends StatelessWidget {
             ),
           ),
           actions: [
+            if (clips.length > 1 && onApplyStyleToAll != null)
+              TextButton(
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      content: Text(context.l10n.captionApplyAllStylesConfirm),
+                      actions: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(false),
+                          child: Text(context.l10n.cancel),
+                        ),
+                        FilledButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(true),
+                          child: Text(context.l10n.apply),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) onApplyStyleToAll!(captionSettings);
+                },
+                child: Text(context.l10n.captionApplyAllStyles),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: Text(context.l10n.cancel),

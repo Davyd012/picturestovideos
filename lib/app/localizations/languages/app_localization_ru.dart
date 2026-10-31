@@ -102,6 +102,34 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get moveImage => 'Переместить изображение';
   @override
+  String queuedImages(int count) => 'Изображения в очереди ($count)';
+  @override
+  String get queuedImagesPurpose =>
+      'Изображения, ожидающие добавления на временную шкалу';
+  @override
+  String get bulkImageTools => 'Инструменты для нескольких изображений';
+  @override
+  String get reorder => 'Изменить порядок';
+  @override
+  String get done => 'Готово';
+  @override
+  String get selected => 'Выбрано';
+  @override
+  String get returnToTimelineOrder => 'Вернуться к порядку временной шкалы';
+  @override
+  String get reviewSequence => 'Проверить последовательность';
+  @override
+  String get openTimeline => 'Открыть временную шкалу';
+  @override
+  String get clipActions => 'Действия с клипом';
+  @override
+  String get noTimelineClips => 'На временной шкале пока нет клипов.';
+  @override
+  String clipMovedToPosition(int position) => 'Перемещено на позицию $position';
+  @override
+  String get moveFailed =>
+      'Этот клип больше недоступен. Обновите список и повторите попытку.';
+  @override
   String get position => 'Позиция';
   @override
   String positionRange(int count) => 'Введите число от 1 до $count';
@@ -134,6 +162,8 @@ class AppLocalizationRu extends AppLocalizationEn {
   String get apply => 'Применить';
   @override
   String get clipCaptions => 'Подписи к клипам';
+  @override
+  String get removeClip => 'Удалить клип';
   @override
   String get editCaption => 'Изменить подпись';
   @override
@@ -328,6 +358,83 @@ class AppLocalizationRu extends AppLocalizationEn {
   String get captionCenter => 'По центру';
   @override
   String get captionTop => 'Сверху';
+  @override
+  String get captionStyle => 'Стиль';
+  @override
+  String get captionStyleClean => 'Чистый';
+  @override
+  String get captionStyleSoft => 'Мягкий фон';
+  @override
+  String get captionStyleBold => 'Контрастный';
+  @override
+  String get captionSize => 'Размер подписи';
+  @override
+  String get captionFont => 'Шрифт';
+  @override
+  String get captionFontUnavailable =>
+      'Выбор шрифта недоступен: экспорт использует один найденный системный шрифт. В предпросмотре применяется тот же нейтральный стиль.';
+  @override
+  String get captionTextColor => 'Цвет текста';
+  @override
+  String get captionBackdrop => 'Фон';
+  @override
+  String get captionBackdropNone => 'Без фона';
+  @override
+  String get captionBackdropSoft => 'Мягкая панель';
+  @override
+  String get captionBackdropStrong => 'Контрастная панель';
+  @override
+  String get captionBackdropClassic => 'Классические блоки';
+  @override
+  String get captionBackdropUnavailable =>
+      'Фоновые панели недоступны: в этом рендерере нет фильтра drawbox.';
+  @override
+  String get captionNoBackdropWarning =>
+      'Без фона читаемость зависит от изображения. Панель обеспечивает более стабильный контраст.';
+  @override
+  String get captionLowContrastWarning =>
+      'Тёмный текст на тёмном фоне может быть плохо виден. Выберите светлый текст.';
+  @override
+  String get captionSectionText => 'Текст';
+  @override
+  String get captionSectionStyle => 'Стиль';
+  @override
+  String get captionSectionPosition => 'Положение';
+  @override
+  String get captionSectionTiming => 'Время';
+  @override
+  String get captionColorLight => 'Светлый';
+  @override
+  String get captionColorDark => 'Тёмный';
+  @override
+  String get captionReset => 'Сбросить стиль';
+  @override
+  String get captionNotVisibleAtTime => 'В это время подпись не отображается.';
+  @override
+  String get clipListSort => 'Сортировка списка клипов';
+  @override
+  String get clipSortTimeline => 'Порядок на шкале';
+  @override
+  String get clipSortNameAscending => 'Имя файла А–Я';
+  @override
+  String get clipSortNameDescending => 'Имя файла Я–А';
+  @override
+  String get clipSortModifiedOldest => 'Дата изменения файла: сначала старые';
+  @override
+  String get clipSortModifiedNewest => 'Дата изменения файла: сначала новые';
+  @override
+  String get clipDateUnavailable => 'Дата недоступна';
+  @override
+  String get clipRepeatedSource => 'Повтор источника';
+  @override
+  String get clipRepeatedDetails => 'Просмотреть повторы источника';
+  @override
+  String get clipOccurrence => 'Вхождение';
+  @override
+  String get captionApplyAllStyles => 'Применить стиль ко всем клипам';
+  @override
+  String get captionApplyAllStylesConfirm =>
+      'Применить этот вид подписи ко всем клипам? Их текст, расположение, время и появление останутся прежними.';
   @override
   String get captionEntrance => 'Появление подписи';
   @override

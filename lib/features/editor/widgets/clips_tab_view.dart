@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:flutter/gestures.dart';
@@ -35,6 +34,11 @@ class ClipsTabView extends StatelessWidget {
     this.snapToMarkers = true,
     this.onTimingChanged,
     this.onCaptionSettingsChanged,
+    this.onApplyCaptionStyleToAll,
+    this.onSelectTimelineClip,
+    this.onRemoveClip,
+    this.onMoveClip,
+    this.onReorderClip,
     this.onFramingChanged,
     this.renderCapabilities,
     this.gateRenderCapabilities = false,
@@ -74,6 +78,11 @@ class ClipsTabView extends StatelessWidget {
   onTimingChanged;
   final void Function(String clipId, CaptionSettings settings)?
   onCaptionSettingsChanged;
+  final ValueChanged<CaptionSettings>? onApplyCaptionStyleToAll;
+  final ValueChanged<MediaTrackClipPayload>? onSelectTimelineClip;
+  final ValueChanged<String>? onRemoveClip;
+  final bool Function(String clipId, int position)? onMoveClip;
+  final bool Function(String clipId, int position)? onReorderClip;
   final void Function(
     String clipId,
     VideoTemplateImageFit fit,
@@ -86,100 +95,109 @@ class ClipsTabView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clips = selectedMedia.isEmpty ? _sampleClips : selectedMedia;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (onCaptionChanged != null)
-          ClipCaptionsEditor(
-            clips: timelineClips,
-            onCaptionChanged: onCaptionChanged!,
-            onMotionChanged: onMotionChanged,
-            onTransitionChanged: onTransitionChanged,
-            template: template,
-            snapToMarkers: snapToMarkers,
-            onTimingChanged: onTimingChanged,
-            onCaptionSettingsChanged: onCaptionSettingsChanged,
-            onFramingChanged: onFramingChanged,
-            renderCapabilities: renderCapabilities,
-            gateRenderCapabilities: gateRenderCapabilities,
-            capabilityProbeFailed: capabilityProbeFailed,
+          Expanded(
+            child: ClipCaptionsEditor(
+              clips: timelineClips,
+              onCaptionChanged: onCaptionChanged!,
+              onMotionChanged: onMotionChanged,
+              onTransitionChanged: onTransitionChanged,
+              template: template,
+              snapToMarkers: snapToMarkers,
+              onTimingChanged: onTimingChanged,
+              onCaptionSettingsChanged: onCaptionSettingsChanged,
+              onApplyStyleToAll: onApplyCaptionStyleToAll,
+              onSelectClip: onSelectTimelineClip,
+              onRemoveClip: onRemoveClip,
+              onMoveClip: onMoveClip,
+              onReorderClip: onReorderClip,
+              onFramingChanged: onFramingChanged,
+              renderCapabilities: renderCapabilities,
+              gateRenderCapabilities: gateRenderCapabilities,
+              capabilityProbeFailed: capabilityProbeFailed,
+            ),
           ),
-        Text(
-          'Queued image clips (${clips.length})',
-          style: context.textTheme.titleMedium,
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        ExpansionTile(
+          title: Text(context.l10n.queuedImages(selectedMedia.length)),
+          subtitle: Text(context.l10n.queuedImagesPurpose),
           children: [
-            TextButton.icon(
-              onPressed: selectedMedia.isEmpty
-                  ? null
-                  : () => onApplyImageFitToAll(VideoTemplateImageFit.cover),
-              icon: const Icon(Icons.crop),
-              label: Text(context.l10n.cropAll),
+            ExpansionTile(
+              title: Text(context.l10n.bulkImageTools),
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    TextButton.icon(
+                      onPressed: selectedMedia.isEmpty
+                          ? null
+                          : () => onApplyImageFitToAll(
+                              VideoTemplateImageFit.cover,
+                            ),
+                      icon: const Icon(Icons.crop),
+                      label: Text(context.l10n.cropAll),
+                    ),
+                    TextButton.icon(
+                      onPressed: selectedMedia.isEmpty
+                          ? null
+                          : () => onApplyImageFitToAll(
+                              VideoTemplateImageFit.contain,
+                            ),
+                      icon: const Icon(Icons.fit_screen),
+                      label: Text(context.l10n.fullImageForAll),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            TextButton.icon(
-              onPressed: selectedMedia.isEmpty
-                  ? null
-                  : () => onApplyImageFitToAll(VideoTemplateImageFit.contain),
-              icon: const Icon(Icons.fit_screen),
-              label: Text(context.l10n.fullImageForAll),
-            ),
+            if (selectedMedia.isNotEmpty)
+              ReorderableListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                buildDefaultDragHandles: false,
+                itemCount: selectedMedia.length,
+                onReorderItem: onReorderMedia,
+                itemBuilder: (context, index) {
+                  final item = selectedMedia[index];
+                  return Padding(
+                    key: ValueKey(item.id),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ClipListItem(
+                      item: item,
+                      index: index,
+                      canReorder: selectedMedia.length > 1,
+                      imageFit: _imageFitFor(item.id),
+                      onImageFitSelected: (imageFit) =>
+                          onImageFitSelected(item.id, imageFit),
+                      cropTransform:
+                          selectedCropTransforms[item.id] ??
+                          ImageCropTransform.centered,
+                      onCropTransformChanged: (transform) =>
+                          onCropTransformChanged(item.id, transform),
+                      itemCount: selectedMedia.length,
+                      onMoveToPosition: (position) =>
+                          onMoveMediaToPosition(item.id, position),
+                    ),
+                  );
+                },
+              ),
           ],
         ),
-        const SizedBox(height: 8),
-        if (selectedMedia.isEmpty)
-          for (var index = 0; index < clips.length; index++) ...[
-            _ClipListItem(item: clips[index], index: index, canReorder: false),
-            const SizedBox(height: 8),
-          ]
-        else
-          ReorderableListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            buildDefaultDragHandles: false,
-            itemCount: selectedMedia.length,
-            onReorderItem: onReorderMedia,
-            itemBuilder: (context, index) {
-              final item = selectedMedia[index];
-              return Padding(
-                key: ValueKey(item.id),
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _ClipListItem(
-                  item: item,
-                  index: index,
-                  canReorder: selectedMedia.length > 1,
-                  imageFit: _imageFitFor(item.id),
-                  onImageFitSelected: (imageFit) =>
-                      onImageFitSelected(item.id, imageFit),
-                  cropTransform:
-                      selectedCropTransforms[item.id] ??
-                      ImageCropTransform.centered,
-                  onCropTransformChanged: (transform) =>
-                      onCropTransformChanged(item.id, transform),
-                  itemCount: selectedMedia.length,
-                  onMoveToPosition: (position) =>
-                      onMoveMediaToPosition(item.id, position),
-                ),
-              );
-            },
-          ),
-        const SizedBox(height: 8),
         Row(
           children: [
             OutlinedButton.icon(
               onPressed: selectedMedia.isEmpty ? null : onOpenTimeline,
               icon: const Icon(Icons.fact_check_outlined),
-              label: const Text('Review sequence'),
+              label: Text(context.l10n.reviewSequence),
             ),
             const SizedBox(width: 12),
             FilledButton.tonalIcon(
               onPressed: onOpenTimeline,
               icon: const Icon(Icons.timeline),
-              label: const Text('Open timeline'),
+              label: Text(context.l10n.openTimeline),
             ),
           ],
         ),
@@ -236,11 +254,6 @@ class _ClipListItem extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: context.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_formatDuration(Duration(seconds: index * 3))} / 3s',
-                        style: context.textTheme.labelMedium,
                       ),
                     ],
                   ),
@@ -570,31 +583,4 @@ class _Thumbnail extends StatelessWidget {
       ),
     );
   }
-}
-
-final _sampleClips = [
-  _sampleClip('sample-01', 'IMG_1042.jpg', 'Opening frame'),
-  _sampleClip('sample-02', 'IMG_1088.jpg', 'Beat cut'),
-  _sampleClip('sample-03', 'IMG_1130.jpg', 'Memory beat'),
-  _sampleClip('sample-04', 'IMG_1192.jpg', 'Caption frame'),
-];
-
-LibraryMediaItem _sampleClip(String id, String title, String tagline) {
-  return LibraryMediaItem(
-    id: id,
-    title: title,
-    sizeLabel: '2.4 MB',
-    tagline: tagline,
-    importedOnLabel: 'Jun 02, 2026',
-    importedOn: DateTime(2026, 6, 2),
-    byteLength: 2400000,
-    thumbnailBytes: Uint8List(0),
-    sourcePath: '',
-  );
-}
-
-String _formatDuration(Duration duration) {
-  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return '$minutes:$seconds';
 }

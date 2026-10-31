@@ -115,55 +115,126 @@ class _AudioEditorScreenState extends ConsumerState<AudioEditorScreen> {
           ),
         ),
       ],
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (project != null) ProjectMediaRecoveryCard(project: project),
-          MobileEditorPreviewCard(
-            beatMap: beatMap,
-            project: timeline?.project,
-            playback: playback,
-            previewState: previewState,
-            audioSourcePath:
-                project?.audioSourcePath ?? importedAudio?.source?.path,
-          ),
-          const SizedBox(height: 12),
-          EditorSectionTabBar(
-            selectedTab: selectedTab,
-            onTabSelected: (tab) =>
-                ref.read(editorTabViewModelProvider.notifier).tabSelected(tab),
-          ),
-          const SizedBox(height: 12),
-          PlaybackControls(
-            beatMap: beatMap,
-            playback: playback,
-            audioSourcePath: project == null
-                ? importedAudio?.source?.path
-                : project.audioSourcePath,
-            audioMix: project?.audioMix ?? const AudioMix(),
-            videoDuration: project?.videoDuration,
-          ),
-          const SizedBox(height: 16),
-          _EditorTabBody(
-            selectedTab: selectedTab,
-            beatMap: beatMap,
-            timeline: timeline,
-            playback: playback,
-            events: events,
-            eventState: eventState,
-            selectedMedia: mediaSelection.selectedMedia,
-            selectedImageFits: mediaSelection.selectedImageFits,
-            selectedCropTransforms: mediaSelection.selectedCropTransforms,
-            audioDuration:
-                importedAudio?.audioData?.duration ?? playback?.sourceDuration,
-            audioData: importedAudio?.audioData,
-            audioSource: importedAudio?.source,
-            audioSourcePath: project == null
-                ? importedAudio?.source?.path
-                : project.audioSourcePath,
-          ),
-        ],
-      ),
+      body: selectedTab == EditorTab.clips
+          ? LayoutBuilder(
+              builder: (context, constraints) {
+                final previewHeight = (constraints.maxHeight * 0.30).clamp(
+                  144.0,
+                  240.0,
+                );
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      if (project != null)
+                        ProjectMediaRecoveryCard(project: project),
+                      SizedBox(
+                        height: previewHeight,
+                        child: MobileEditorPreviewCard(
+                          beatMap: beatMap,
+                          project: project,
+                          playback: playback,
+                          previewState: previewState,
+                          audioSourcePath:
+                              project?.audioSourcePath ??
+                              importedAudio?.source?.path,
+                          compact: true,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      EditorSectionTabBar(
+                        selectedTab: selectedTab,
+                        onTabSelected: (tab) => ref
+                            .read(editorTabViewModelProvider.notifier)
+                            .tabSelected(tab),
+                      ),
+                      PlaybackControls(
+                        beatMap: beatMap,
+                        playback: playback,
+                        audioSourcePath: project == null
+                            ? importedAudio?.source?.path
+                            : project.audioSourcePath,
+                        audioMix: project?.audioMix ?? const AudioMix(),
+                        videoDuration: project?.videoDuration,
+                      ),
+                      Expanded(
+                        child: _EditorTabBody(
+                          selectedTab: selectedTab,
+                          beatMap: beatMap,
+                          timeline: timeline,
+                          playback: playback,
+                          events: events,
+                          eventState: eventState,
+                          selectedMedia: mediaSelection.selectedMedia,
+                          selectedImageFits: mediaSelection.selectedImageFits,
+                          selectedCropTransforms:
+                              mediaSelection.selectedCropTransforms,
+                          audioDuration:
+                              importedAudio?.audioData?.duration ??
+                              playback?.sourceDuration,
+                          audioData: importedAudio?.audioData,
+                          audioSource: importedAudio?.source,
+                          audioSourcePath: project == null
+                              ? importedAudio?.source?.path
+                              : project.audioSourcePath,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (project != null) ProjectMediaRecoveryCard(project: project),
+                MobileEditorPreviewCard(
+                  beatMap: beatMap,
+                  project: project,
+                  playback: playback,
+                  previewState: previewState,
+                  audioSourcePath:
+                      project?.audioSourcePath ?? importedAudio?.source?.path,
+                ),
+                const SizedBox(height: 12),
+                EditorSectionTabBar(
+                  selectedTab: selectedTab,
+                  onTabSelected: (tab) => ref
+                      .read(editorTabViewModelProvider.notifier)
+                      .tabSelected(tab),
+                ),
+                const SizedBox(height: 12),
+                PlaybackControls(
+                  beatMap: beatMap,
+                  playback: playback,
+                  audioSourcePath: project == null
+                      ? importedAudio?.source?.path
+                      : project.audioSourcePath,
+                  audioMix: project?.audioMix ?? const AudioMix(),
+                  videoDuration: project?.videoDuration,
+                ),
+                const SizedBox(height: 16),
+                _EditorTabBody(
+                  selectedTab: selectedTab,
+                  beatMap: beatMap,
+                  timeline: timeline,
+                  playback: playback,
+                  events: events,
+                  eventState: eventState,
+                  selectedMedia: mediaSelection.selectedMedia,
+                  selectedImageFits: mediaSelection.selectedImageFits,
+                  selectedCropTransforms: mediaSelection.selectedCropTransforms,
+                  audioDuration:
+                      importedAudio?.audioData?.duration ??
+                      playback?.sourceDuration,
+                  audioData: importedAudio?.audioData,
+                  audioSource: importedAudio?.source,
+                  audioSourcePath: project == null
+                      ? importedAudio?.source?.path
+                      : project.audioSourcePath,
+                ),
+              ],
+            ),
     );
   }
 
@@ -292,6 +363,20 @@ class _EditorTabBody extends ConsumerWidget {
         onCaptionSettingsChanged: (clipId, settings) => ref
             .read(timelineViewModelProvider.notifier)
             .captionSettingsChanged(clipId: clipId, settings: settings),
+        onApplyCaptionStyleToAll: (settings) => ref
+            .read(timelineViewModelProvider.notifier)
+            .captionStyleAppliedToAll(settings),
+        onSelectTimelineClip: (clip) =>
+            _seekTo(ref, clip.start + ((clip.end - clip.start) ~/ 2)),
+        onRemoveClip: (clipId) => ref
+            .read(timelineViewModelProvider.notifier)
+            .clipRemoved(clipId: clipId),
+        onMoveClip: (clipId, position) => ref
+            .read(timelineViewModelProvider.notifier)
+            .clipMoved(clipId: clipId, position: position),
+        onReorderClip: (clipId, position) => ref
+            .read(timelineViewModelProvider.notifier)
+            .clipMoved(clipId: clipId, position: position),
         onMotionChanged: (clipId, preset, intensity) => ref
             .read(timelineViewModelProvider.notifier)
             .clipMotionChanged(

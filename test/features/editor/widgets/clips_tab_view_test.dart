@@ -37,6 +37,8 @@ void main() {
         ),
       ),
     );
+    await tester.tap(find.text('Queued images (3)'));
+    await tester.pumpAndSettle();
 
     tester
         .widget<ReorderableListView>(find.byType(ReorderableListView))
@@ -73,6 +75,8 @@ void main() {
         ),
       ),
     );
+    await tester.tap(find.text('Queued images (1)'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Fill frame (crop)'));
     await tester.pumpAndSettle();
@@ -114,6 +118,8 @@ void main() {
         ),
       ),
     );
+    await tester.tap(find.text('Queued images (2)'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Move to position').first);
     await tester.pumpAndSettle();

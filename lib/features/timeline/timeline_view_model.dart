@@ -11,6 +11,7 @@ import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/timeline/application/build_project_timeline_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/edit_clip_boundary_use_case.dart';
+import 'package:picturestovideos/core/timeline/application/move_timeline_clip_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/update_audio_mix_use_case.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
@@ -449,11 +450,112 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     _editClip(clipId, (clip) => clip.copyWith(captionSettings: settings));
   }
 
+  void captionStyleAppliedToAll(CaptionSettings style) {
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) return;
+    final updatedTracks = [
+      for (final track in project.tracks)
+        if (track.id == 'track-media')
+          track.copyWith(
+            events: List.unmodifiable([
+              for (final event in track.events)
+                if (event.payload is MediaTrackClipPayload)
+                  BeatEvent(
+                    time: event.time,
+                    type: event.type,
+                    payload: (event.payload as MediaTrackClipPayload).copyWith(
+                      captionSettings: (event.payload as MediaTrackClipPayload)
+                          .captionSettings
+                          .copyStyleFrom(style),
+                    ),
+                  )
+                else
+                  event,
+            ]),
+          )
+        else
+          track,
+    ];
+    final updated = project.copyWith(
+      tracks: List.unmodifiable(updatedTracks),
+      hasManualEdits: true,
+    );
+    _emit(
+      currentState.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+  }
+
   void clipImageFitChanged({
     required String clipId,
     required VideoTemplateImageFit imageFit,
   }) {
     _editClip(clipId, (clip) => clip.copyWith(imageFit: imageFit));
+  }
+
+  bool clipMoved({required String clipId, required int position}) {
+    final current = _currentState;
+    final project = current.project;
+    if (project == null) return false;
+    final updated = const MoveTimelineClipUseCase().call(
+      project,
+      clipId,
+      position,
+    );
+    if (identical(updated, project)) return false;
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+    return true;
+  }
+
+  void clipRemoved({required String clipId}) {
+    if (clipId.isEmpty) return;
+    final currentState = _currentState;
+    final project = currentState.project;
+    if (project == null) return;
+
+    final mediaTrack = _trackById(project.tracks, 'track-media');
+    if (mediaTrack == null ||
+        !mediaTrack.events.any(
+          (event) =>
+              event.payload is MediaTrackClipPayload &&
+              (event.payload as MediaTrackClipPayload).clipId == clipId,
+        )) {
+      return;
+    }
+    final updatedTracks = [
+      for (final track in project.tracks)
+        if (track.id != 'track-media')
+          track
+        else
+          track.copyWith(
+            events: List.unmodifiable(
+              track.events.where(
+                (event) =>
+                    event.payload is! MediaTrackClipPayload ||
+                    (event.payload as MediaTrackClipPayload).clipId != clipId,
+              ),
+            ),
+          ),
+    ];
+
+    final updated = project.copyWith(
+      tracks: List.unmodifiable(updatedTracks),
+      hasManualEdits: true,
+    );
+    _emit(
+      currentState.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
   }
 
   void clipMotionChanged({

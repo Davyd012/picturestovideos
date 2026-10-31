@@ -16,10 +16,15 @@ class CaptionLayout {
   }) : originalText = '$title $supportingLine',
        titleSize = math.max(
          1,
-         (math.min(width, height) * (template.id == 'storybook' ? 0.06 : 0.05))
+         (math.min(width, height) *
+                 (template.id == 'storybook' ? 0.06 : 0.05) *
+                 settings.sizeScale)
              .round(),
        ),
-       supportSize = math.max(1, (math.min(width, height) * 0.035).round()),
+       supportSize = math.max(
+         1,
+         (math.min(width, height) * 0.035 * settings.sizeScale).round(),
+       ),
        placement = settings.placementFor(template),
        width = width,
        height = height {
@@ -36,9 +41,12 @@ class CaptionLayout {
     );
     titleText = titleWrapped.text;
     supportText = supportWrapped.text;
-    overflow = titleWrapped.overflow || supportWrapped.overflow;
     titleLines = titleText.isEmpty ? 0 : titleText.split('\n').length;
     supportLines = supportText.isEmpty ? 0 : supportText.split('\n').length;
+    overflow =
+        titleWrapped.overflow ||
+        supportWrapped.overflow ||
+        totalHeight > (height * 0.8).round();
   }
 
   final int width;
@@ -64,11 +72,18 @@ class CaptionLayout {
   int get gap =>
       titleLines > 0 && supportLines > 0 ? (height * 0.02).round() : 0;
   int get totalHeight => titleHeight + gap + supportHeight;
-  int get top => switch (placement) {
-    CaptionPlacement.top => (height * 0.1).round(),
-    CaptionPlacement.center => (height - totalHeight) ~/ 2,
-    CaptionPlacement.bottom => (height * 0.9).round() - totalHeight,
-  };
+  int get top {
+    final safeTop = (height * 0.1).round();
+    final safeBottom = (height * 0.9).round();
+    final desired = switch (placement) {
+      CaptionPlacement.top => safeTop,
+      CaptionPlacement.center => (height - totalHeight) ~/ 2,
+      CaptionPlacement.bottom => safeBottom - totalHeight,
+    };
+    final maximumTop = math.max(safeTop, safeBottom - totalHeight);
+    return desired.clamp(safeTop, maximumTop);
+  }
+
   int get supportTop => top + titleHeight + gap;
 
   bool readingTimeIsShort(Duration visibleDuration) {

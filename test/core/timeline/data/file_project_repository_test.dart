@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
@@ -62,9 +63,18 @@ void main() {
       expect(clips.first.imageFit, VideoTemplateImageFit.cover);
       expect(clips.first.cropTransform.focalX, 0.5);
       expect(clips.first.caption, 'First occurrence');
+      expect(clips.first.captionSettings.placement, CaptionPlacement.top);
+      expect(clips.first.captionSettings.entrance, CaptionEntrance.fade);
+      expect(clips.first.captionSettings.startFraction, 0.2);
+      expect(clips.first.captionSettings.sizeScale, 1.1);
+      expect(clips.first.captionSettings.backdrop, CaptionBackdrop.panel);
       expect(clips.last.imageFit, VideoTemplateImageFit.contain);
       expect(clips.last.cropTransform.focalY, 0.75);
       expect(clips.last.caption, 'Second occurrence');
+      expect(clips.last.captionSettings.placement, CaptionPlacement.bottom);
+      expect(clips.last.captionSettings.entrance, CaptionEntrance.slide);
+      expect(clips.last.captionSettings.startFraction, 0.1);
+      expect(clips.last.captionSettings.textColor, CaptionTextColor.black);
       expect(clips.last.motionOverride, ClipMotionPreset.slowZoomOut);
       expect(clips.last.transitionOverride, ClipTransitionType.dissolve);
 
@@ -380,6 +390,15 @@ ProjectTimeline _project(String id, {String? name}) => ProjectTimeline(
             imageFit: VideoTemplateImageFit.cover,
             cropTransform: ImageCropTransform(focalX: 0.5, focalY: -0.25),
             caption: 'First occurrence',
+            captionSettings: CaptionSettings(
+              preset: CaptionStylePreset.softBackdrop,
+              placement: CaptionPlacement.top,
+              entrance: CaptionEntrance.fade,
+              startFraction: 0.2,
+              endFraction: 0.9,
+              sizeScale: 1.1,
+              backdrop: CaptionBackdrop.panel,
+            ),
           ),
         ),
         BeatEvent(
@@ -396,6 +415,15 @@ ProjectTimeline _project(String id, {String? name}) => ProjectTimeline(
             imageFit: VideoTemplateImageFit.contain,
             cropTransform: ImageCropTransform(focalX: -0.5, focalY: 0.75),
             caption: 'Second occurrence',
+            captionSettings: CaptionSettings(
+              preset: CaptionStylePreset.bold,
+              placement: CaptionPlacement.bottom,
+              entrance: CaptionEntrance.slide,
+              startFraction: 0.1,
+              endFraction: 0.8,
+              textColor: CaptionTextColor.black,
+              backdrop: CaptionBackdrop.strongPanel,
+            ),
             motionOverride: ClipMotionPreset.slowZoomOut,
             transitionOverride: ClipTransitionType.dissolve,
             transitionDuration: Duration(milliseconds: 400),

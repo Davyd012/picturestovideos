@@ -4,12 +4,22 @@ enum CaptionPlacement { bottom, center, top }
 
 enum CaptionEntrance { none, fade, slide }
 
+enum CaptionStylePreset { clean, softBackdrop, bold }
+
+enum CaptionTextColor { white, black }
+
+enum CaptionBackdrop { legacy, none, panel, strongPanel }
+
 class CaptionSettings {
   const CaptionSettings({
     this.placement,
     this.entrance = CaptionEntrance.none,
     this.startFraction = 0,
     this.endFraction = 1,
+    this.preset,
+    this.sizeScale = 1,
+    this.textColor = CaptionTextColor.white,
+    this.backdrop = CaptionBackdrop.legacy,
   }) : assert(
          startFraction >= 0 && startFraction < endFraction && endFraction <= 1,
        );
@@ -17,6 +27,10 @@ class CaptionSettings {
   final CaptionEntrance entrance;
   final double startFraction;
   final double endFraction;
+  final CaptionStylePreset? preset;
+  final double sizeScale;
+  final CaptionTextColor textColor;
+  final CaptionBackdrop backdrop;
 
   CaptionPlacement placementFor(VideoTemplate template) =>
       placement ??
@@ -30,6 +44,10 @@ class CaptionSettings {
     'entrance': entrance.name,
     'startFraction': startFraction,
     'endFraction': endFraction,
+    'preset': preset?.name,
+    'sizeScale': sizeScale,
+    'textColor': textColor.name,
+    'backdrop': backdrop.name,
   };
   factory CaptionSettings.fromJson(Object? json) {
     if (json is! Map) return const CaptionSettings();
@@ -52,8 +70,68 @@ class CaptionSettings {
           CaptionEntrance.none,
       startFraction: start < end ? start : 0,
       endFraction: start < end ? end : 1,
+      preset: CaptionStylePreset.values
+          .where((value) => value.name == json['preset'])
+          .firstOrNull,
+      sizeScale: ((json['sizeScale'] as num?)?.toDouble() ?? 1).clamp(0.7, 1.4),
+      textColor:
+          CaptionTextColor.values
+              .where((value) => value.name == json['textColor'])
+              .firstOrNull ??
+          CaptionTextColor.white,
+      backdrop:
+          CaptionBackdrop.values
+              .where((value) => value.name == json['backdrop'])
+              .firstOrNull ??
+          CaptionBackdrop.legacy,
     );
   }
+
+  CaptionSettings applyPreset(CaptionStylePreset value) => copyWith(
+    preset: value,
+    sizeScale: switch (value) {
+      CaptionStylePreset.clean => 1,
+      CaptionStylePreset.softBackdrop => 1,
+      CaptionStylePreset.bold => 1.15,
+    },
+    textColor: value == CaptionStylePreset.clean
+        ? CaptionTextColor.white
+        : CaptionTextColor.white,
+    backdrop: switch (value) {
+      CaptionStylePreset.clean => CaptionBackdrop.none,
+      CaptionStylePreset.softBackdrop => CaptionBackdrop.panel,
+      CaptionStylePreset.bold => CaptionBackdrop.strongPanel,
+    },
+  );
+
+  CaptionSettings copyWith({
+    CaptionPlacement? placement,
+    CaptionEntrance? entrance,
+    double? startFraction,
+    double? endFraction,
+    CaptionStylePreset? preset,
+    double? sizeScale,
+    CaptionTextColor? textColor,
+    CaptionBackdrop? backdrop,
+    bool clearPreset = false,
+  }) => CaptionSettings(
+    placement: placement ?? this.placement,
+    entrance: entrance ?? this.entrance,
+    startFraction: startFraction ?? this.startFraction,
+    endFraction: endFraction ?? this.endFraction,
+    preset: clearPreset ? null : preset ?? this.preset,
+    sizeScale: sizeScale ?? this.sizeScale,
+    textColor: textColor ?? this.textColor,
+    backdrop: backdrop ?? this.backdrop,
+  );
+
+  CaptionSettings copyStyleFrom(CaptionSettings source) => copyWith(
+    preset: source.preset,
+    sizeScale: source.sizeScale,
+    textColor: source.textColor,
+    backdrop: source.backdrop,
+    clearPreset: source.preset == null,
+  );
 
   CaptionTiming timingFor(Duration clipDuration) {
     final durationMicros = clipDuration.inMicroseconds.toDouble();

@@ -27,7 +27,7 @@ import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 
 // Increment when filter graphs, frame sampling, or render output semantics change.
-const _rendererPipelineSignature = 'renderer-pipeline-v2';
+const _rendererPipelineSignature = 'renderer-pipeline-v3-caption-style';
 
 PreviewRendererRepository createPreviewRendererRepository(AppLogger logger) {
   if (Platform.isAndroid) {
@@ -877,12 +877,25 @@ List<String> _textFilters({
   final offset = settings.entrance == CaptionEntrance.slide
       ? '+${layout.height ~/ 30}*(1-$progress)'
       : '';
+  final color = settings.textColor == CaptionTextColor.white
+      ? 'white'
+      : 'black';
+  final backdrop = settings.backdrop;
+  final filters = <String>[];
+  if (backdrop == CaptionBackdrop.panel ||
+      backdrop == CaptionBackdrop.strongPanel) {
+    final padding = (layout.titleSize / 2).round();
+    final opacity = backdrop == CaptionBackdrop.panel ? '0.72' : '0.88';
+    filters.add(
+      "drawbox=x='iw*0.1':y='${layout.top - padding}$offset':w='iw*0.8':h='${layout.totalHeight + padding * 2}':color=black@$opacity:t=fill:$enable",
+    );
+  }
   String filter(String path, int size, int top, int spacing) =>
-      "drawtext=${fontPath == null ? '' : "fontfile='${_escapeFilterPath(fontPath)}':"}textfile='${_escapeFilterPath(path)}':expansion=none:x='(w-text_w)/2':y='$top$offset':fontsize=$size:fontcolor=white:line_spacing=$spacing:box=1:boxcolor=black@0.75:boxborderw=${(size / 5).round()}:alpha='$alpha':$enable";
-  final filters = <String>[
+      "drawtext=${fontPath == null ? '' : "fontfile='${_escapeFilterPath(fontPath)}':"}textfile='${_escapeFilterPath(path)}':expansion=none:x='(w-text_w)/2':y='$top$offset':fontsize=$size:fontcolor=$color:line_spacing=$spacing:box=${backdrop == CaptionBackdrop.legacy ? 1 : 0}:boxcolor=black@0.75:boxborderw=${(size / 5).round()}:alpha='$alpha':$enable";
+  filters.addAll([
     if (titlePath != null)
       filter(titlePath, layout.titleSize, layout.top, layout.titleLineSpacing),
-  ];
+  ]);
 
   if (subtitlePath != null) {
     filters.add(
@@ -957,7 +970,7 @@ String _previewClipCacheKey({
 }) {
   return _stableHexKey([
     _rendererPipelineSignature,
-    'motion-caption-source-content-v7',
+    'motion-caption-source-content-v8-caption-style',
     clip.mediaId,
     clip.caption,
     clip.captionSupportingLine,

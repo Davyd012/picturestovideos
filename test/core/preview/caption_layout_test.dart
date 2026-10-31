@@ -62,6 +62,101 @@ void main() {
     );
   });
 
+  test(
+    'legacy caption JSON keeps its appearance when style keys are absent',
+    () {
+      final legacy = CaptionSettings.fromJson({
+        'placement': 'top',
+        'entrance': 'fade',
+        'startFraction': 0.2,
+        'endFraction': 0.8,
+      });
+      expect(legacy.placement, CaptionPlacement.top);
+      expect(legacy.entrance, CaptionEntrance.fade);
+      expect(legacy.startFraction, 0.2);
+      expect(legacy.endFraction, 0.8);
+      expect(legacy.sizeScale, 1);
+      expect(legacy.textColor, CaptionTextColor.white);
+      expect(legacy.backdrop, CaptionBackdrop.legacy);
+    },
+  );
+
+  test(
+    'style round trips and applying style preserves per-occurrence timing',
+    () {
+      const style = CaptionSettings(
+        preset: CaptionStylePreset.bold,
+        sizeScale: 1.2,
+        textColor: CaptionTextColor.black,
+        backdrop: CaptionBackdrop.strongPanel,
+      );
+      const occurrence = CaptionSettings(
+        placement: CaptionPlacement.top,
+        entrance: CaptionEntrance.slide,
+        startFraction: 0.25,
+        endFraction: 0.75,
+      );
+      final restored = CaptionSettings.fromJson(style.toJson());
+      expect(restored.preset, CaptionStylePreset.bold);
+      expect(restored.sizeScale, 1.2);
+      expect(restored.textColor, CaptionTextColor.black);
+      expect(restored.backdrop, CaptionBackdrop.strongPanel);
+
+      final applied = occurrence.copyStyleFrom(restored);
+      expect(applied.placement, CaptionPlacement.top);
+      expect(applied.entrance, CaptionEntrance.slide);
+      expect(applied.startFraction, 0.25);
+      expect(applied.endFraction, 0.75);
+      expect(applied.backdrop, CaptionBackdrop.strongPanel);
+    },
+  );
+
+  test('unknown and invalid caption style values fall back safely', () {
+    final invalid = CaptionSettings.fromJson({
+      'placement': 'middle-ish',
+      'entrance': 'bounce',
+      'startFraction': 0.9,
+      'endFraction': 0.2,
+      'preset': 'neon',
+      'sizeScale': 99,
+      'textColor': 'yellow',
+      'backdrop': 'gradient',
+    });
+    expect(invalid.placement, isNull);
+    expect(invalid.entrance, CaptionEntrance.none);
+    expect(invalid.startFraction, 0);
+    expect(invalid.endFraction, 1);
+    expect(invalid.preset, isNull);
+    expect(invalid.sizeScale, 1.4);
+    expect(invalid.textColor, CaptionTextColor.white);
+    expect(invalid.backdrop, CaptionBackdrop.legacy);
+  });
+
+  test(
+    'caption size scales with video coordinates and reports safe area overflow',
+    () {
+      final standard = CaptionLayout(
+        title: 'A readable title',
+        supportingLine: 'A short line',
+        template: VideoTemplates.calmMemories,
+        settings: const CaptionSettings(),
+        width: 1080,
+        height: 1920,
+      );
+      final large = CaptionLayout(
+        title: 'A readable title',
+        supportingLine: 'A short line',
+        template: VideoTemplates.calmMemories,
+        settings: const CaptionSettings(sizeScale: 1.4),
+        width: 1080,
+        height: 1920,
+      );
+      expect(large.titleSize, greaterThan(standard.titleSize));
+      expect(large.top, greaterThanOrEqualTo(192));
+      expect(large.top + large.totalHeight, lessThanOrEqualTo(1728));
+    },
+  );
+
   test('wraps Unicode without splitting emoji and reports overflow and reading time', () {
     const family = '👨‍👩‍👧‍👦';
     for (final ratio in VideoTemplateAspectRatio.values) {

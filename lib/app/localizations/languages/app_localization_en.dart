@@ -48,6 +48,34 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get moveImage => 'Move image';
   @override
+  String queuedImages(int count) => 'Queued images ($count)';
+  @override
+  String get queuedImagesPurpose =>
+      'Images waiting to be placed on the timeline';
+  @override
+  String get bulkImageTools => 'Bulk image tools';
+  @override
+  String get reorder => 'Reorder';
+  @override
+  String get done => 'Done';
+  @override
+  String get selected => 'Selected';
+  @override
+  String get returnToTimelineOrder => 'Return to timeline order';
+  @override
+  String get reviewSequence => 'Review sequence';
+  @override
+  String get openTimeline => 'Open timeline';
+  @override
+  String get clipActions => 'Clip actions';
+  @override
+  String get noTimelineClips => 'No clips are on the timeline yet.';
+  @override
+  String clipMovedToPosition(int position) => 'Moved to position $position';
+  @override
+  String get moveFailed =>
+      'This clip is no longer available. Refresh the list and try again.';
+  @override
   String get position => 'Position';
   @override
   String positionRange(int count) => 'Enter a number from 1 to $count';
@@ -80,6 +108,8 @@ class AppLocalizationEn extends AppLocalizations {
   String get apply => 'Apply';
   @override
   String get clipCaptions => 'Sequence captions';
+  @override
+  String get removeClip => 'Remove clip';
   @override
   String get editCaption => 'Edit caption';
   @override
@@ -274,6 +304,83 @@ class AppLocalizationEn extends AppLocalizations {
   String get captionCenter => 'Center';
   @override
   String get captionTop => 'Top';
+  @override
+  String get captionStyle => 'Style preset';
+  @override
+  String get captionStyleClean => 'Clean';
+  @override
+  String get captionStyleSoft => 'Soft backdrop';
+  @override
+  String get captionStyleBold => 'Bold';
+  @override
+  String get captionSize => 'Caption size';
+  @override
+  String get captionFont => 'Font';
+  @override
+  String get captionFontUnavailable =>
+      'Font choices are unavailable because export uses one detected system font. The preview uses the same neutral text style.';
+  @override
+  String get captionTextColor => 'Text color';
+  @override
+  String get captionBackdrop => 'Backdrop';
+  @override
+  String get captionBackdropNone => 'None';
+  @override
+  String get captionBackdropSoft => 'Soft panel';
+  @override
+  String get captionBackdropStrong => 'Strong panel';
+  @override
+  String get captionBackdropClassic => 'Classic line boxes';
+  @override
+  String get captionBackdropUnavailable =>
+      'Panel backdrops are unavailable because this renderer lacks the drawbox filter.';
+  @override
+  String get captionNoBackdropWarning =>
+      'Without a backdrop, readability changes with the footage. Use a panel for more consistent contrast.';
+  @override
+  String get captionLowContrastWarning =>
+      'Dark text on a dark backdrop may be difficult to read. Choose light text.';
+  @override
+  String get captionSectionText => 'Text';
+  @override
+  String get captionSectionStyle => 'Style';
+  @override
+  String get captionSectionPosition => 'Position';
+  @override
+  String get captionSectionTiming => 'Timing';
+  @override
+  String get captionColorLight => 'Light';
+  @override
+  String get captionColorDark => 'Dark';
+  @override
+  String get captionReset => 'Reset style';
+  @override
+  String get captionNotVisibleAtTime => 'Caption is outside its visible time.';
+  @override
+  String get clipListSort => 'Sort clip list';
+  @override
+  String get clipSortTimeline => 'Timeline order';
+  @override
+  String get clipSortNameAscending => 'Filename A–Z';
+  @override
+  String get clipSortNameDescending => 'Filename Z–A';
+  @override
+  String get clipSortModifiedOldest => 'File modified date: oldest';
+  @override
+  String get clipSortModifiedNewest => 'File modified date: newest';
+  @override
+  String get clipDateUnavailable => 'Date unavailable';
+  @override
+  String get clipRepeatedSource => 'Repeated source';
+  @override
+  String get clipRepeatedDetails => 'Review repeated source occurrences';
+  @override
+  String get clipOccurrence => 'Occurrence';
+  @override
+  String get captionApplyAllStyles => 'Apply style to all clips';
+  @override
+  String get captionApplyAllStylesConfirm =>
+      'Apply this caption appearance to every clip? Their text, placement, timing, and entrance will stay unchanged.';
   @override
   String get captionEntrance => 'Caption entrance';
   @override

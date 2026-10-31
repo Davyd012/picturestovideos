@@ -9,6 +9,7 @@ import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
 import 'package:picturestovideos/core/composition/domain/composition_evaluator.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/caption_layout.dart';
+import 'package:picturestovideos/core/preview/domain/caption_render_colors.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
@@ -25,6 +26,7 @@ class MobileEditorPreviewCard extends ConsumerWidget {
     required this.playback,
     required this.previewState,
     this.audioSourcePath,
+    this.compact = false,
     super.key,
   });
 
@@ -33,6 +35,7 @@ class MobileEditorPreviewCard extends ConsumerWidget {
   final PlaybackState? playback;
   final EditorPreviewState previewState;
   final String? audioSourcePath;
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,7 +73,7 @@ class MobileEditorPreviewCard extends ConsumerWidget {
             ),
           ),
           LinearProgressIndicator(value: progress, minHeight: 6),
-          if (previewState.hasRenderedResult || project != null)
+          if (!compact && (previewState.hasRenderedResult || project != null))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
@@ -377,47 +380,92 @@ class _CaptionPreview extends StatelessWidget {
         final slide = clip.captionSettings.entrance == CaptionEntrance.slide
             ? (layout.height / 30) * (1 - frame.entranceProgress) * scale
             : 0.0;
+        final combined = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (layout.titleText.isNotEmpty)
+              _CaptionLine(
+                text: layout.titleText,
+                size: layout.titleSize * scale,
+                color: CaptionRenderColors.text(clip.captionSettings),
+                isTitle: true,
+                legacyBackdrop:
+                    clip.captionSettings.backdrop == CaptionBackdrop.legacy,
+              ),
+            if (layout.gap > 0) SizedBox(height: layout.gap * scale),
+            if (layout.supportText.isNotEmpty)
+              _CaptionLine(
+                text: layout.supportText,
+                size: layout.supportSize * scale,
+                color: CaptionRenderColors.text(clip.captionSettings),
+                isTitle: false,
+                legacyBackdrop:
+                    clip.captionSettings.backdrop == CaptionBackdrop.legacy,
+              ),
+          ],
+        );
+        final hasPanel =
+            clip.captionSettings.backdrop == CaptionBackdrop.panel ||
+            clip.captionSettings.backdrop == CaptionBackdrop.strongPanel;
+        final padding = (layout.titleSize / 2) * scale;
         return Stack(
           children: [
             Positioned(
-              top: layout.top * scale + slide,
+              top: (layout.top * scale + slide) - (hasPanel ? padding : 0),
               left: constraints.maxWidth * 0.1,
               right: constraints.maxWidth * 0.1,
               child: Opacity(
                 opacity: frame.opacity,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (layout.titleText.isNotEmpty)
-                      ColoredBox(
-                        color: context.colors.surface,
-                        child: Text(
-                          layout.titleText,
-                          textAlign: TextAlign.center,
-                          style: context.textTheme.titleMedium?.copyWith(
-                            fontSize: layout.titleSize * scale,
-                          ),
+                child: hasPanel
+                    ? ColoredBox(
+                        color: CaptionRenderColors.backdrop(
+                          clip.captionSettings,
                         ),
-                      ),
-                    if (layout.gap > 0) SizedBox(height: layout.gap * scale),
-                    if (layout.supportText.isNotEmpty)
-                      ColoredBox(
-                        color: context.colors.surface,
-                        child: Text(
-                          layout.supportText,
-                          textAlign: TextAlign.center,
-                          style: context.textTheme.bodyMedium?.copyWith(
-                            fontSize: layout.supportSize * scale,
-                          ),
+                        child: Padding(
+                          padding: EdgeInsets.all(padding),
+                          child: combined,
                         ),
-                      ),
-                  ],
-                ),
+                      )
+                    : combined,
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+class _CaptionLine extends StatelessWidget {
+  const _CaptionLine({
+    required this.text,
+    required this.size,
+    required this.color,
+    required this.isTitle,
+    required this.legacyBackdrop,
+  });
+
+  final String text;
+  final double size;
+  final Color color;
+  final bool isTitle;
+  final bool legacyBackdrop;
+
+  @override
+  Widget build(BuildContext context) {
+    final caption = Text(
+      text,
+      textAlign: TextAlign.center,
+      style:
+          (isTitle
+                  ? context.textTheme.titleMedium
+                  : context.textTheme.bodyMedium)
+              ?.copyWith(fontSize: size, color: color),
+    );
+    if (!legacyBackdrop) return caption;
+    return ColoredBox(
+      color: CaptionRenderColors.backdrop(const CaptionSettings()),
+      child: caption,
     );
   }
 }

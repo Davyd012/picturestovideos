@@ -100,6 +100,34 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get moveImage => 'Flytt bilde';
   @override
+  String queuedImages(int count) => 'Bilder i kø ($count)';
+  @override
+  String get queuedImagesPurpose =>
+      'Bilder som venter på å bli lagt til i tidslinjen';
+  @override
+  String get bulkImageTools => 'Verktøy for flere bilder';
+  @override
+  String get reorder => 'Endre rekkefølge';
+  @override
+  String get done => 'Ferdig';
+  @override
+  String get selected => 'Valgt';
+  @override
+  String get returnToTimelineOrder => 'Gå tilbake til tidslinjerekkefølgen';
+  @override
+  String get reviewSequence => 'Se gjennom sekvensen';
+  @override
+  String get openTimeline => 'Åpne tidslinjen';
+  @override
+  String get clipActions => 'Klippvalg';
+  @override
+  String get noTimelineClips => 'Det er ingen klipp på tidslinjen ennå.';
+  @override
+  String clipMovedToPosition(int position) => 'Flyttet til plass $position';
+  @override
+  String get moveFailed =>
+      'Dette klippet er ikke lenger tilgjengelig. Oppdater listen og prøv igjen.';
+  @override
   String get position => 'Posisjon';
   @override
   String positionRange(int count) => 'Skriv inn et tall fra 1 til $count';
@@ -132,6 +160,8 @@ class AppLocalizationNo extends AppLocalizationEn {
   String get apply => 'Bruk';
   @override
   String get clipCaptions => 'Tekst i sekvensen';
+  @override
+  String get removeClip => 'Fjern klipp';
   @override
   String get editCaption => 'Rediger tekst';
   @override
@@ -325,6 +355,84 @@ class AppLocalizationNo extends AppLocalizationEn {
   String get captionCenter => 'Midten';
   @override
   String get captionTop => 'Øverst';
+  @override
+  String get captionStyle => 'Forhåndsinnstilling';
+  @override
+  String get captionStyleClean => 'Ren';
+  @override
+  String get captionStyleSoft => 'Myk bakgrunn';
+  @override
+  String get captionStyleBold => 'Tydelig';
+  @override
+  String get captionSize => 'Tekststørrelse';
+  @override
+  String get captionFont => 'Skrift';
+  @override
+  String get captionFontUnavailable =>
+      'Skriftvalg er utilgjengelig fordi eksport bruker én funnet systemskrift. Forhåndsvisningen bruker samme nøytrale tekststil.';
+  @override
+  String get captionTextColor => 'Tekstfarge';
+  @override
+  String get captionBackdrop => 'Bakgrunn';
+  @override
+  String get captionBackdropNone => 'Ingen';
+  @override
+  String get captionBackdropSoft => 'Mykt panel';
+  @override
+  String get captionBackdropStrong => 'Tydelig panel';
+  @override
+  String get captionBackdropClassic => 'Klassiske tekstbokser';
+  @override
+  String get captionBackdropUnavailable =>
+      'Panelbakgrunner er utilgjengelige fordi denne rendereren mangler drawbox-filteret.';
+  @override
+  String get captionNoBackdropWarning =>
+      'Uten bakgrunn varierer lesbarheten med motivet. Bruk et panel for jevnere kontrast.';
+  @override
+  String get captionLowContrastWarning =>
+      'Mørk tekst på mørk bakgrunn kan være vanskelig å lese. Velg lys tekst.';
+  @override
+  String get captionSectionText => 'Tekst';
+  @override
+  String get captionSectionStyle => 'Stil';
+  @override
+  String get captionSectionPosition => 'Plassering';
+  @override
+  String get captionSectionTiming => 'Tid';
+  @override
+  String get captionColorLight => 'Lys';
+  @override
+  String get captionColorDark => 'Mørk';
+  @override
+  String get captionReset => 'Tilbakestill stil';
+  @override
+  String get captionNotVisibleAtTime =>
+      'Teksten vises ikke på dette tidspunktet.';
+  @override
+  String get clipListSort => 'Sorter klipplisten';
+  @override
+  String get clipSortTimeline => 'Tidslinjerekkefølge';
+  @override
+  String get clipSortNameAscending => 'Filnavn A–Å';
+  @override
+  String get clipSortNameDescending => 'Filnavn Å–A';
+  @override
+  String get clipSortModifiedOldest => 'Filendret dato: eldste';
+  @override
+  String get clipSortModifiedNewest => 'Filendret dato: nyeste';
+  @override
+  String get clipDateUnavailable => 'Dato utilgjengelig';
+  @override
+  String get clipRepeatedSource => 'Gjentatt kilde';
+  @override
+  String get clipRepeatedDetails => 'Se gjentatte kildeforekomster';
+  @override
+  String get clipOccurrence => 'Forekomst';
+  @override
+  String get captionApplyAllStyles => 'Bruk stil på alle klipp';
+  @override
+  String get captionApplyAllStylesConfirm =>
+      'Bruke dette utseendet på alle klipp? Tekst, plassering, tid og inngang beholdes.';
   @override
   String get captionEntrance => 'Tekstens inngang';
   @override

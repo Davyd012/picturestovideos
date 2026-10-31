@@ -14,6 +14,7 @@ void main() {
           body: SingleChildScrollView(
             child: CaptionSettingsFields(
               settings: const CaptionSettings(),
+              section: CaptionEditorSection.position,
               overflow: true,
               shortReadingTime: true,
               onChanged: (value) => selected = value,
@@ -22,13 +23,31 @@ void main() {
         ),
       ),
     );
+    final placementField = tester
+        .widget<DropdownButtonFormField<CaptionPlacement?>>(
+          find.byType(DropdownButtonFormField<CaptionPlacement?>),
+        );
+    expect(placementField.onChanged, isNotNull);
+    placementField.onChanged!(CaptionPlacement.top);
+    expect(selected?.placement, CaptionPlacement.top);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: CaptionSettingsFields(
+              settings: const CaptionSettings(),
+              section: CaptionEditorSection.timing,
+              overflow: true,
+              shortReadingTime: true,
+              onChanged: (value) => selected = value,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
     expect(find.textContaining('exceeds the safe area'), findsOneWidget);
     expect(find.textContaining('difficult to read'), findsOneWidget);
-    await tester.tap(find.text('Style default'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Top').last);
-    await tester.pumpAndSettle();
-    expect(selected?.placement, CaptionPlacement.top);
     final slider = tester.widget<RangeSlider>(find.byType(RangeSlider));
     slider.onChanged!(const RangeValues(0.25, 0.75));
     expect(selected?.startFraction, 0.25);

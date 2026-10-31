@@ -1,4 +1,5 @@
 import 'package:picturestovideos/core/composition/domain/video_composition.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
@@ -56,6 +57,7 @@ class RenderCapabilities {
   bool get supportsTransitions => supportsFilter('xfade');
   bool get supportsCaptions =>
       supportsFilter('drawtext') && (fontPath?.isNotEmpty ?? false);
+  bool get supportsCaptionBackdrop => supportsFilter('drawbox');
 
   bool supportsTemplate(VideoTemplate template, {required int clipCount}) {
     if (!platformSupported || !ffmpegAvailable) return false;
@@ -143,6 +145,13 @@ class RenderCapabilities {
     );
     if (hasCaptions) {
       requiredFilters.add('drawtext');
+      if (composition.clips.any(
+        (clip) =>
+            clip.captionSettings.backdrop == CaptionBackdrop.panel ||
+            clip.captionSettings.backdrop == CaptionBackdrop.strongPanel,
+      )) {
+        requiredFilters.add('drawbox');
+      }
     }
     if (composition.template.frameStyle != VideoTemplateFrameStyle.none ||
         (hasCaptions &&

@@ -144,9 +144,42 @@ Muxers:
     expect(unsupportedPlatform.supportsTransitions, isFalse);
     expect(unsupportedPlatform.supportsCaptions, isFalse);
   });
+
+  test('caption panels require drawbox while legacy caption boxes do not', () {
+    final renderer = RenderCapabilities(
+      platformSupported: true,
+      ffmpegAvailable: true,
+      filters: {'scale', 'crop', 'drawtext'},
+      encoders: {'libx264'},
+      muxers: {'mp4'},
+      videoEncoder: 'libx264',
+      fontPath: 'font.ttf',
+    );
+    expect(renderer.issuesFor(_composition(caption: 'Text')), isEmpty);
+    expect(
+      renderer.issuesFor(
+        _composition(
+          caption: 'Text',
+          captionSettings: const CaptionSettings(
+            backdrop: CaptionBackdrop.panel,
+          ),
+          template: VideoTemplates.cleanMemories.copyWith(
+            overlayStyle: VideoTemplateOverlayStyle.none,
+            transition: VideoTemplateTransition.hardCut,
+            imageAnimation: VideoTemplateImageAnimation.none,
+          ),
+        ),
+      ),
+      [RenderCapabilityIssue.missingFilter],
+    );
+  });
 }
 
-VideoComposition _composition({String caption = ''}) => VideoComposition(
+VideoComposition _composition({
+  String caption = '',
+  CaptionSettings captionSettings = const CaptionSettings(),
+  VideoTemplate template = _plainTemplate,
+}) => VideoComposition(
   clips: [
     CompositionClip(
       clipId: 'clip-1',
@@ -164,7 +197,7 @@ VideoComposition _composition({String caption = ''}) => VideoComposition(
       ),
       caption: caption,
       captionSupportingLine: '',
-      captionSettings: const CaptionSettings(),
+      captionSettings: captionSettings,
       transitionType: ClipTransitionType.cut,
       transitionDuration: Duration.zero,
     ),
@@ -172,6 +205,20 @@ VideoComposition _composition({String caption = ''}) => VideoComposition(
   width: 1280,
   height: 720,
   frameRate: 30,
-  template: VideoTemplates.cleanMemories,
+  template: template,
   audioMix: const AudioMix(),
+);
+
+const _plainTemplate = VideoTemplate(
+  id: 'plain',
+  name: 'Plain',
+  description: 'No additional filters',
+  aspectRatio: VideoTemplateAspectRatio.landscape,
+  defaultSlideDuration: Duration(seconds: 2),
+  imageFit: VideoTemplateImageFit.cover,
+  imageAnimation: VideoTemplateImageAnimation.none,
+  textPlacement: VideoTemplateTextPlacement.bottomCenter,
+  overlayStyle: VideoTemplateOverlayStyle.none,
+  frameStyle: VideoTemplateFrameStyle.none,
+  transition: VideoTemplateTransition.hardCut,
 );

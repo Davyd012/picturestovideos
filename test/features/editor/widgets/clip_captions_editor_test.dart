@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/app/localizations/app_localizations.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
@@ -27,6 +28,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -44,7 +47,16 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clip 2: photo.jpg'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 2: photo.jpg'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Fill frame (crop)').first);
     await tester.pumpAndSettle();
@@ -91,6 +103,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -104,7 +118,16 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clip 1: Photo'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 1: Photo'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Clip duration (seconds)'),
@@ -132,6 +155,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -143,7 +168,15 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Clip 1: Photo'));
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 1: Photo'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -171,6 +204,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -184,7 +219,16 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clip 1: Photo'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 1: Photo'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(
       find.text('The transition will be shortened to fit these clips.'),
@@ -213,6 +257,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -228,7 +274,16 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clip 1: photo.jpg'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 1: photo.jpg'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Style default').first);
     await tester.pumpAndSettle();
@@ -267,6 +322,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -285,7 +342,16 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clip 1: photo.jpg'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 1: photo.jpg'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(
@@ -310,6 +376,9 @@ void main() {
       tester.widget<TextFormField>(find.byType(TextFormField).first).enabled,
       isFalse,
     );
+    await tester.ensureVisible(find.text('Timing').last);
+    await tester.tap(find.text('Timing').last);
+    await tester.pumpAndSettle();
     expect(
       tester.widget<RangeSlider>(find.byType(RangeSlider)).onChanged,
       isNull,
@@ -350,6 +419,8 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        builder: (_, child) =>
+            ProviderScope(child: child ?? const SizedBox.shrink()),
         localizationsDelegates: const [AppLocalizations.delegate],
         home: Scaffold(
           body: ClipCaptionsEditor(
@@ -368,7 +439,16 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clip 2: photo.jpg'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Clip 2: photo.jpg'),
+          matching: find.byType(ListTile),
+        ),
+        matching: find.byTooltip('Edit clip'),
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).first, 'Sommer i Norge');
     await tester.enterText(find.byType(TextFormField).last, 'Привет!');
