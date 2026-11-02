@@ -653,6 +653,16 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get importImagesHeading => 'Import images';
   @override
+  String get libraryEmptyTitle => 'Start with your images';
+  @override
+  String get libraryEmptyDescription =>
+      'Add images to choose their order, motion and duration.';
+  @override
+  String get libraryExampleTitle => 'Your image queue';
+  @override
+  String get libraryExampleDescription =>
+      'After importing, tap images to select them.';
+  @override
   String libraryVisibleCount(int count) => 'Visible: $count';
   @override
   String libraryImportedCount(int count) => 'Imported: $count';

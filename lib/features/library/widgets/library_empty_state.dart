@@ -4,122 +4,134 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/features/library/widgets/library_error_message.dart';
 import 'package:picturestovideos/features/library/widgets/library_status_message.dart';
-import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class LibraryEmptyState extends ConsumerWidget {
-  const LibraryEmptyState({
-    required this.visibleCount,
-    required this.selectedCount,
-    super.key,
-  });
-
-  final int visibleCount;
-  final int selectedCount;
+  const LibraryEmptyState({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(libraryViewModelProvider);
-    final viewModel = ref.read(libraryViewModelProvider.notifier);
-    final folderPathsUnavailable =
-        defaultTargetPlatform == TargetPlatform.android;
-
-    return Card(
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card.outlined(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.add_photo_alternate_outlined,
+                  size: 64,
+                  color: context.colors.primary,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  context.l10n.libraryEmptyTitle,
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  context.l10n.libraryEmptyDescription,
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: state.isImporting
+                        ? null
+                        : ref
+                              .read(libraryViewModelProvider.notifier)
+                              .pickImages,
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: Text(context.l10n.importImagesHeading),
+                  ),
+                ),
+                if (state.isImporting) ...[
+                  const SizedBox(height: 16),
+                  const LinearProgressIndicator(),
+                ],
+                if (state.error != null) ...[
+                  const SizedBox(height: 16),
+                  LibraryErrorMessage(error: state.error),
+                ],
+                if (state.importStatus != null) ...[
+                  const SizedBox(height: 16),
+                  LibraryStatusMessage(
+                    status: state.importStatus,
+                    count: state.statusItemCount,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        ExpansionTile(
+          title: Text(context.l10n.importFolder),
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Icon(
-                Icons.add_photo_alternate_outlined,
-                size: 48,
-                color: context.colors.primary,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              context.l10n.importImagesHeading,
-              style: context.textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              context.l10n.libraryDescription,
-              style: context.textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Chip(
-                  label: Text(context.l10n.libraryVisibleCount(visibleCount)),
+            if (defaultTargetPlatform != TargetPlatform.android)
+              TextField(
+                enabled: !state.isImporting,
+                onChanged: ref
+                    .read(libraryViewModelProvider.notifier)
+                    .folderPathChanged,
+                decoration: InputDecoration(
+                  hintText: context.l10n.pasteFolderPath,
                 ),
-                Chip(label: Text(context.l10n.libraryImportedCount(0))),
-                Chip(
-                  label: Text(context.l10n.libraryInEditorCount(selectedCount)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              enabled: !state.isImporting && !folderPathsUnavailable,
-              onChanged: viewModel.folderPathChanged,
-              decoration: InputDecoration(
-                prefixIcon: Icon(Icons.folder_open_outlined),
-                hintText: folderPathsUnavailable
-                    ? null
-                    : context.l10n.pasteFolderPath,
               ),
+            TextButton.icon(
+              onPressed: state.isImporting
+                  ? null
+                  : defaultTargetPlatform == TargetPlatform.android
+                  ? ref
+                        .read(libraryViewModelProvider.notifier)
+                        .importImagesFromFolderPicker
+                  : ref
+                        .read(libraryViewModelProvider.notifier)
+                        .importImagesFromFolderPath,
+              icon: const Icon(Icons.drive_folder_upload_outlined),
+              label: Text(context.l10n.importFolder),
             ),
-            if (folderPathsUnavailable) ...[
-              const SizedBox(height: 8),
-              Text(
-                context.l10n.folderPathUnavailableOnAndroid,
-                style: context.textTheme.bodySmall,
-              ),
-            ],
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                FilledButton.icon(
-                  onPressed: state.isImporting ? null : viewModel.pickImages,
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: Text(context.l10n.pickImages),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Text(
+          context.l10n.libraryExampleTitle,
+          style: context.textTheme.titleLarge,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            for (final icon in [
+              Icons.landscape_outlined,
+              Icons.photo_outlined,
+            ]) ...[
+              Expanded(
+                child: AspectRatio(
+                  aspectRatio: 1.2,
+                  child: Card.filled(
+                    child: Icon(
+                      icon,
+                      size: 48,
+                      color: context.colors.onSurfaceVariant,
+                    ),
+                  ),
                 ),
-                OutlinedButton.icon(
-                  onPressed: state.isImporting
-                      ? null
-                      : folderPathsUnavailable
-                      ? viewModel.importImagesFromFolderPicker
-                      : viewModel.importImagesFromFolderPath,
-                  icon: const Icon(Icons.drive_folder_upload_outlined),
-                  label: Text(context.l10n.importFolder),
-                ),
-              ],
-            ),
-            if (state.isImporting) ...[
-              const SizedBox(height: 16),
-              const LinearProgressIndicator(),
-            ],
-            if (state.error != null) ...[
-              const SizedBox(height: 16),
-              LibraryErrorMessage(error: state.error),
-            ],
-            if (state.importStatus != null) ...[
-              const SizedBox(height: 16),
-              LibraryStatusMessage(
-                status: state.importStatus,
-                count: state.statusItemCount,
               ),
+              if (icon == Icons.landscape_outlined) const SizedBox(width: 8),
             ],
           ],
         ),
-      ),
+        const SizedBox(height: 16),
+        Text(
+          context.l10n.libraryExampleDescription,
+          style: context.textTheme.bodyMedium,
+        ),
+      ],
     );
   }
 }

@@ -7,7 +7,6 @@ import 'package:picturestovideos/features/library/widgets/library_empty_state.da
 import 'package:picturestovideos/features/library/widgets/library_image_grid.dart';
 import 'package:picturestovideos/features/library/widgets/library_toolbar.dart';
 import 'package:picturestovideos/features/library/widgets/selection_action_bar.dart';
-import 'package:picturestovideos/features/library/widgets/staged_summary_card.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
@@ -44,36 +43,14 @@ class LibraryBrowseView extends ConsumerWidget {
                     slivers: [
                       SliverToBoxAdapter(
                         child: Text(
-                          context.l10n.imageLibraryTitle,
-                          style: context.textTheme.headlineMedium,
-                        ),
-                      ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                      SliverToBoxAdapter(
-                        child: Text(
-                          context.l10n.libraryDescription,
-                          style: context.textTheme.bodyLarge,
+                          context.l10n.libraryImportedCount(state.totalCount),
+                          style: context.textTheme.bodyMedium,
                         ),
                       ),
                       const SliverToBoxAdapter(child: SizedBox(height: 24)),
                       if (!state.hasItems)
-                        SliverToBoxAdapter(
-                          child: LibraryEmptyState(
-                            selectedCount: editorSelection.selectedCount,
-                            visibleCount: visibleItems.length,
-                          ),
-                        )
+                        const SliverToBoxAdapter(child: LibraryEmptyState())
                       else ...[
-                        if (editorSelection.hasSelection) ...[
-                          SliverToBoxAdapter(
-                            child: StagedSummaryCard(
-                              importedCount: state.totalCount,
-                              visibleCount: visibleItems.length,
-                              stagedCount: editorSelection.selectedCount,
-                            ),
-                          ),
-                          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                        ],
                         SliverToBoxAdapter(
                           child: LibraryToolbar(
                             visibleCount: visibleItems.length,

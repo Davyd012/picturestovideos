@@ -296,6 +296,10 @@ abstract class AppLocalizations {
   String get selectAction;
   String get importAction;
   String get imageLibraryTitle;
+  String get libraryEmptyTitle;
+  String get libraryEmptyDescription;
+  String get libraryExampleTitle;
+  String get libraryExampleDescription;
   String get libraryDescription;
   String get importImagesHeading;
   String libraryVisibleCount(int count);

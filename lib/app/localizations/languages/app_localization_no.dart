@@ -653,6 +653,16 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get importImagesHeading => 'Importer bilder';
   @override
+  String get libraryEmptyTitle => 'Start med bildene dine';
+  @override
+  String get libraryEmptyDescription =>
+      'Legg til bilder for å velge rekkefølge, bevegelse og varighet.';
+  @override
+  String get libraryExampleTitle => 'Slik vil bildekøen se ut';
+  @override
+  String get libraryExampleDescription =>
+      'Etter import kan du trykke på bilder for å velge dem.';
+  @override
   String libraryVisibleCount(int count) => 'Synlige: $count';
   @override
   String libraryImportedCount(int count) => 'Importert: $count';

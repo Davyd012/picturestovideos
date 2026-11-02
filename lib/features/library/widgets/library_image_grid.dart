@@ -32,11 +32,12 @@ class LibraryImageGrid extends StatelessWidget {
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: width < 420 ? 0.66 : 0.78,
+            childAspectRatio: 1,
           ),
           itemBuilder: (context, index) {
             final item = items[index];
             return ImageGridCard(
+              key: ValueKey(item.id),
               item: item,
               isStaged: stagedIds.contains(item.id),
               isSelected: selectedIds.contains(item.id),

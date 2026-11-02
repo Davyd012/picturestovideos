@@ -19,7 +19,7 @@ class LibraryScreen extends ConsumerWidget {
 
     return AppShellScaffold(
       currentRoute: AppRoutes.library,
-      title: context.l10n.navLibrary,
+      title: context.l10n.imageLibraryTitle,
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 16),

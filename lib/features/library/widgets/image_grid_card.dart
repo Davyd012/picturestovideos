@@ -1,12 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
+import 'package:picturestovideos/features/editor/widgets/media_thumbnail.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/library/library_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
-import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class ImageGridCard extends ConsumerWidget {
   const ImageGridCard({
@@ -22,147 +19,48 @@ class ImageGridCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      elevation: isSelected ? 4 : 1,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _toggleStaged(ref),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  _GridThumbnail(item: item),
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: reduceMotion ? 1 : 0, end: 1),
+      duration: const Duration(milliseconds: 160),
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.scale(scale: 0.96 + 0.04 * value, child: child),
+      ),
+      child: Card.outlined(
+        clipBehavior: Clip.antiAlias,
+        child: Semantics(
+          label: item.title,
+          selected: isSelected,
+          button: true,
+          child: InkWell(
+            onTap: () => ref
+                .read(libraryViewModelProvider.notifier)
+                .itemSelectionToggled(item.id),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                MediaThumbnail(item: item),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => ref
+                        .read(libraryViewModelProvider.notifier)
+                        .itemSelectionToggled(item.id),
+                  ),
+                ),
+                if (isStaged)
                   Positioned(
                     left: 8,
-                    top: 8,
-                    child: _StatusBadge(isStaged: isStaged),
+                    bottom: 8,
+                    child: Chip(label: Text(context.l10n.libraryStaged)),
                   ),
-                  if (isSelected)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Icon(
-                        Icons.check_circle,
-                        color: context.colors.primary,
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${item.sizeLabel} - ${item.importedOnLabel}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.textTheme.labelMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.sourcePath,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: () => _toggleStaged(ref),
-                    icon: Icon(isStaged ? Icons.check : Icons.add),
-                    label: Text(
-                      isStaged
-                          ? context.l10n.libraryStaged
-                          : context.l10n.libraryStage,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  void _toggleStaged(WidgetRef ref) {
-    ref.read(editorMediaSelectionViewModelProvider.notifier).toggleMedia(item);
-    if (isStaged) {
-      ref.read(libraryViewModelProvider.notifier).itemSelectionRemoved(item.id);
-      return;
-    }
-    if (!isSelected) {
-      ref.read(libraryViewModelProvider.notifier).itemSelectionToggled(item.id);
-    }
-  }
-}
-
-class _GridThumbnail extends StatelessWidget {
-  const _GridThumbnail({required this.item});
-
-  final LibraryMediaItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    if (item.thumbnailBytes.isNotEmpty) {
-      return Image.memory(
-        item.thumbnailBytes,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const _BrokenThumbnail(),
-      );
-    }
-    if (item.sourcePath.isNotEmpty) {
-      return Image.file(
-        File(item.sourcePath),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => const _BrokenThumbnail(),
-      );
-    }
-    return const _BrokenThumbnail();
-  }
-}
-
-class _BrokenThumbnail extends StatelessWidget {
-  const _BrokenThumbnail();
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: context.colors.surfaceContainerHighest,
-      child: Center(
-        child: Icon(
-          Icons.broken_image_outlined,
-          size: 40,
-          color: context.colors.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.isStaged});
-
-  final bool isStaged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      visualDensity: VisualDensity.compact,
-      avatar: Icon(isStaged ? Icons.check : Icons.image_outlined),
-      label: Text(
-        isStaged ? context.l10n.libraryStaged : context.l10n.libraryReady,
       ),
     );
   }

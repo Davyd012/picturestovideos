@@ -656,6 +656,16 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get importImagesHeading => 'Импорт фотографий';
   @override
+  String get libraryEmptyTitle => 'Начните с фотографий';
+  @override
+  String get libraryEmptyDescription =>
+      'Добавьте фотографии, чтобы выбрать порядок, движение и длительность.';
+  @override
+  String get libraryExampleTitle => 'Очередь фотографий';
+  @override
+  String get libraryExampleDescription =>
+      'После импорта нажмите на фотографии, чтобы выбрать их.';
+  @override
   String libraryVisibleCount(int count) => 'Видно: $count';
   @override
   String libraryImportedCount(int count) => 'Импортировано: $count';
