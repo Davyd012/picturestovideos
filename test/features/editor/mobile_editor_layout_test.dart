@@ -36,8 +36,9 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Clips'), findsOneWidget);
-      expect(find.text('Queue'), findsOneWidget);
+      expect(find.text('Your project is empty'), findsOneWidget);
+      expect(find.text('Add images from queue'), findsOneWidget);
+      expect(find.text('More'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }

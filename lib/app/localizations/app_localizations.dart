@@ -5,6 +5,15 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_no
 import 'package:picturestovideos/app/localizations/languages/app_localization_ru.dart';
 
 abstract class AppLocalizations {
+  String get emptyEditorTitle;
+  String get emptyEditorDescription;
+  String get emptyEditorAddImages;
+  String get emptyEditorAddQueued;
+  String get emptyEditorSteps;
+  String get emptyEditorOrder;
+  String get emptyEditorEdit;
+  String get emptyEditorExport;
+  String get emptyEditorToolsHint;
   const AppLocalizations();
 
   static const delegate = _AppLocalizationsDelegate();

@@ -2,6 +2,26 @@ import 'package:picturestovideos/app/localizations/app_localizations.dart';
 
 class AppLocalizationEn extends AppLocalizations {
   @override
+  String get emptyEditorTitle => 'Your project is empty';
+  @override
+  String get emptyEditorDescription =>
+      'Import images to make your first video.';
+  @override
+  String get emptyEditorAddImages => 'Add images';
+  @override
+  String get emptyEditorAddQueued => 'Add images from queue';
+  @override
+  String get emptyEditorSteps => 'After adding images';
+  @override
+  String get emptyEditorOrder => 'Choose the order';
+  @override
+  String get emptyEditorEdit => 'Edit framing and motion';
+  @override
+  String get emptyEditorExport => 'Preview and export';
+  @override
+  String get emptyEditorToolsHint =>
+      'Editing tools open after you add at least one image.';
+  @override
   String get editorTimeline => 'Timeline';
   @override
   String get editorMarkers => 'Markers';

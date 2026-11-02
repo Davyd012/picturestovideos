@@ -15,6 +15,7 @@ import 'package:picturestovideos/features/editor/editor_tab_state.dart';
 import 'package:picturestovideos/features/editor/editor_tab_label.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_controls.dart';
 import 'package:picturestovideos/features/editor/widgets/editor_filmstrip.dart';
+import 'package:picturestovideos/features/editor/widgets/empty_editor_state.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_preview_card.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
@@ -95,168 +96,203 @@ class MobileEditorScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilledButton.icon(
-              onPressed: canExport
-                  ? () => context.appNavigator.goToDownload()
-                  : null,
-              icon: const Icon(Icons.ios_share),
-              label: Text(context.l10n.navExport),
+          if (clips.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton.icon(
+                onPressed: canExport
+                    ? () => context.appNavigator.goToDownload()
+                    : null,
+                icon: const Icon(Icons.ios_share),
+                label: Text(context.l10n.navExport),
+              ),
             ),
-          ),
         ],
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 500;
-            final availableHeight = constraints.maxHeight < 400
-                ? 520.0
-                : constraints.maxHeight;
-            final previewHeight = math.min(
-              availableHeight * (compact ? 0.34 : 0.40),
-              constraints.maxWidth /
-                  (project?.template.aspectRatio.value ?? 16 / 9),
-            );
-            final workspace = Column(
-              children: [
-                SizedBox(
-                  height: previewHeight,
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio:
-                          project?.template.aspectRatio.value ?? 16 / 9,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          _AnimatedPreview(project: project, beatMap: beatMap),
-                          Positioned(
-                            left: 0,
-                            bottom: 0,
-                            child: Material(
-                              color: context.colors.surface,
-                              child: IconButton(
-                                onPressed: () => showDialog<void>(
-                                  context: context,
-                                  builder: (_) => _FullscreenPreview(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          layoutBuilder: (current, previous) => Stack(
+            fit: StackFit.expand,
+            children: [...previous, ?current],
+          ),
+          child: clips.isEmpty
+              ? EmptyEditorState(
+                  key: const ValueKey('empty'),
+                  hasQueuedImages: queueCount > 0,
+                  onAdd: () => queueCount > 0
+                      ? context.appNavigator.goToEditorQueue()
+                      : context.appNavigator.goToLibrary(),
+                )
+              : LayoutBuilder(
+                  key: const ValueKey('workspace'),
+                  builder: (context, constraints) {
+                    final compact = constraints.maxHeight < 500;
+                    final availableHeight = constraints.maxHeight < 400
+                        ? 520.0
+                        : constraints.maxHeight;
+                    final previewHeight = math.min(
+                      availableHeight * (compact ? 0.34 : 0.40),
+                      constraints.maxWidth /
+                          (project?.template.aspectRatio.value ?? 16 / 9),
+                    );
+                    final workspace = Column(
+                      children: [
+                        SizedBox(
+                          height: previewHeight,
+                          child: Center(
+                            child: AspectRatio(
+                              aspectRatio:
+                                  project?.template.aspectRatio.value ?? 16 / 9,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  _AnimatedPreview(
                                     project: project,
                                     beatMap: beatMap,
                                   ),
-                                ),
-                                icon: const Icon(Icons.fullscreen),
+                                  Positioned(
+                                    left: 0,
+                                    bottom: 0,
+                                    child: Material(
+                                      color: context.colors.surface,
+                                      child: IconButton(
+                                        onPressed: () => showDialog<void>(
+                                          context: context,
+                                          builder: (_) => _FullscreenPreview(
+                                            project: project,
+                                            beatMap: beatMap,
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.fullscreen),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 8,
+                                    bottom: 8,
+                                    child: ColoredBox(
+                                      color: context.colors.surface,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Text(
+                                          project?.template.aspectRatio.label ??
+                                              '16:9',
+                                          style: context.textTheme.labelSmall,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-                          Positioned(
-                            right: 8,
-                            bottom: 8,
-                            child: ColoredBox(
-                              color: context.colors.surface,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Text(
-                                  project?.template.aspectRatio.label ?? '16:9',
-                                  style: context.textTheme.labelSmall,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                EditorPlaybackBar(
-                  duration: duration,
-                  canPlay: canPlay,
-                  onSeek: (value) => seek(value),
-                  onPlay: () async {
-                    await prepare();
-                    final vm = ref.read(playbackViewModelProvider.notifier);
-                    if (ref
-                            .read(playbackViewModelProvider)
-                            .asData
-                            ?.value
-                            .isPlaying ??
-                        false) {
-                      await vm.pause();
-                    } else {
-                      await vm.play();
-                    }
-                  },
-                  onFullscreen: () => showDialog<void>(
-                    context: context,
-                    builder: (context) =>
-                        _FullscreenPreview(project: project, beatMap: beatMap),
-                  ),
-                  onVolume: () => openAdvanced(EditorTab.tools),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: EditorWorkspaceTab(
-                        label: context.l10n.editorClips,
-                        count: clips.length,
-                        selected: true,
-                        onTap: () {},
-                      ),
-                    ),
-                    Expanded(
-                      child: EditorWorkspaceTab(
-                        label: context.l10n.editorQueue,
-                        count: queueCount,
-                        selected: false,
-                        onTap: () => context.appNavigator.goToEditorQueue(),
-                      ),
-                    ),
-                  ],
-                ),
-                Expanded(
-                  flex: 3,
-                  child: EditorFilmstrip(
-                    clips: clips,
-                    selectedId: selectedId,
-                    audioPath: audioPath,
-                    onSelect: (clip) {
-                      ref
-                          .read(editorClipSelectionViewModelProvider.notifier)
-                          .clipSelected(clip.clipId);
-                      seek(clip.start);
-                    },
-                    onEditClip: (clip) {
-                      ref
-                          .read(editorClipSelectionViewModelProvider.notifier)
-                          .clipSelected(clip.clipId);
-                      context.appNavigator.goToImageSettings(clip.clipId);
-                    },
-                    onReorder: (oldIndex, newIndex) {
-                      if (oldIndex < clips.length && newIndex < clips.length) {
-                        ref
-                            .read(timelineViewModelProvider.notifier)
-                            .clipMoved(
-                              clipId: clips[oldIndex].clipId,
-                              position: newIndex + 1,
+                        ),
+                        EditorPlaybackBar(
+                          duration: duration,
+                          canPlay: canPlay,
+                          onSeek: (value) => seek(value),
+                          onPlay: () async {
+                            await prepare();
+                            final vm = ref.read(
+                              playbackViewModelProvider.notifier,
                             );
-                      }
-                    },
-                    onAdd: () => context.appNavigator.goToEditorQueue(),
-                  ),
+                            if (ref
+                                    .read(playbackViewModelProvider)
+                                    .asData
+                                    ?.value
+                                    .isPlaying ??
+                                false) {
+                              await vm.pause();
+                            } else {
+                              await vm.play();
+                            }
+                          },
+                          onFullscreen: () => showDialog<void>(
+                            context: context,
+                            builder: (context) => _FullscreenPreview(
+                              project: project,
+                              beatMap: beatMap,
+                            ),
+                          ),
+                          onVolume: () => openAdvanced(EditorTab.tools),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: EditorWorkspaceTab(
+                                label: context.l10n.editorClips,
+                                count: clips.length,
+                                selected: true,
+                                onTap: () {},
+                              ),
+                            ),
+                            Expanded(
+                              child: EditorWorkspaceTab(
+                                label: context.l10n.editorQueue,
+                                count: queueCount,
+                                selected: false,
+                                onTap: () =>
+                                    context.appNavigator.goToEditorQueue(),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: EditorFilmstrip(
+                            clips: clips,
+                            selectedId: selectedId,
+                            audioPath: audioPath,
+                            onSelect: (clip) {
+                              ref
+                                  .read(
+                                    editorClipSelectionViewModelProvider
+                                        .notifier,
+                                  )
+                                  .clipSelected(clip.clipId);
+                              seek(clip.start);
+                            },
+                            onEditClip: (clip) {
+                              ref
+                                  .read(
+                                    editorClipSelectionViewModelProvider
+                                        .notifier,
+                                  )
+                                  .clipSelected(clip.clipId);
+                              context.appNavigator.goToImageSettings(
+                                clip.clipId,
+                              );
+                            },
+                            onReorder: (oldIndex, newIndex) {
+                              if (oldIndex < clips.length &&
+                                  newIndex < clips.length) {
+                                ref
+                                    .read(timelineViewModelProvider.notifier)
+                                    .clipMoved(
+                                      clipId: clips[oldIndex].clipId,
+                                      position: newIndex + 1,
+                                    );
+                              }
+                            },
+                            onAdd: () => context.appNavigator.goToEditorQueue(),
+                          ),
+                        ),
+                        EditorToolbar(
+                          enabled: selected != null,
+                          onSettings: settings,
+                          onMore: () => _showMore(context),
+                        ),
+                      ],
+                    );
+                    if (constraints.maxHeight < 400) {
+                      return SingleChildScrollView(
+                        child: SizedBox(height: 520, child: workspace),
+                      );
+                    }
+                    return workspace;
+                  },
                 ),
-                EditorToolbar(
-                  enabled: selected != null,
-                  onSettings: settings,
-                  onMore: () => _showMore(context),
-                ),
-              ],
-            );
-            if (constraints.maxHeight < 400) {
-              return SingleChildScrollView(
-                child: SizedBox(height: 520, child: workspace),
-              );
-            }
-            return workspace;
-          },
         ),
       ),
     );

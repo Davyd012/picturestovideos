@@ -2,6 +2,26 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_en
 
 class AppLocalizationNo extends AppLocalizationEn {
   @override
+  String get emptyEditorTitle => 'Prosjektet er tomt';
+  @override
+  String get emptyEditorDescription =>
+      'Importer bilder for å lage din første video.';
+  @override
+  String get emptyEditorAddImages => 'Legg til bilder';
+  @override
+  String get emptyEditorAddQueued => 'Legg til bilder fra køen';
+  @override
+  String get emptyEditorSteps => 'Når du har lagt til bilder';
+  @override
+  String get emptyEditorOrder => 'Velg rekkefølge';
+  @override
+  String get emptyEditorEdit => 'Rediger utsnitt og bevegelse';
+  @override
+  String get emptyEditorExport => 'Forhåndsvis og eksporter';
+  @override
+  String get emptyEditorToolsHint =>
+      'Redigeringsverktøyene åpnes når du har lagt til minst ett bilde.';
+  @override
   String get editorTimeline => 'Tidslinje';
   @override
   String get editorMarkers => 'Markører';

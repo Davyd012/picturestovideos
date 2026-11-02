@@ -2,6 +2,26 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_en
 
 class AppLocalizationRu extends AppLocalizationEn {
   @override
+  String get emptyEditorTitle => 'Проект пуст';
+  @override
+  String get emptyEditorDescription =>
+      'Импортируйте изображения, чтобы создать первое видео.';
+  @override
+  String get emptyEditorAddImages => 'Добавить изображения';
+  @override
+  String get emptyEditorAddQueued => 'Добавить изображения из очереди';
+  @override
+  String get emptyEditorSteps => 'После добавления изображений';
+  @override
+  String get emptyEditorOrder => 'Выберите порядок';
+  @override
+  String get emptyEditorEdit => 'Настройте кадрирование и движение';
+  @override
+  String get emptyEditorExport => 'Просмотрите и экспортируйте видео';
+  @override
+  String get emptyEditorToolsHint =>
+      'Инструменты редактирования появятся после добавления изображения.';
+  @override
   String get editorTimeline => 'Таймлайн';
   @override
   String get editorMarkers => 'Маркеры';
