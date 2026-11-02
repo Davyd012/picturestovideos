@@ -320,6 +320,8 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get motionIntensity => 'Интенсивность движения';
   @override
+  String get motionApplyAll => 'Применить ко всем изображениям';
+  @override
   String get motionSubtle => 'Незаметное';
   @override
   String get motionMore => 'Больше движения';

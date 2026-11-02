@@ -14,10 +14,18 @@ class PlannedScreenArgs {
   final String summary;
 }
 
+enum ImageSettingsSection { framing, motion, text, timing }
+
 class ImageSettingsRouteArgs {
-  const ImageSettingsRouteArgs.forClip(this.clipId) : mediaId = null;
-  const ImageSettingsRouteArgs.forQueuedMedia(this.mediaId) : clipId = null;
+  const ImageSettingsRouteArgs.forClip(
+    this.clipId, {
+    this.section = ImageSettingsSection.framing,
+  }) : mediaId = null;
+  const ImageSettingsRouteArgs.forQueuedMedia(this.mediaId)
+    : clipId = null,
+      section = ImageSettingsSection.framing;
 
   final String? clipId;
   final String? mediaId;
+  final ImageSettingsSection section;
 }

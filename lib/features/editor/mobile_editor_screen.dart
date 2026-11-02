@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/core/audio/domain/audio_mix.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_editor_preview_frame_use_case.dart';
@@ -12,7 +13,6 @@ import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/editor_clip_selection_view_model.dart';
 import 'package:picturestovideos/features/editor/editor_tab_state.dart';
-import 'package:picturestovideos/features/editor/editor_tab_label.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_controls.dart';
 import 'package:picturestovideos/features/editor/widgets/editor_filmstrip.dart';
 import 'package:picturestovideos/features/editor/widgets/empty_editor_state.dart';
@@ -50,9 +50,9 @@ class MobileEditorScreen extends ConsumerWidget {
     final selectedId = ref
         .watch(editorClipSelectionViewModelProvider)
         .selectedClipId;
-    final selected = clips
-        .where((clip) => clip.clipId == selectedId)
-        .firstOrNull;
+    final selected =
+        clips.where((clip) => clip.clipId == selectedId).firstOrNull ??
+        clips.firstOrNull;
     final duration = project?.videoDuration ?? Duration.zero;
     final canPlay = audioPath?.isNotEmpty ?? false;
     Future<void> prepare() async => ref
@@ -74,9 +74,12 @@ class MobileEditorScreen extends ConsumerWidget {
       await ref.read(playbackViewModelProvider.notifier).seek(position);
     }
 
-    void settings() {
+    void settings(ImageSettingsSection section) {
       if (selected != null) {
-        context.appNavigator.goToImageSettings(selected.clipId);
+        context.appNavigator.goToImageSettings(
+          selected.clipId,
+          section: section,
+        );
       }
     }
 
@@ -112,10 +115,8 @@ class MobileEditorScreen extends ConsumerWidget {
       body: SafeArea(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 180),
-          layoutBuilder: (current, previous) => Stack(
-            fit: StackFit.expand,
-            children: [...previous, ?current],
-          ),
+          layoutBuilder: (current, previous) =>
+              Stack(fit: StackFit.expand, children: [...previous, ?current]),
           child: clips.isEmpty
               ? EmptyEditorState(
                   key: const ValueKey('empty'),
@@ -217,6 +218,26 @@ class MobileEditorScreen extends ConsumerWidget {
                           ),
                           onVolume: () => openAdvanced(EditorTab.tools),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  context.l10n.selected,
+                                  style: context.textTheme.titleMedium,
+                                ),
+                              ),
+                              Text(
+                                '${clips.indexOf(selected!) + 1} / ${clips.length}',
+                                style: context.textTheme.labelLarge,
+                              ),
+                            ],
+                          ),
+                        ),
                         Row(
                           children: [
                             Expanded(
@@ -242,7 +263,7 @@ class MobileEditorScreen extends ConsumerWidget {
                           flex: 3,
                           child: EditorFilmstrip(
                             clips: clips,
-                            selectedId: selectedId,
+                            selectedId: selected.clipId,
                             audioPath: audioPath,
                             onSelect: (clip) {
                               ref
@@ -279,9 +300,9 @@ class MobileEditorScreen extends ConsumerWidget {
                           ),
                         ),
                         EditorToolbar(
-                          enabled: selected != null,
+                          enabled: true,
                           onSettings: settings,
-                          onMore: () => _showMore(context),
+                          onAudio: () => context.appNavigator.goToAudioEditor(),
                         ),
                       ],
                     );
@@ -297,26 +318,6 @@ class MobileEditorScreen extends ConsumerWidget {
       ),
     );
   }
-
-  void _showMore(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    builder: (context) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final tab in EditorTab.values)
-            ListTile(
-              title: Text(editorTabLabel(context, tab)),
-              onTap: () {
-                Navigator.pop(context);
-                openAdvanced(tab);
-              },
-            ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _FullscreenPreview extends ConsumerWidget {

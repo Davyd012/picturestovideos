@@ -61,11 +61,13 @@ class AppNavigator {
 
   Future<T?> goToEditorQueue<T extends Object?>() =>
       pushNamed<T>(AppRoutes.editorQueue);
-  Future<T?> goToImageSettings<T extends Object?>(String clipId) =>
-      pushNamed<T>(
-        AppRoutes.imageSettings,
-        arguments: ImageSettingsRouteArgs.forClip(clipId),
-      );
+  Future<T?> goToImageSettings<T extends Object?>(
+    String clipId, {
+    ImageSettingsSection section = ImageSettingsSection.framing,
+  }) => pushNamed<T>(
+    AppRoutes.imageSettings,
+    arguments: ImageSettingsRouteArgs.forClip(clipId, section: section),
+  );
   Future<T?> goToQueuedImageSettings<T extends Object?>(String mediaId) =>
       pushNamed<T>(
         AppRoutes.imageSettings,

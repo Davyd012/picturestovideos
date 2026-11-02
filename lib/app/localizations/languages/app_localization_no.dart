@@ -318,6 +318,8 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get motionIntensity => 'Bevegelsesmengde';
   @override
+  String get motionApplyAll => 'Bruk på alle bilder';
+  @override
   String get motionSubtle => 'Forsiktig';
   @override
   String get motionMore => 'Mer bevegelse';

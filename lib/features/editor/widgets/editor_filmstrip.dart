@@ -116,11 +116,12 @@ class EditorFilmstrip extends ConsumerWidget {
                             child: InkWell(
                               onTap: () => onSelect(clip),
                               onLongPress: () => onEditClip(clip),
-                              child: Container(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 140),
                                 decoration: BoxDecoration(
                                   border: Border.all(
                                     color: selected
-                                        ? context.colors.primary
+                                        ? context.colors.outline
                                         : context
                                               .colors
                                               .surfaceContainerHighest,

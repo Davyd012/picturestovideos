@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/features/playback/playback_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
@@ -111,7 +112,13 @@ class EditorPlaybackBar extends ConsumerWidget {
             ),
             IconButton.filled(
               onPressed: canPlay ? onPlay : null,
-              icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 140),
+                child: Icon(
+                  playing ? Icons.pause : Icons.play_arrow,
+                  key: ValueKey(playing),
+                ),
+              ),
             ),
             IconButton(
               tooltip: '+10s',
@@ -150,41 +157,50 @@ class EditorToolbar extends StatelessWidget {
     super.key,
     required this.enabled,
     required this.onSettings,
-    required this.onMore,
+    required this.onAudio,
   });
   final bool enabled;
-  final VoidCallback onSettings;
-  final VoidCallback onMore;
+  final ValueChanged<ImageSettingsSection> onSettings;
+  final VoidCallback onAudio;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(8),
-    child: Row(
-      children: enabled
-          ? [
-              _button(context, Icons.tune, context.l10n.editClip, onSettings),
-              _button(context, Icons.crop, context.l10n.editorCrop, onSettings),
-              _button(
-                context,
-                Icons.more_horiz,
-                context.l10n.editorMore,
-                onMore,
-              ),
-            ]
-          : [
-              _button(
-                context,
-                Icons.text_fields,
-                context.l10n.editorText,
-                null,
-              ),
-              _button(context, Icons.speed, context.l10n.editorSpeed, null),
-              _button(
-                context,
-                Icons.more_horiz,
-                context.l10n.editorMore,
-                onMore,
-              ),
-            ],
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _button(
+            context,
+            Icons.image_outlined,
+            context.l10n.editorCrop,
+            enabled ? () => onSettings(ImageSettingsSection.framing) : null,
+          ),
+          _button(
+            context,
+            Icons.animation,
+            context.l10n.motion,
+            enabled ? () => onSettings(ImageSettingsSection.motion) : null,
+          ),
+          _button(
+            context,
+            Icons.text_fields,
+            context.l10n.editorText,
+            enabled ? () => onSettings(ImageSettingsSection.text) : null,
+          ),
+          _button(
+            context,
+            Icons.schedule,
+            context.l10n.editorDisplayDuration,
+            enabled ? () => onSettings(ImageSettingsSection.timing) : null,
+          ),
+          _button(
+            context,
+            Icons.music_note,
+            context.l10n.musicSettings,
+            onAudio,
+          ),
+        ],
+      ),
     ),
   );
   Widget _button(
@@ -192,7 +208,8 @@ class EditorToolbar extends StatelessWidget {
     IconData icon,
     String label,
     VoidCallback? onTap,
-  ) => Expanded(
+  ) => SizedBox(
+    width: 104,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: FilledButton.tonal(

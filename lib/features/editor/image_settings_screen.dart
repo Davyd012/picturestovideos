@@ -69,6 +69,7 @@ class ImageSettingsScreen extends ConsumerWidget {
         maxSeconds: 60,
         initialMotion: false,
         queuedMediaId: media.id,
+        initialSection: ImageSettingsSection.framing,
       );
     }
     final timeline = ref.watch(timelineViewModelProvider).asData?.value;
@@ -101,6 +102,7 @@ class ImageSettingsScreen extends ConsumerWidget {
           clips[index].motionFor(project.template).preset !=
           ClipMotionPreset.none,
       queuedMediaId: null,
+      initialSection: args.section,
     );
   }
 }
@@ -113,6 +115,7 @@ class _SettingsForm extends ConsumerStatefulWidget {
     required this.maxSeconds,
     required this.initialMotion,
     required this.queuedMediaId,
+    required this.initialSection,
   });
   final MediaTrackClipPayload clip;
   final VideoTemplateAspectRatio ratio;
@@ -120,6 +123,7 @@ class _SettingsForm extends ConsumerStatefulWidget {
   final double maxSeconds;
   final bool initialMotion;
   final String? queuedMediaId;
+  final ImageSettingsSection initialSection;
   @override
   ConsumerState<_SettingsForm> createState() => _SettingsFormState();
 }
@@ -130,7 +134,13 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
   late VideoTemplateAspectRatio ratio = widget.ratio;
   late double duration =
       (widget.clip.end - widget.clip.start).inMilliseconds / 1000;
-  late bool motion = widget.initialMotion;
+  late ImageSettingsSection section = widget.initialSection;
+  late ClipMotionPreset? motion = widget.clip.motionOverride;
+  late ClipMotionIntensity? intensity = widget.clip.useStyleMotionIntensity
+      ? null
+      : widget.clip.motionIntensity;
+  bool applyMotionToAll = false;
+  bool motionChanged = false;
   late CaptionSettings captionSettings = widget.clip.captionSettings;
   CaptionEditorSection captionSection = CaptionEditorSection.text;
   double previewFraction = 0.5;
@@ -223,93 +233,124 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (widget.queuedMediaId == null)
-                              Text(context.l10n.editorOutputRatio),
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  ChoiceChip(
-                                    label: Text(context.l10n.editorFit),
-                                    selected:
-                                        fit == VideoTemplateImageFit.contain,
-                                    onSelected: (_) => setState(() {
-                                      fit = VideoTemplateImageFit.contain;
-                                      dirty = true;
-                                    }),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ChoiceChip(
-                                    label: Text(context.l10n.editorFill),
-                                    selected:
-                                        fit == VideoTemplateImageFit.cover,
-                                    onSelected: (_) => setState(() {
-                                      fit = VideoTemplateImageFit.cover;
-                                      dirty = true;
-                                    }),
-                                  ),
-                                  if (widget.queuedMediaId == null)
-                                    for (final value in [
-                                      VideoTemplateAspectRatio.landscape,
-                                      VideoTemplateAspectRatio.square,
-                                      VideoTemplateAspectRatio.portrait,
-                                    ]) ...[
-                                      const SizedBox(width: 8),
-                                      ChoiceChip(
-                                        label: Text(value.label),
-                                        selected: ratio == value,
-                                        onSelected: (_) => setState(() {
-                                          ratio = value;
-                                          dirty = true;
-                                        }),
-                                      ),
-                                    ],
-                                ],
-                              ),
+                    if (widget.queuedMediaId == null) ...[
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SegmentedButton<ImageSettingsSection>(
+                          segments: [
+                            ButtonSegment(
+                              value: ImageSettingsSection.framing,
+                              label: Text(context.l10n.editorCrop),
                             ),
-                            ClipFramingFields(
-                              imageFit: fit,
-                              crop: crop,
-                              sourcePath: widget.clip.sourcePath,
-                              aspectRatio: ratio.value,
-                              onFitChanged: (value) => setState(() {
-                                fit = value;
-                                dirty = true;
-                              }),
-                              onCropChanged: (value) => setState(() {
-                                crop = value;
-                                dirty = true;
-                              }),
+                            ButtonSegment(
+                              value: ImageSettingsSection.motion,
+                              label: Text(context.l10n.motion),
                             ),
-                            if (widget.queuedMediaId == null &&
-                                widget.clip.clipId.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Align(
-                                alignment: AlignmentDirectional.centerStart,
-                                child: TextButton.icon(
-                                  onPressed: () => _applyFramingToAll(),
-                                  icon: Icon(
-                                    applyFramingToAll
-                                        ? Icons.check
-                                        : Icons.copy_all,
-                                  ),
-                                  label: Text(
-                                    context.l10n.applyFramingToAllClips,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ButtonSegment(
+                              value: ImageSettingsSection.text,
+                              label: Text(context.l10n.editorText),
+                            ),
+                            ButtonSegment(
+                              value: ImageSettingsSection.timing,
+                              label: Text(context.l10n.editorDisplayDuration),
+                            ),
                           ],
+                          selected: {section},
+                          onSelectionChanged: (value) =>
+                              setState(() => section = value.first),
                         ),
                       ),
-                    ),
-                    if (widget.queuedMediaId == null) ...[
+                      const SizedBox(height: 16),
+                    ],
+                    if (section == ImageSettingsSection.framing)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (widget.queuedMediaId == null)
+                                Text(context.l10n.editorOutputRatio),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    ChoiceChip(
+                                      label: Text(context.l10n.editorFit),
+                                      selected:
+                                          fit == VideoTemplateImageFit.contain,
+                                      onSelected: (_) => setState(() {
+                                        fit = VideoTemplateImageFit.contain;
+                                        dirty = true;
+                                      }),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ChoiceChip(
+                                      label: Text(context.l10n.editorFill),
+                                      selected:
+                                          fit == VideoTemplateImageFit.cover,
+                                      onSelected: (_) => setState(() {
+                                        fit = VideoTemplateImageFit.cover;
+                                        dirty = true;
+                                      }),
+                                    ),
+                                    if (widget.queuedMediaId == null)
+                                      for (final value in [
+                                        VideoTemplateAspectRatio.landscape,
+                                        VideoTemplateAspectRatio.square,
+                                        VideoTemplateAspectRatio.portrait,
+                                      ]) ...[
+                                        const SizedBox(width: 8),
+                                        ChoiceChip(
+                                          label: Text(value.label),
+                                          selected: ratio == value,
+                                          onSelected: (_) => setState(() {
+                                            ratio = value;
+                                            dirty = true;
+                                          }),
+                                        ),
+                                      ],
+                                  ],
+                                ),
+                              ),
+                              ClipFramingFields(
+                                imageFit: fit,
+                                crop: crop,
+                                sourcePath: widget.clip.sourcePath,
+                                aspectRatio: ratio.value,
+                                onFitChanged: (value) => setState(() {
+                                  fit = value;
+                                  dirty = true;
+                                }),
+                                onCropChanged: (value) => setState(() {
+                                  crop = value;
+                                  dirty = true;
+                                }),
+                              ),
+                              if (widget.queuedMediaId == null &&
+                                  widget.clip.clipId.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: TextButton.icon(
+                                    onPressed: () => _applyFramingToAll(),
+                                    icon: Icon(
+                                      applyFramingToAll
+                                          ? Icons.check
+                                          : Icons.copy_all,
+                                    ),
+                                    label: Text(
+                                      context.l10n.applyFramingToAllClips,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (widget.queuedMediaId == null &&
+                        section == ImageSettingsSection.timing) ...[
                       const SizedBox(height: 8),
                       Card(
                         child: Padding(
@@ -341,6 +382,9 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                           ),
                         ),
                       ),
+                    ],
+                    if (widget.queuedMediaId == null &&
+                        section == ImageSettingsSection.text) ...[
                       const SizedBox(height: 8),
                       _CaptionSettingsCard(
                         clip: widget.clip,
@@ -364,16 +408,90 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                         }),
                         onApplyStyleToAll: _applyCaptionStyleToAll,
                       ),
-                      const SizedBox(height: 8),
+                    ],
+                    if (widget.queuedMediaId == null &&
+                        section == ImageSettingsSection.motion) ...[
                       Card(
-                        child: SwitchListTile(
-                          secondary: const Icon(Icons.animation),
-                          title: Text(context.l10n.editorSmoothAnimation),
-                          value: motion,
-                          onChanged: (value) => setState(() {
-                            motion = value;
-                            dirty = true;
-                          }),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                context.l10n.motion,
+                                style: context.textTheme.titleMedium,
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (final entry
+                                      in <(ClipMotionPreset?, String)>[
+                                        (null, context.l10n.styleDefault),
+                                        (
+                                          ClipMotionPreset.none,
+                                          context.l10n.motionNone,
+                                        ),
+                                        (
+                                          ClipMotionPreset.slowZoomIn,
+                                          context.l10n.motionZoomIn,
+                                        ),
+                                        (
+                                          ClipMotionPreset.slowZoomOut,
+                                          context.l10n.motionZoomOut,
+                                        ),
+                                        (
+                                          ClipMotionPreset.gentlePan,
+                                          context.l10n.motionPan,
+                                        ),
+                                      ])
+                                    ChoiceChip(
+                                      label: Text(entry.$2),
+                                      selected: motion == entry.$1,
+                                      onSelected: (_) => setState(() {
+                                        motion = entry.$1;
+                                        motionChanged = true;
+                                        dirty = true;
+                                      }),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              DropdownButtonFormField<ClipMotionIntensity?>(
+                                initialValue: intensity,
+                                decoration: InputDecoration(
+                                  labelText: context.l10n.motionIntensity,
+                                ),
+                                items: [
+                                  DropdownMenuItem(
+                                    value: null,
+                                    child: Text(context.l10n.styleDefault),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: ClipMotionIntensity.subtle,
+                                    child: Text(context.l10n.motionSubtle),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: ClipMotionIntensity.moreMovement,
+                                    child: Text(context.l10n.motionMore),
+                                  ),
+                                ],
+                                onChanged: (value) => setState(() {
+                                  intensity = value;
+                                  motionChanged = true;
+                                  dirty = true;
+                                }),
+                              ),
+                              SwitchListTile(
+                                title: Text(context.l10n.motionApplyAll),
+                                value: applyMotionToAll,
+                                onChanged: (value) => setState(() {
+                                  applyMotionToAll = value;
+                                  motionChanged = true;
+                                  dirty = true;
+                                }),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -481,12 +599,16 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
         settings: captionSettings,
       );
     }
-    if (motion != widget.initialMotion) {
-      timeline.clipMotionChanged(
-        clipId: widget.clip.clipId,
-        preset: motion ? ClipMotionPreset.slowZoomIn : ClipMotionPreset.none,
-        intensity: null,
-      );
+    if (motionChanged) {
+      if (applyMotionToAll) {
+        timeline.clipMotionAppliedToAll(preset: motion, intensity: intensity);
+      } else {
+        timeline.clipMotionChanged(
+          clipId: widget.clip.clipId,
+          preset: motion,
+          intensity: intensity,
+        );
+      }
     }
     setState(() => dirty = false);
     WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -266,6 +266,8 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get motionIntensity => 'Movement';
   @override
+  String get motionApplyAll => 'Apply to all images';
+  @override
   String get motionSubtle => 'Subtle';
   @override
   String get motionMore => 'More movement';

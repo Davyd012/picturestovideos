@@ -642,6 +642,49 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     );
   }
 
+  void clipMotionAppliedToAll({
+    ClipMotionPreset? preset,
+    ClipMotionIntensity? intensity,
+  }) {
+    final current = _currentState;
+    final project = current.project;
+    if (project == null) return;
+    final updated = project.copyWith(
+      tracks: List.unmodifiable([
+        for (final track in project.tracks)
+          if (track.id == 'track-media')
+            track.copyWith(
+              events: List.unmodifiable([
+                for (final event in track.events)
+                  if (event.payload is MediaTrackClipPayload)
+                    BeatEvent(
+                      time: event.time,
+                      type: event.type,
+                      payload: (event.payload as MediaTrackClipPayload)
+                          .copyWith(
+                            motionOverride: preset,
+                            clearMotionOverride: preset == null,
+                            motionIntensity: intensity,
+                            useStyleMotionIntensity: intensity == null,
+                          ),
+                    )
+                  else
+                    event,
+              ]),
+            )
+          else
+            track,
+      ]),
+      hasManualEdits: true,
+    );
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+  }
+
   void clipTransitionChanged({
     required String clipId,
     ClipTransitionType? type,

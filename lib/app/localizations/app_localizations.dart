@@ -134,6 +134,7 @@ abstract class AppLocalizations {
   String get motionZoomOut;
   String get motionPan;
   String get motionIntensity;
+  String get motionApplyAll;
   String get motionSubtle;
   String get motionMore;
   String get savedProjects;
