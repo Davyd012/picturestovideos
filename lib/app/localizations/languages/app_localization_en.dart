@@ -2,6 +2,46 @@ import 'package:picturestovideos/app/localizations/app_localizations.dart';
 
 class AppLocalizationEn extends AppLocalizations {
   @override
+  String get exportTitle => 'Export video';
+  @override
+  String get exportEmpty => 'No video to export';
+  @override
+  String get exportEmptyHelp =>
+      'Add at least one image to the editor before exporting.';
+  @override
+  String get exportGoImages => 'Go to images';
+  @override
+  String get exportInvalid =>
+      'The sequence is invalid. Check the clips in the editor.';
+  @override
+  String get exportSettings => 'Export settings';
+  @override
+  String get exportFormat => 'Format';
+  @override
+  String get exportResolution => 'Resolution';
+  @override
+  String get exportFrameRate => 'Frame rate';
+  @override
+  String get exportDuration => 'Estimated duration';
+  @override
+  String get exportRendering => 'Exporting video';
+  @override
+  String get exportValidating => 'Checking sequence';
+  @override
+  String get exportComplete => 'Video ready';
+  @override
+  String get exportSave => 'Save to gallery';
+  @override
+  String get exportSaving => 'Saving';
+  @override
+  String get exportSaved => 'Saved to gallery';
+  @override
+  String get exportShare => 'Share';
+  @override
+  String get exportSharing => 'Sharing';
+  @override
+  String get exportProgress => 'Export progress';
+  @override
   String get emptyEditorTitle => 'Your project is empty';
   @override
   String get emptyEditorDescription =>

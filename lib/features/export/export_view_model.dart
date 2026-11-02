@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
+import 'package:picturestovideos/core/composition/domain/video_composition.dart';
 import 'package:picturestovideos/core/preview/application/build_preview_video_use_case.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/build_preview_video_request.dart';
@@ -32,9 +33,18 @@ class ExportViewModel extends Notifier<ExportState> {
     required ProjectTimeline? project,
     required String? audioSourcePath,
   }) async {
-    if (state.isRendering || state.isSaving || state.isSharing) {
+    if (state.isValidating ||
+        state.isRendering ||
+        state.isSaving ||
+        state.isSharing) {
       return;
     }
+    state = state.copyWith(
+      status: ExportStatus.validating,
+      clearResult: true,
+      clearError: true,
+      clearRenderProgress: true,
+    );
     if (project == null) {
       _renderSession++;
       state = const ExportState(
@@ -58,10 +68,27 @@ class ExportViewModel extends Notifier<ExportState> {
       return;
     }
 
+    final composition = VideoComposition.fromProject(
+      project: project,
+      committedClips: clips,
+      width: project.template.aspectRatio.exportWidth,
+      height: project.template.aspectRatio.exportHeight,
+      frameRate: _exportFrameRate,
+      audioSourcePath: audioSourcePath,
+    );
+    if (composition.quantizedForOutput().validate().isNotEmpty) {
+      state = const ExportState(
+        status: ExportStatus.failure,
+        statusMessage: 'Invalid composition',
+      );
+      return;
+    }
+
     final renderSession = ++_renderSession;
     final cancellation = _cancellation = RenderCancellation();
     state = state.copyWith(
       status: ExportStatus.rendering,
+      project: project,
       statusMessage: 'Rendering 1080p MP4 export.',
       clearResult: true,
       clearError: true,
@@ -132,6 +159,12 @@ class ExportViewModel extends Notifier<ExportState> {
       status: ExportStatus.cancelling,
       statusMessage: 'Cancelling export',
     );
+  }
+
+  void projectChanged() {
+    _renderSession++;
+    _cancellation?.cancel();
+    state = const ExportState.initial();
   }
 
   Future<void> saveToGallery() async {

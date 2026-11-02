@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:picturestovideos/app/localizations/app_localizations.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/data/audio_player_repository.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
@@ -16,6 +18,19 @@ import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 
 void main() {
+  testWidgets('empty export is localized in Russian', (tester) async {
+    await tester.pumpWidget(const ProviderScope(child: MaterialApp(
+      locale: Locale('ru'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: [AppLocalizations.delegate, GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
+      home: ExportScreen(),
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Нет видео для экспорта'), findsOneWidget);
+    expect(find.text('Перейти к изображениям'), findsOneWidget);
+    expect(find.text('Export settings'), findsNothing);
+  });
+
   testWidgets('export screen shows blocked state without project data', (
     tester,
   ) async {
@@ -31,9 +46,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Finalize output'), findsOneWidget);
-    expect(find.textContaining('Unavailable'), findsWidgets);
-    expect(find.text('Export / Download'), findsAtLeastNWidgets(1));
+    expect(find.text('No video to export'), findsOneWidget);
+    expect(find.text('Go to images'), findsOneWidget);
+    expect(find.text('Export settings'), findsNothing);
   });
 
   testWidgets('export screen shows ready state when timeline data exists', (
@@ -105,10 +120,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Image preview summary'), findsOneWidget);
-    expect(find.text('Finalize output'), findsOneWidget);
-    expect(find.text('Picture To Videos Project'), findsWidgets);
-    expect(find.text('Render'), findsOneWidget);
+    expect(find.text('Export settings'), findsOneWidget);
+    expect(find.text('MP4'), findsOneWidget);
+    expect(find.text('Export video'), findsWidgets);
   });
 
   testWidgets('export is enabled for manually timed clips without beats', (
@@ -154,7 +168,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final exportButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Export').first,
+      find.widgetWithText(FilledButton, 'Export video').first,
     );
     expect(exportButton.onPressed, isNotNull);
     expect(find.text('Preview unavailable'), findsNothing);
@@ -202,7 +216,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final renderButton = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Render').first,
+      find.widgetWithText(FilledButton, 'Export video').first,
     );
     expect(renderButton.onPressed, isNull);
     expect(

@@ -1,8 +1,10 @@
 import 'package:picturestovideos/core/preview/domain/build_preview_video_result.dart';
 import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
+import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 
 enum ExportStatus {
   idle,
+  validating,
   rendering,
   cancelling,
   cancelled,
@@ -21,6 +23,7 @@ class ExportState {
     this.errorMessage,
     this.capabilityIssue,
     this.renderProgress,
+    this.project,
   });
 
   const ExportState.initial()
@@ -29,7 +32,8 @@ class ExportState {
       result = null,
       errorMessage = null,
       capabilityIssue = null,
-      renderProgress = null;
+      renderProgress = null,
+      project = null;
 
   final ExportStatus status;
   final String statusMessage;
@@ -37,9 +41,11 @@ class ExportState {
   final String? errorMessage;
   final RenderCapabilityIssue? capabilityIssue;
   final BuildPreviewVideoProgress? renderProgress;
+  final ProjectTimeline? project;
 
   bool get isRendering =>
       status == ExportStatus.rendering || status == ExportStatus.cancelling;
+  bool get isValidating => status == ExportStatus.validating;
   bool get isCancelling => status == ExportStatus.cancelling;
   bool get isCancelled => status == ExportStatus.cancelled;
   bool get isReady =>
@@ -60,6 +66,7 @@ class ExportState {
     String? errorMessage,
     RenderCapabilityIssue? capabilityIssue,
     BuildPreviewVideoProgress? renderProgress,
+    ProjectTimeline? project,
     bool clearResult = false,
     bool clearError = false,
     bool clearRenderProgress = false,
@@ -75,6 +82,7 @@ class ExportState {
       renderProgress: clearRenderProgress
           ? null
           : renderProgress ?? this.renderProgress,
+      project: project ?? this.project,
     );
   }
 }

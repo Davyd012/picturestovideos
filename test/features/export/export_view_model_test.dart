@@ -41,6 +41,7 @@ void main() {
               time: Duration.zero,
               type: 'image',
               payload: MediaTrackClipPayload(
+                clipId: 'clip',
                 mediaId: 'image',
                 title: 'Image',
                 tagline: '',
@@ -59,6 +60,10 @@ void main() {
       project: project,
       audioSourcePath: null,
     );
+    renderer.onProgress!(const BuildPreviewVideoProgress(
+      completedSteps: 1, totalSteps: 4, currentStepLabel: 'Rendering',
+    ));
+    expect(container.read(exportViewModelProvider).renderProgress?.percent, 25);
     notifier.cancelRender();
     expect(renderer.cancellation?.isCancelled, isTrue);
     expect(
@@ -100,6 +105,7 @@ void main() {
               time: Duration(seconds: 1),
               type: 'image',
               payload: MediaTrackClipPayload(
+                clipId: 'clip',
                 mediaId: 'image',
                 title: 'Image',
                 tagline: '',
@@ -128,6 +134,7 @@ void main() {
 class _PendingRenderer implements PreviewRendererRepository {
   final result = Completer<BuildPreviewVideoResult>();
   RenderCancellation? cancellation;
+  BuildPreviewVideoProgressCallback? onProgress;
 
   @override
   Future<BuildPreviewVideoResult> buildPreviewVideo(
@@ -136,6 +143,7 @@ class _PendingRenderer implements PreviewRendererRepository {
     RenderCancellation? cancellation,
   }) {
     this.cancellation = cancellation;
+    this.onProgress = onProgress;
     return result.future;
   }
 }

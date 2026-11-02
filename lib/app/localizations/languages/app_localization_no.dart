@@ -2,6 +2,46 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_en
 
 class AppLocalizationNo extends AppLocalizationEn {
   @override
+  String get exportTitle => 'Eksporter video';
+  @override
+  String get exportEmpty => 'Ingen video å eksportere';
+  @override
+  String get exportEmptyHelp =>
+      'Legg til minst ett bilde i editoren før du kan eksportere.';
+  @override
+  String get exportGoImages => 'Gå til bilder';
+  @override
+  String get exportInvalid =>
+      'Sekvensen er ugyldig. Kontroller klippene i editoren.';
+  @override
+  String get exportSettings => 'Eksportinnstillinger';
+  @override
+  String get exportFormat => 'Format';
+  @override
+  String get exportResolution => 'Oppløsning';
+  @override
+  String get exportFrameRate => 'Bilderate';
+  @override
+  String get exportDuration => 'Estimert lengde';
+  @override
+  String get exportRendering => 'Eksporterer video';
+  @override
+  String get exportValidating => 'Kontrollerer sekvensen';
+  @override
+  String get exportComplete => 'Videoen er klar';
+  @override
+  String get exportSave => 'Lagre i galleriet';
+  @override
+  String get exportSaving => 'Lagrer';
+  @override
+  String get exportSaved => 'Lagret i galleriet';
+  @override
+  String get exportShare => 'Del';
+  @override
+  String get exportSharing => 'Deler';
+  @override
+  String get exportProgress => 'Eksportfremdrift';
+  @override
   String get emptyEditorTitle => 'Prosjektet er tomt';
   @override
   String get emptyEditorDescription =>

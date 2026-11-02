@@ -5,6 +5,25 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_no
 import 'package:picturestovideos/app/localizations/languages/app_localization_ru.dart';
 
 abstract class AppLocalizations {
+  String get exportTitle;
+  String get exportEmpty;
+  String get exportEmptyHelp;
+  String get exportGoImages;
+  String get exportInvalid;
+  String get exportSettings;
+  String get exportFormat;
+  String get exportResolution;
+  String get exportFrameRate;
+  String get exportDuration;
+  String get exportRendering;
+  String get exportValidating;
+  String get exportComplete;
+  String get exportSave;
+  String get exportSaving;
+  String get exportSaved;
+  String get exportShare;
+  String get exportSharing;
+  String get exportProgress;
   String get emptyEditorTitle;
   String get emptyEditorDescription;
   String get emptyEditorAddImages;

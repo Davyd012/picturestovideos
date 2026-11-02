@@ -2,6 +2,46 @@ import 'package:picturestovideos/app/localizations/languages/app_localization_en
 
 class AppLocalizationRu extends AppLocalizationEn {
   @override
+  String get exportTitle => 'Экспорт видео';
+  @override
+  String get exportEmpty => 'Нет видео для экспорта';
+  @override
+  String get exportEmptyHelp =>
+      'Добавьте хотя бы одно изображение в редактор перед экспортом.';
+  @override
+  String get exportGoImages => 'Перейти к изображениям';
+  @override
+  String get exportInvalid =>
+      'Последовательность недействительна. Проверьте клипы в редакторе.';
+  @override
+  String get exportSettings => 'Настройки экспорта';
+  @override
+  String get exportFormat => 'Формат';
+  @override
+  String get exportResolution => 'Разрешение';
+  @override
+  String get exportFrameRate => 'Частота кадров';
+  @override
+  String get exportDuration => 'Примерная длительность';
+  @override
+  String get exportRendering => 'Экспорт видео';
+  @override
+  String get exportValidating => 'Проверка последовательности';
+  @override
+  String get exportComplete => 'Видео готово';
+  @override
+  String get exportSave => 'Сохранить в галерею';
+  @override
+  String get exportSaving => 'Сохранение';
+  @override
+  String get exportSaved => 'Сохранено в галерею';
+  @override
+  String get exportShare => 'Поделиться';
+  @override
+  String get exportSharing => 'Отправка';
+  @override
+  String get exportProgress => 'Ход экспорта';
+  @override
   String get emptyEditorTitle => 'Проект пуст';
   @override
   String get emptyEditorDescription =>
