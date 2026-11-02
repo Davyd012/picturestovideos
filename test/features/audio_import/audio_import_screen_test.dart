@@ -25,6 +25,8 @@ import 'package:picturestovideos/core/audio/domain/beat_detection_config.dart';
 import 'package:picturestovideos/core/audio/domain/selected_audio_file.dart';
 import 'package:picturestovideos/core/logging/app_logger.dart';
 import 'package:picturestovideos/features/audio_import/widgets/import_empty_state.dart';
+import 'package:picturestovideos/features/audio_import/audio_import_state.dart';
+import 'package:picturestovideos/features/library/library_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -57,10 +59,12 @@ void main() {
         home: Scaffold(
           appBar: AppBar(title: const Text('Импорт аудио')),
           body: ImportEmptyState(
+            audio: const AudioImportState.initial(),
+            library: const LibraryState.initial(),
             onChooseFile: () {},
-            onSelectSongOnly: () {},
-            onImportFromPath: () {},
-            onSelectSongOnlyFromPath: () {},
+            onChooseImages: () {},
+            onOpenLibrary: () {},
+            onResetAudio: () {},
           ),
         ),
       ),
@@ -68,12 +72,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('Импорт аудио'), findsOneWidget);
-    expect(find.text('Анализ WAV'), findsOneWidget);
-    expect(find.text('Выбрать только песню'), findsOneWidget);
-    expect(find.text('Песня по пути'), findsOneWidget);
+    expect(find.text('Добавьте музыку'), findsOneWidget);
+    expect(find.text('Выберите изображения'), findsOneWidget);
   });
 
-  testWidgets('closing the path dialog then changing tabs keeps app mounted', (
+  testWidgets('changing tabs keeps app mounted', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 1000));
@@ -84,11 +87,6 @@ void main() {
     await _pumpApp(tester);
     await tester.tap(find.text('Import'));
     await _pumpApp(tester);
-    await tester.ensureVisible(find.text('WAV from path'));
-    await tester.tap(find.text('WAV from path'));
-    await _pumpApp(tester);
-    await tester.tap(find.text('Cancel'));
-    await tester.pump(const Duration(seconds: 1));
     await tester.tap(find.text('Library'));
     await _pumpApp(tester);
 
@@ -96,7 +94,7 @@ void main() {
     expect(find.text('Image library'), findsOneWidget);
   });
 
-  testWidgets('import flow renders completed state and pipeline sheet', (
+  testWidgets('imported audio remains visible after changing tabs', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 1000));
@@ -110,20 +108,14 @@ void main() {
     await tester.tap(find.text('Import'));
     await _pumpApp(tester);
 
-    await tester.tap(find.text('Analyze WAV'));
+    await tester.tap(find.text('Choose audio from device'));
     await _pumpApp(tester);
-
-    expect(find.text('Import complete'), findsOneWidget);
     expect(find.text('beat.wav'), findsWidgets);
-    expect(find.text('44100 Hz'), findsOneWidget);
-    expect(find.text('Go to editor'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('View pipeline progress'));
-    await tester.tap(find.text('View pipeline progress'));
+    await tester.tap(find.text('Library'));
     await _pumpApp(tester);
-
-    expect(find.text('Pipeline progress'), findsOneWidget);
-    expect(find.text('Beat detection'), findsOneWidget);
+    await tester.tap(find.text('Import'));
+    await _pumpApp(tester);
+    expect(find.text('beat.wav'), findsWidgets);
   });
 }
 

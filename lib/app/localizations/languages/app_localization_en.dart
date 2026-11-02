@@ -62,6 +62,11 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get centerImage => 'Center image';
   @override
+  String get applyFramingToAllClips => 'Apply framing to all clips';
+  @override
+  String get applyFramingToAllClipsConfirm =>
+      'Apply this image fit and crop to every clip?';
+  @override
   String get cropPositionCentered => 'Centered';
   @override
   String get cropDirectionLeft => 'left';
@@ -540,6 +545,75 @@ class AppLocalizationEn extends AppLocalizations {
   String get navEditor => 'Editor';
   @override
   String get navExport => 'Export';
+  @override
+  String get importMediaTitle => 'Import media';
+
+  @override
+  String get importStepsSubtitle => 'Choose files in two simple steps';
+
+  @override
+  String get importOptionalStep => '1  OPTIONAL';
+
+  @override
+  String get importAddMusic => 'Add music';
+
+  @override
+  String get importMusicDescription =>
+      'Use audio to create a video to the rhythm.';
+
+  @override
+  String get importNoAudio => 'No audio selected';
+
+  @override
+  String get importAudioFormats => 'WAV · can be added later';
+
+  @override
+  String get importAudioFormatsAndroid =>
+      'WAV, MP3, M4A, AAC · can be added later';
+
+  @override
+  String get importChooseAudio => 'Choose audio from device';
+
+  @override
+  String get importChoosingFile => 'Waiting for file selection';
+
+  @override
+  String get importAnalyzing => 'Importing and analyzing audio';
+
+  @override
+  String get importAudioFailed => 'Audio import failed';
+
+  @override
+  String get importStop => 'Stop import';
+
+  @override
+  String get importRequiredStep => '2  REQUIRED';
+
+  @override
+  String get importChooseImagesTitle => 'Choose images';
+
+  @override
+  String get importImagesDescription => 'Choose images from your device.';
+
+  @override
+  String get importImagesProgress => 'Importing images';
+
+  @override
+  String get importChooseImages => 'Choose images from device';
+
+  @override
+  String get importImageFormats => 'JPG, PNG, WEBP · select multiple images';
+
+  @override
+  String get importNextStep =>
+      'Next, select images in the library and open the editor.';
+
+  @override
+  String get importOpenImages => 'Open images';
+
+  @override
+  String get importRetry => 'Try again';
+
   @override
   String get importAudioTitle => 'Import audio';
   @override

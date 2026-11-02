@@ -62,6 +62,11 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get centerImage => 'Sentrer bildet';
   @override
+  String get applyFramingToAllClips => 'Bruk innramming på alle klipp';
+  @override
+  String get applyFramingToAllClipsConfirm =>
+      'Bruke denne bildetilpasningen og beskjæringen på alle klipp?';
+  @override
   String get cropPositionCentered => 'Midtstilt';
   @override
   String get cropDirectionLeft => 'venstre';
@@ -540,6 +545,75 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get styleUnavailable =>
       'Denne stilen krever gjengivelsesfunksjoner som ikke er tilgjengelige på denne enheten.';
+  @override
+  String get importMediaTitle => 'Importer medier';
+
+  @override
+  String get importStepsSubtitle => 'Velg filer i to enkle steg';
+
+  @override
+  String get importOptionalStep => '1  VALGFRITT';
+
+  @override
+  String get importAddMusic => 'Legg til musikk';
+
+  @override
+  String get importMusicDescription => 'Bruk lyd for å lage video til rytmen.';
+
+  @override
+  String get importNoAudio => 'Ingen lyd valgt';
+
+  @override
+  String get importAudioFormats => 'WAV · kan legges til senere';
+
+  @override
+  String get importAudioFormatsAndroid =>
+      'WAV, MP3, M4A, AAC · kan legges til senere';
+
+  @override
+  String get importChooseAudio => 'Velg lyd fra enheten';
+
+  @override
+  String get importChoosingFile => 'Venter på filvalg';
+
+  @override
+  String get importAnalyzing => 'Importerer og analyserer lyd';
+
+  @override
+  String get importAudioFailed => 'Lydimporten mislyktes';
+
+  @override
+  String get importStop => 'Stopp import';
+
+  @override
+  String get importRequiredStep => '2  PÅKREVD';
+
+  @override
+  String get importChooseImagesTitle => 'Velg bilder';
+
+  @override
+  String get importImagesDescription => 'Bruk bilder fra enheten.';
+
+  @override
+  String get importImagesProgress => 'Importerer bilder';
+
+  @override
+  String get importChooseImages => 'Velg bilder fra enheten';
+
+  @override
+  String get importImageFormats =>
+      'JPG, PNG, WEBP · velg flere bilder samtidig';
+
+  @override
+  String get importNextStep =>
+      'Velg deretter bilder i biblioteket og åpne editoren.';
+
+  @override
+  String get importOpenImages => 'Åpne bilder';
+
+  @override
+  String get importRetry => 'Prøv igjen';
+
   @override
   String get importAudioTitle => 'Importer lyd';
   @override

@@ -666,6 +666,44 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     _editClip(clipId, (clip) => clip.copyWith(cropTransform: transform));
   }
 
+  void clipFramingAppliedToAll({
+    required VideoTemplateImageFit imageFit,
+    required ImageCropTransform crop,
+  }) {
+    final current = _currentState;
+    final project = current.project;
+    if (project == null) return;
+    final updated = project.copyWith(
+      tracks: List.unmodifiable([
+        for (final track in project.tracks)
+          if (track.id == 'track-media')
+            track.copyWith(
+              events: List.unmodifiable([
+                for (final event in track.events)
+                  if (event.payload is MediaTrackClipPayload)
+                    BeatEvent(
+                      time: event.time,
+                      type: event.type,
+                      payload: (event.payload as MediaTrackClipPayload)
+                          .copyWith(imageFit: imageFit, cropTransform: crop),
+                    )
+                  else
+                    event,
+              ]),
+            )
+          else
+            track,
+      ]),
+      hasManualEdits: true,
+    );
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+  }
+
   void _editClip(
     String clipId,
     MediaTrackClipPayload Function(MediaTrackClipPayload) edit,

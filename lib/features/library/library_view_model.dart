@@ -13,9 +13,7 @@ import 'package:picturestovideos/features/editor/editor_media_selection_view_mod
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 final libraryViewModelProvider =
-    NotifierProvider.autoDispose<LibraryViewModel, LibraryState>(
-      LibraryViewModel.new,
-    );
+    NotifierProvider<LibraryViewModel, LibraryState>(LibraryViewModel.new);
 
 class LibraryViewModel extends Notifier<LibraryState> {
   static const _tag = 'LibraryViewModel';

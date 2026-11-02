@@ -62,6 +62,11 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get centerImage => 'По центру';
   @override
+  String get applyFramingToAllClips => 'Применить кадрирование ко всем клипам';
+  @override
+  String get applyFramingToAllClipsConfirm =>
+      'Применить этот режим изображения и кадрирование ко всем клипам?';
+  @override
   String get cropPositionCentered => 'По центру';
   @override
   String get cropDirectionLeft => 'левому';
@@ -542,6 +547,76 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get styleUnavailable =>
       'Для этого стиля нужны функции рендеринга, недоступные на этом устройстве.';
+  @override
+  String get importMediaTitle => 'Импорт медиа';
+
+  @override
+  String get importStepsSubtitle => 'Выберите файлы за два простых шага';
+
+  @override
+  String get importOptionalStep => '1  НЕОБЯЗАТЕЛЬНО';
+
+  @override
+  String get importAddMusic => 'Добавьте музыку';
+
+  @override
+  String get importMusicDescription =>
+      'Используйте звук, чтобы создать видео в ритме музыки.';
+
+  @override
+  String get importNoAudio => 'Аудио не выбрано';
+
+  @override
+  String get importAudioFormats => 'WAV · можно добавить позже';
+
+  @override
+  String get importAudioFormatsAndroid =>
+      'WAV, MP3, M4A, AAC · можно добавить позже';
+
+  @override
+  String get importChooseAudio => 'Выбрать аудио на устройстве';
+
+  @override
+  String get importChoosingFile => 'Ожидание выбора файла';
+
+  @override
+  String get importAnalyzing => 'Импорт и анализ аудио';
+
+  @override
+  String get importAudioFailed => 'Не удалось импортировать аудио';
+
+  @override
+  String get importStop => 'Остановить импорт';
+
+  @override
+  String get importRequiredStep => '2  ОБЯЗАТЕЛЬНО';
+
+  @override
+  String get importChooseImagesTitle => 'Выберите изображения';
+
+  @override
+  String get importImagesDescription => 'Выберите изображения на устройстве.';
+
+  @override
+  String get importImagesProgress => 'Импорт изображений';
+
+  @override
+  String get importChooseImages => 'Выбрать изображения на устройстве';
+
+  @override
+  String get importImageFormats =>
+      'JPG, PNG, WEBP · можно выбрать несколько изображений';
+
+  @override
+  String get importNextStep =>
+      'Затем выберите изображения в библиотеке и откройте редактор.';
+
+  @override
+  String get importOpenImages => 'Открыть изображения';
+
+  @override
+  String get importRetry => 'Повторить';
+
   @override
   String get importAudioTitle => 'Импорт аудио';
   @override

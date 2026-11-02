@@ -4,16 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
+import 'package:picturestovideos/core/preview/domain/caption_layout.dart';
+import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
+import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/features/editor/widgets/clip_framing_fields.dart';
+import 'package:picturestovideos/features/editor/widgets/caption_editor_preview.dart';
+import 'package:picturestovideos/features/editor/widgets/caption_settings_fields.dart';
 import 'package:picturestovideos/features/editor/widgets/media_thumbnail.dart';
 import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
 class ImageSettingsScreen extends ConsumerWidget {
   ImageSettingsScreen({String? clipId, ImageSettingsRouteArgs? args, super.key})
@@ -53,6 +59,13 @@ class ImageSettingsScreen extends ConsumerWidget {
       return _SettingsForm(
         clip: clip,
         ratio: ratio,
+        template:
+            ref
+                .watch(timelineViewModelProvider)
+                .asData
+                ?.value
+                .selectedTemplate ??
+            VideoTemplates.cleanMemories,
         maxSeconds: 60,
         initialMotion: false,
         queuedMediaId: media.id,
@@ -82,6 +95,7 @@ class ImageSettingsScreen extends ConsumerWidget {
     return _SettingsForm(
       clip: clips[index],
       ratio: project.template.aspectRatio,
+      template: project.template,
       maxSeconds: maxSeconds,
       initialMotion:
           clips[index].motionFor(project.template).preset !=
@@ -95,12 +109,14 @@ class _SettingsForm extends ConsumerStatefulWidget {
   const _SettingsForm({
     required this.clip,
     required this.ratio,
+    required this.template,
     required this.maxSeconds,
     required this.initialMotion,
     required this.queuedMediaId,
   });
   final MediaTrackClipPayload clip;
   final VideoTemplateAspectRatio ratio;
+  final VideoTemplate template;
   final double maxSeconds;
   final bool initialMotion;
   final String? queuedMediaId;
@@ -115,13 +131,22 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
   late double duration =
       (widget.clip.end - widget.clip.start).inMilliseconds / 1000;
   late bool motion = widget.initialMotion;
+  late CaptionSettings captionSettings = widget.clip.captionSettings;
+  CaptionEditorSection captionSection = CaptionEditorSection.text;
+  double previewFraction = 0.5;
+  bool applyCaptionStyleToAll = false;
   late final TextEditingController caption = TextEditingController(
     text: widget.clip.caption,
   );
+  late final TextEditingController supportingLine = TextEditingController(
+    text: widget.clip.captionSupportingLine,
+  );
   bool dirty = false;
+  bool applyFramingToAll = false;
   @override
   void dispose() {
     caption.dispose();
+    supportingLine.dispose();
     super.dispose();
   }
 
@@ -248,11 +273,38 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                                 ],
                               ),
                             ),
-                            TextButton.icon(
-                              onPressed: () => _editCrop(context),
-                              icon: const Icon(Icons.crop),
-                              label: Text(context.l10n.adjustCrop),
+                            ClipFramingFields(
+                              imageFit: fit,
+                              crop: crop,
+                              sourcePath: widget.clip.sourcePath,
+                              aspectRatio: ratio.value,
+                              onFitChanged: (value) => setState(() {
+                                fit = value;
+                                dirty = true;
+                              }),
+                              onCropChanged: (value) => setState(() {
+                                crop = value;
+                                dirty = true;
+                              }),
                             ),
+                            if (widget.queuedMediaId == null &&
+                                widget.clip.clipId.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: TextButton.icon(
+                                  onPressed: () => _applyFramingToAll(),
+                                  icon: Icon(
+                                    applyFramingToAll
+                                        ? Icons.check
+                                        : Icons.copy_all,
+                                  ),
+                                  label: Text(
+                                    context.l10n.applyFramingToAllClips,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -290,25 +342,27 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: TextField(
-                            controller: caption,
-                            maxLength: 100,
-                            decoration: InputDecoration(
-                              labelText: context.l10n.editorOptionalCaption,
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  caption.clear();
-                                  setState(() => dirty = true);
-                                },
-                                icon: const Icon(Icons.clear),
-                              ),
-                            ),
-                            onChanged: (_) => setState(() => dirty = true),
-                          ),
-                        ),
+                      _CaptionSettingsCard(
+                        clip: widget.clip,
+                        template: widget.template.copyWith(aspectRatio: ratio),
+                        duration: duration,
+                        caption: caption,
+                        supportingLine: supportingLine,
+                        settings: captionSettings,
+                        section: captionSection,
+                        previewFraction: previewFraction,
+                        applyToAll: applyCaptionStyleToAll,
+                        onCaptionChanged: () => setState(() => dirty = true),
+                        onSettingsChanged: (value) => setState(() {
+                          captionSettings = value;
+                          dirty = true;
+                        }),
+                        onSectionChanged: (value) =>
+                            setState(() => captionSection = value),
+                        onPreviewFractionChanged: (value) => setState(() {
+                          previewFraction = value;
+                        }),
+                        onApplyStyleToAll: _applyCaptionStyleToAll,
                       ),
                       const SizedBox(height: 8),
                       Card(
@@ -343,41 +397,26 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     );
   }
 
-  Future<void> _editCrop(BuildContext context) async {
-    var draftFit = fit;
-    var draftCrop = crop;
+  Future<void> _applyFramingToAll() async {
     final apply = await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: Text(context.l10n.adjustCrop),
-          content: SingleChildScrollView(
-            child: ClipFramingFields(
-              imageFit: draftFit,
-              crop: draftCrop,
-              sourcePath: widget.clip.sourcePath,
-              aspectRatio: ratio.value,
-              onFitChanged: (value) => update(() => draftFit = value),
-              onCropChanged: (value) => update(() => draftCrop = value),
-            ),
+      builder: (context) => AlertDialog(
+        content: Text(context.l10n.applyFramingToAllClipsConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(context.l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(context.l10n.apply),
-            ),
-          ],
-        ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.apply),
+          ),
+        ],
       ),
     );
     if (apply == true && mounted) {
       setState(() {
-        fit = draftFit;
-        crop = draftCrop;
+        applyFramingToAll = true;
         dirty = true;
       });
     }
@@ -402,6 +441,12 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     }
     final timeline = ref.read(timelineViewModelProvider.notifier);
     if (ratio != widget.ratio) timeline.aspectRatioSelected(ratio);
+    if (applyFramingToAll) {
+      timeline.clipFramingAppliedToAll(imageFit: fit, crop: crop);
+    }
+    if (applyCaptionStyleToAll) {
+      timeline.captionStyleAppliedToAll(captionSettings);
+    }
     if (fit != widget.clip.imageFit) {
       timeline.clipImageFitChanged(clipId: widget.clip.clipId, imageFit: fit);
     }
@@ -420,7 +465,20 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       timeline.captionChanged(
         clipId: widget.clip.clipId,
         caption: caption.text,
-        supportingLine: widget.clip.captionSupportingLine,
+        supportingLine: supportingLine.text,
+      );
+    }
+    if (supportingLine.text != widget.clip.captionSupportingLine) {
+      timeline.captionChanged(
+        clipId: widget.clip.clipId,
+        caption: caption.text,
+        supportingLine: supportingLine.text,
+      );
+    }
+    if (captionSettings != widget.clip.captionSettings) {
+      timeline.captionSettingsChanged(
+        clipId: widget.clip.clipId,
+        settings: captionSettings,
       );
     }
     if (motion != widget.initialMotion) {
@@ -434,5 +492,168 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.appNavigator.maybePop();
     });
+  }
+
+  Future<void> _applyCaptionStyleToAll() async {
+    final apply = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text(context.l10n.captionApplyAllStylesConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.apply),
+          ),
+        ],
+      ),
+    );
+    if (apply == true && mounted) {
+      setState(() {
+        applyCaptionStyleToAll = true;
+        dirty = true;
+      });
+    }
+  }
+}
+
+class _CaptionSettingsCard extends StatelessWidget {
+  const _CaptionSettingsCard({
+    required this.clip,
+    required this.template,
+    required this.duration,
+    required this.caption,
+    required this.supportingLine,
+    required this.settings,
+    required this.section,
+    required this.previewFraction,
+    required this.applyToAll,
+    required this.onCaptionChanged,
+    required this.onSettingsChanged,
+    required this.onSectionChanged,
+    required this.onPreviewFractionChanged,
+    required this.onApplyStyleToAll,
+  });
+
+  final MediaTrackClipPayload clip;
+  final VideoTemplate template;
+  final double duration;
+  final TextEditingController caption;
+  final TextEditingController supportingLine;
+  final CaptionSettings settings;
+  final CaptionEditorSection section;
+  final double previewFraction;
+  final bool applyToAll;
+  final VoidCallback onCaptionChanged;
+  final ValueChanged<CaptionSettings> onSettingsChanged;
+  final ValueChanged<CaptionEditorSection> onSectionChanged;
+  final ValueChanged<double> onPreviewFractionChanged;
+  final VoidCallback onApplyStyleToAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final clipDuration = Duration(milliseconds: (duration * 1000).round());
+    final ratio = template.aspectRatio;
+    final layout = CaptionLayout(
+      title: caption.text,
+      supportingLine: supportingLine.text,
+      template: template,
+      settings: settings,
+      width: ratio.exportWidth,
+      height: ratio.exportHeight,
+    );
+    final visibleDuration = Duration(
+      microseconds:
+          (clipDuration.inMicroseconds *
+                  (settings.endFraction - settings.startFraction))
+              .round(),
+    );
+    final previewWidth = (MediaQuery.sizeOf(context).width - 64)
+        .clamp(0.0, 560.0)
+        .toDouble();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CaptionEditorPreview(
+              sourcePath: clip.sourcePath,
+              title: caption.text,
+              supportingLine: supportingLine.text,
+              settings: settings,
+              template: template,
+              clipDuration: clipDuration,
+              previewTime: Duration(
+                microseconds: (clipDuration.inMicroseconds * previewFraction)
+                    .round(),
+              ),
+              width: previewWidth,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              context.l10n.captionTiming,
+              style: context.textTheme.labelLarge,
+            ),
+            Slider(
+              min: 0,
+              max: 1,
+              divisions: 100,
+              value: previewFraction,
+              semanticFormatterCallback: (value) =>
+                  '${(clipDuration.inSeconds * value).toStringAsFixed(1)} s',
+              onChanged: onPreviewFractionChanged,
+            ),
+            CaptionSettingsFields(
+              settings: settings,
+              section: section,
+              onSectionChanged: onSectionChanged,
+              overflow: layout.overflow,
+              shortReadingTime: layout.readingTimeIsShort(visibleDuration),
+              clipDuration: clipDuration,
+              onChanged: onSettingsChanged,
+            ),
+            if (section == CaptionEditorSection.text) ...[
+              const SizedBox(height: 8),
+              TextField(
+                controller: caption,
+                maxLength: 100,
+                decoration: InputDecoration(
+                  labelText: context.l10n.editorOptionalCaption,
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      caption.clear();
+                      onCaptionChanged();
+                    },
+                    icon: const Icon(Icons.clear),
+                  ),
+                ),
+                onChanged: (_) => onCaptionChanged(),
+              ),
+              TextField(
+                controller: supportingLine,
+                maxLength: 100,
+                decoration: InputDecoration(
+                  labelText: context.l10n.captionSupportingLine,
+                ),
+                onChanged: (_) => onCaptionChanged(),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: onApplyStyleToAll,
+                icon: Icon(applyToAll ? Icons.check : Icons.copy_all),
+                label: Text(context.l10n.captionApplyAllStyles),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
