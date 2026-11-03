@@ -6,7 +6,8 @@ enum ClipMotionPreset {
   none,
   slowZoomIn,
   slowZoomOut,
-  gentlePan;
+  gentlePan,
+  gentlePanReverse;
 
   static ClipMotionPreset fromTemplate(VideoTemplateImageAnimation animation) =>
       switch (animation) {
@@ -28,11 +29,15 @@ class ClipMotion {
 
   double get amount => intensity == ClipMotionIntensity.subtle ? 0.08 : 0.16;
   double get startZoom => switch (preset) {
-    ClipMotionPreset.slowZoomOut || ClipMotionPreset.gentlePan => 1 + amount,
+    ClipMotionPreset.slowZoomOut ||
+    ClipMotionPreset.gentlePan ||
+    ClipMotionPreset.gentlePanReverse => 1 + amount,
     _ => 1,
   };
   double get endZoom => switch (preset) {
-    ClipMotionPreset.slowZoomIn || ClipMotionPreset.gentlePan => 1 + amount,
+    ClipMotionPreset.slowZoomIn ||
+    ClipMotionPreset.gentlePan ||
+    ClipMotionPreset.gentlePanReverse => 1 + amount,
     _ => 1,
   };
   double zoomAt(double progress) =>
@@ -41,8 +46,12 @@ class ClipMotion {
   /// The pan range shrinks near an edge, keeping the selected focal point visible.
   double horizontalAnchorAt(double progress, double focalX) {
     final anchor = ((focalX + 1) / 2).clamp(0.0, 1.0);
-    if (preset != ClipMotionPreset.gentlePan) return anchor;
+    if (preset != ClipMotionPreset.gentlePan &&
+        preset != ClipMotionPreset.gentlePanReverse) {
+      return anchor;
+    }
     final range = math.min(anchor, 1 - anchor);
-    return anchor + (2 * progress.clamp(0, 1) - 1) * range;
+    final direction = preset == ClipMotionPreset.gentlePanReverse ? -1 : 1;
+    return anchor + direction * (2 * progress.clamp(0, 1) - 1) * range;
   }
 }

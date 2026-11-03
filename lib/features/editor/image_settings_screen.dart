@@ -3,20 +3,28 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/core/preview/application/resolve_preview_clips_use_case.dart';
+import 'package:picturestovideos/core/preview/data/render_capability_repository.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
-import 'package:picturestovideos/core/preview/domain/caption_layout.dart';
+import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
-import 'package:picturestovideos/features/editor/widgets/clip_framing_fields.dart';
+import 'package:picturestovideos/features/editor/clip_editor_controller.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_framing_card.dart';
 import 'package:picturestovideos/features/editor/widgets/caption_editor_preview.dart';
 import 'package:picturestovideos/features/editor/widgets/caption_settings_fields.dart';
-import 'package:picturestovideos/features/editor/widgets/media_thumbnail.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_caption_settings_card.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_motion_card.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_scope_selector.dart';
+import 'package:picturestovideos/features/editor/widgets/transition_editor_fields.dart';
+import 'package:picturestovideos/features/editor/widgets/transition_demo.dart';
+import 'package:picturestovideos/features/editor/widgets/clip_framing_preview.dart';
 import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
+import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
@@ -67,9 +75,13 @@ class ImageSettingsScreen extends ConsumerWidget {
                 .selectedTemplate ??
             VideoTemplates.cleanMemories,
         maxSeconds: 60,
-        initialMotion: false,
         queuedMediaId: media.id,
+        queuedMedia: media,
         initialSection: ImageSettingsSection.framing,
+        next: null,
+        index: selection.selectedMedia.indexWhere((item) => item.id == mediaId),
+        count: selection.selectedMedia.length,
+        snap: false,
       );
     }
     final timeline = ref.watch(timelineViewModelProvider).asData?.value;
@@ -98,11 +110,16 @@ class ImageSettingsScreen extends ConsumerWidget {
       ratio: project.template.aspectRatio,
       template: project.template,
       maxSeconds: maxSeconds,
-      initialMotion:
-          clips[index].motionFor(project.template).preset !=
-          ClipMotionPreset.none,
       queuedMediaId: null,
-      initialSection: args.section,
+      queuedMedia: null,
+      initialSection:
+          args.section == ImageSettingsSection.transition && next == null
+          ? ImageSettingsSection.framing
+          : args.section,
+      next: next,
+      index: index,
+      count: clips.length,
+      snap: project.snapToMarkers,
     );
   }
 }
@@ -113,46 +130,103 @@ class _SettingsForm extends ConsumerStatefulWidget {
     required this.ratio,
     required this.template,
     required this.maxSeconds,
-    required this.initialMotion,
     required this.queuedMediaId,
+    required this.queuedMedia,
     required this.initialSection,
+    required this.next,
+    required this.index,
+    required this.count,
+    required this.snap,
   });
   final MediaTrackClipPayload clip;
   final VideoTemplateAspectRatio ratio;
   final VideoTemplate template;
   final double maxSeconds;
-  final bool initialMotion;
   final String? queuedMediaId;
+  final LibraryMediaItem? queuedMedia;
   final ImageSettingsSection initialSection;
+  final MediaTrackClipPayload? next;
+  final int index;
+  final int count;
+  final bool snap;
   @override
   ConsumerState<_SettingsForm> createState() => _SettingsFormState();
 }
 
 class _SettingsFormState extends ConsumerState<_SettingsForm> {
-  late VideoTemplateImageFit fit = widget.clip.imageFit;
-  late ImageCropTransform crop = widget.clip.cropTransform;
-  late VideoTemplateAspectRatio ratio = widget.ratio;
-  late double duration =
-      (widget.clip.end - widget.clip.start).inMilliseconds / 1000;
-  late ImageSettingsSection section = widget.initialSection;
-  late ClipMotionPreset? motion = widget.clip.motionOverride;
-  late ClipMotionIntensity? intensity = widget.clip.useStyleMotionIntensity
-      ? null
-      : widget.clip.motionIntensity;
-  bool applyMotionToAll = false;
-  bool motionChanged = false;
-  late CaptionSettings captionSettings = widget.clip.captionSettings;
-  CaptionEditorSection captionSection = CaptionEditorSection.text;
-  double previewFraction = 0.5;
-  bool applyCaptionStyleToAll = false;
+  late final ClipEditorSeed seed = ClipEditorSeed(
+    widget.clip,
+    widget.ratio,
+    widget.initialSection,
+    snap: widget.snap,
+  );
+  ClipEditorDraft get draft => ref.read(clipEditorControllerProvider(seed));
+  ClipEditorController get controller =>
+      ref.read(clipEditorControllerProvider(seed).notifier);
+  VideoTemplateImageFit get fit => draft.fit;
+  set fit(VideoTemplateImageFit value) => controller.fitChanged(value);
+  ImageCropTransform get crop => draft.crop;
+  set crop(ImageCropTransform value) => controller.cropChanged(value);
+  VideoTemplateAspectRatio get ratio => draft.ratio;
+  set ratio(VideoTemplateAspectRatio value) => controller.ratioChanged(value);
+  double get duration => draft.duration;
+  set duration(double value) => controller.durationChanged(value);
+  ImageSettingsSection get section => draft.section;
+  set section(ImageSettingsSection value) => controller.sectionChanged(value);
+  ClipMotionPreset? get motion => draft.motion;
+  set motion(ClipMotionPreset? value) => controller.motionChanged(value);
+  ClipMotionIntensity? get intensity => draft.intensity;
+  set intensity(ClipMotionIntensity? value) =>
+      controller.intensityChanged(value);
+  bool get applyMotionToAll => draft.motionScope == ClipEditScope.all;
+  set applyMotionToAll(bool value) => controller.motionScopeChanged(
+    value ? ClipEditScope.all : ClipEditScope.clip,
+  );
+  bool get motionChanged => draft.motionChanged;
+  set motionChanged(bool value) => controller.motionEdited(value);
+  ClipTransitionType? get transition => draft.transition;
+  set transition(ClipTransitionType? value) =>
+      controller.transitionChanged(value);
+  Duration get transitionDuration => draft.transitionDuration;
+  set transitionDuration(Duration value) =>
+      controller.transitionDurationChanged(value);
+  int get transitionSelectionRevision => draft.transitionSelectionRevision;
+  set transitionSelectionRevision(int value) =>
+      controller.transitionPreviewRequested(value);
+  CaptionSettings get captionSettings => draft.captionSettings;
+  set captionSettings(CaptionSettings value) =>
+      controller.captionSettingsChanged(value);
+  CaptionEditorSection get captionSection => draft.captionSection;
+  set captionSection(CaptionEditorSection value) =>
+      controller.captionSectionChanged(value);
+  double get previewFraction => draft.previewFraction;
+  set previewFraction(double value) => controller.previewTimeChanged(value);
+  bool get applyCaptionStyleToAll =>
+      draft.captionStyleScope == ClipEditScope.all;
+  set applyCaptionStyleToAll(bool value) => controller.captionStyleScopeChanged(
+    value ? ClipEditScope.all : ClipEditScope.clip,
+  );
+  bool get applyCaptionToAll => switch (captionSection) {
+    CaptionEditorSection.text => draft.captionTextScope == ClipEditScope.all,
+    CaptionEditorSection.style => draft.captionStyleScope == ClipEditScope.all,
+    CaptionEditorSection.position =>
+      draft.captionPositionScope == ClipEditScope.all,
+    CaptionEditorSection.timing =>
+      draft.captionTimingScope == ClipEditScope.all,
+  };
+  bool get applyTransitionToAll => draft.transitionScope == ClipEditScope.all;
   late final TextEditingController caption = TextEditingController(
     text: widget.clip.caption,
   );
   late final TextEditingController supportingLine = TextEditingController(
     text: widget.clip.captionSupportingLine,
   );
-  bool dirty = false;
-  bool applyFramingToAll = false;
+  bool get dirty => draft.dirty;
+  set dirty(bool value) => controller.dirtyChanged(value);
+  bool get applyFramingToAll => draft.framingScope == ClipEditScope.all;
+  set applyFramingToAll(bool value) => controller.framingScopeChanged(
+    value ? ClipEditScope.all : ClipEditScope.clip,
+  );
   @override
   void dispose() {
     caption.dispose();
@@ -179,13 +253,65 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
         ),
       );
       if (discard != true || !mounted) return;
+      controller.dirtyChanged(false);
+      await WidgetsBinding.instance.endOfFrame;
     }
     if (mounted) context.appNavigator.maybePop();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(clipEditorControllerProvider(seed));
+    final capabilityState = widget.queuedMediaId == null
+        ? ref.watch(renderCapabilitiesProvider)
+        : null;
+    final capabilities = capabilityState?.asData?.value;
+    String? unavailable(bool supported, String unsupported) {
+      if (capabilities == null) {
+        return (capabilityState?.hasError ?? false)
+            ? context.l10n.exportCapabilityProbeFailed
+            : context.l10n.exportCapabilityChecking;
+      }
+      if (!capabilities.platformSupported) {
+        return context.l10n.exportUnsupportedPlatform;
+      }
+      if (!capabilities.ffmpegAvailable) {
+        return context.l10n.exportMissingFfmpeg;
+      }
+      return supported ? null : unsupported;
+    }
+
+    final motionUnavailable = unavailable(
+      capabilities?.supportsMotion ?? false,
+      context.l10n.editorMotionUnavailable,
+    );
+    final captionUnavailable = unavailable(
+      capabilities?.supportsCaptions ?? false,
+      context.l10n.editorCaptionUnavailable,
+    );
+    final transitionUnavailable = unavailable(
+      capabilities?.supportsTransitions ?? false,
+      context.l10n.editorTransitionUnavailable,
+    );
+    final resolvedTransition = widget.next == null
+        ? null
+        : ClipTransition.between(
+            widget.clip.copyWith(
+              transitionOverride: transition,
+              clearTransitionOverride: transition == null,
+              transitionDuration: transitionDuration,
+            ),
+            widget.next!,
+            widget.template,
+          );
     final upper = math.max(0.1, math.max(widget.maxSeconds, duration));
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final viewportHeight = MediaQuery.sizeOf(context).height;
+    final availableHeight = viewportHeight - keyboard - kToolbarHeight;
+    final showPreview = keyboard == 0 || availableHeight >= 400;
+    final previewHeight = keyboard == 0
+        ? viewportHeight * 0.34
+        : availableHeight * 0.25;
     return PopScope(
       canPop: !dirty,
       onPopInvokedWithResult: (didPop, _) {
@@ -194,318 +320,345 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       child: Scaffold(
         appBar: AppBar(
           leading: BackButton(onPressed: close),
-          title: Text(context.l10n.editClip),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(context.l10n.editClip),
+              Text(
+                context.l10n.editorImageIndex(widget.index + 1, widget.count),
+                style: context.textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
         body: SafeArea(
           child: Column(
             children: [
-              Expanded(
-                child: ListView(
+              if (showPreview)
+                Padding(
                   padding: const EdgeInsets.all(16),
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: ratio.value,
-                            child: ClipRect(
-                              child: Transform.scale(
-                                scale: fit == VideoTemplateImageFit.cover
-                                    ? crop.zoom
-                                    : 1,
-                                alignment: Alignment(crop.focalX, crop.focalY),
-                                child: MediaThumbnail(
-                                  path: widget.clip.sourcePath,
-                                  fit: fit == VideoTemplateImageFit.cover
-                                      ? BoxFit.cover
-                                      : BoxFit.contain,
-                                  alignment: Alignment(
-                                    crop.focalX,
-                                    crop.focalY,
+                  child: SizedBox(
+                    height: previewHeight,
+                    child:
+                        section == ImageSettingsSection.text &&
+                            widget.queuedMediaId == null
+                        ? LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width = math.min(
+                                constraints.maxWidth,
+                                constraints.maxHeight * ratio.value,
+                              );
+                              final clipDuration = Duration(
+                                milliseconds: (duration * 1000).round(),
+                              );
+                              return Center(
+                                child: CaptionEditorPreview(
+                                  sourcePath: widget.clip.sourcePath,
+                                  title: caption.text,
+                                  supportingLine: supportingLine.text,
+                                  settings: captionSettings,
+                                  template: widget.template.copyWith(
+                                    aspectRatio: ratio,
                                   ),
+                                  clipDuration: clipDuration,
+                                  previewTime: Duration(
+                                    microseconds:
+                                        (clipDuration.inMicroseconds *
+                                                previewFraction)
+                                            .round(),
+                                  ),
+                                  width: width,
+                                  crop: crop,
+                                  imageFit: fit,
                                 ),
-                              ),
-                            ),
+                              );
+                            },
+                          )
+                        : ClipFramingPreview(
+                            sourcePath: widget.clip.sourcePath,
+                            item: widget.queuedMedia,
+                            fit: fit,
+                            crop: crop,
+                            aspectRatio: ratio.value,
+                            editable: section == ImageSettingsSection.framing,
+                            motion: section == ImageSettingsSection.motion
+                                ? motion ??
+                                      ClipMotionPreset.fromTemplate(
+                                        widget.template.imageAnimation,
+                                      )
+                                : null,
+                            onChanged: (value) => setState(() {
+                              crop = value;
+                              dirty = true;
+                            }),
                           ),
+                  ),
+                ),
+              if (widget.queuedMediaId == null &&
+                  MediaQuery.viewInsetsOf(context).bottom == 0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: SegmentedButton<ImageSettingsSection>(
+                      segments: [
+                        ButtonSegment(
+                          value: ImageSettingsSection.framing,
+                          label: Text(context.l10n.editorCrop),
                         ),
-                      ),
+                        ButtonSegment(
+                          value: ImageSettingsSection.motion,
+                          label: Text(context.l10n.motion),
+                        ),
+                        if (widget.next != null)
+                          ButtonSegment(
+                            value: ImageSettingsSection.transition,
+                            label: Text(context.l10n.transitionToNext),
+                          ),
+                        ButtonSegment(
+                          value: ImageSettingsSection.text,
+                          label: Text(context.l10n.editorText),
+                        ),
+                        ButtonSegment(
+                          value: ImageSettingsSection.timing,
+                          label: Text(context.l10n.editorDisplayDuration),
+                        ),
+                      ],
+                      selected: {section},
+                      onSelectionChanged: (value) =>
+                          setState(() => section = value.first),
                     ),
-                    const SizedBox(height: 16),
-                    if (widget.queuedMediaId == null) ...[
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SegmentedButton<ImageSettingsSection>(
-                          segments: [
-                            ButtonSegment(
-                              value: ImageSettingsSection.framing,
-                              label: Text(context.l10n.editorCrop),
-                            ),
-                            ButtonSegment(
-                              value: ImageSettingsSection.motion,
-                              label: Text(context.l10n.motion),
-                            ),
-                            ButtonSegment(
-                              value: ImageSettingsSection.text,
-                              label: Text(context.l10n.editorText),
-                            ),
-                            ButtonSegment(
-                              value: ImageSettingsSection.timing,
-                              label: Text(context.l10n.editorDisplayDuration),
-                            ),
-                          ],
-                          selected: {section},
-                          onSelectionChanged: (value) =>
-                              setState(() => section = value.first),
+                  ),
+                ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 140),
+                  child: ListView(
+                    key: PageStorageKey(section),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (section == ImageSettingsSection.framing)
+                        ClipFramingCard(
+                          fit: fit,
+                          crop: crop,
+                          ratio: ratio,
+                          sourcePath: widget.clip.sourcePath,
+                          showRatio: widget.queuedMediaId == null,
+                          all: applyFramingToAll,
+                          onFitChanged: (value) => setState(() {
+                            fit = value;
+                            dirty = true;
+                          }),
+                          onCropChanged: (value) => setState(() {
+                            crop = value;
+                            dirty = true;
+                          }),
+                          onRatioChanged: (value) => setState(() {
+                            ratio = value;
+                            dirty = true;
+                          }),
+                          onScopeChanged: (value) => setState(() {
+                            applyFramingToAll = value;
+                            dirty = true;
+                          }),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    if (section == ImageSettingsSection.framing)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (widget.queuedMediaId == null)
-                                Text(context.l10n.editorOutputRatio),
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
+                      if (widget.queuedMediaId == null &&
+                          section == ImageSettingsSection.timing) ...[
+                        const SizedBox(height: 8),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                Row(
                                   children: [
-                                    ChoiceChip(
-                                      label: Text(context.l10n.editorFit),
-                                      selected:
-                                          fit == VideoTemplateImageFit.contain,
-                                      onSelected: (_) => setState(() {
-                                        fit = VideoTemplateImageFit.contain;
-                                        dirty = true;
-                                      }),
-                                    ),
+                                    const Icon(Icons.schedule),
                                     const SizedBox(width: 8),
-                                    ChoiceChip(
-                                      label: Text(context.l10n.editorFill),
-                                      selected:
-                                          fit == VideoTemplateImageFit.cover,
-                                      onSelected: (_) => setState(() {
-                                        fit = VideoTemplateImageFit.cover;
-                                        dirty = true;
-                                      }),
+                                    Expanded(
+                                      child: Text(
+                                        context.l10n.editorDisplayDuration,
+                                      ),
                                     ),
-                                    if (widget.queuedMediaId == null)
-                                      for (final value in [
-                                        VideoTemplateAspectRatio.landscape,
-                                        VideoTemplateAspectRatio.square,
-                                        VideoTemplateAspectRatio.portrait,
-                                      ]) ...[
-                                        const SizedBox(width: 8),
-                                        ChoiceChip(
-                                          label: Text(value.label),
-                                          selected: ratio == value,
-                                          onSelected: (_) => setState(() {
-                                            ratio = value;
-                                            dirty = true;
-                                          }),
-                                        ),
-                                      ],
+                                    Text('${duration.toStringAsFixed(1)} s'),
                                   ],
                                 ),
-                              ),
-                              ClipFramingFields(
-                                imageFit: fit,
-                                crop: crop,
-                                sourcePath: widget.clip.sourcePath,
-                                aspectRatio: ratio.value,
-                                onFitChanged: (value) => setState(() {
-                                  fit = value;
-                                  dirty = true;
-                                }),
-                                onCropChanged: (value) => setState(() {
-                                  crop = value;
-                                  dirty = true;
-                                }),
-                              ),
-                              if (widget.queuedMediaId == null &&
-                                  widget.clip.clipId.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Align(
-                                  alignment: AlignmentDirectional.centerStart,
-                                  child: TextButton.icon(
-                                    onPressed: () => _applyFramingToAll(),
-                                    icon: Icon(
-                                      applyFramingToAll
-                                          ? Icons.check
-                                          : Icons.copy_all,
-                                    ),
-                                    label: Text(
-                                      context.l10n.applyFramingToAllClips,
-                                    ),
-                                  ),
+                                Slider(
+                                  min: 0.1,
+                                  max: upper,
+                                  value: duration.clamp(0.1, upper),
+                                  onChanged: (value) => setState(() {
+                                    duration = value;
+                                    dirty = true;
+                                  }),
+                                ),
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(context.l10n.snapToMarkers),
+                                  subtitle: Text(context.l10n.snapDescription),
+                                  value: draft.snap,
+                                  onChanged: (value) =>
+                                      controller.snapChanged(value),
                                 ),
                               ],
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    if (widget.queuedMediaId == null &&
-                        section == ImageSettingsSection.timing) ...[
-                      const SizedBox(height: 8),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.schedule),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      context.l10n.editorDisplayDuration,
-                                    ),
-                                  ),
-                                  Text('${duration.toStringAsFixed(1)} s'),
-                                ],
-                              ),
-                              Slider(
-                                min: 0.1,
-                                max: upper,
-                                value: duration.clamp(0.1, upper),
-                                onChanged: (value) => setState(() {
-                                  duration = value;
-                                  dirty = true;
-                                }),
-                              ),
-                            ],
+                      ],
+                      if (widget.queuedMediaId == null &&
+                          section == ImageSettingsSection.text) ...[
+                        const SizedBox(height: 8),
+                        ClipCaptionSettingsCard(
+                          template: widget.template.copyWith(
+                            aspectRatio: ratio,
                           ),
+                          duration: duration,
+                          caption: caption,
+                          supportingLine: supportingLine,
+                          settings: captionSettings,
+                          section: captionSection,
+                          previewFraction: previewFraction,
+                          applyToAll: applyCaptionToAll,
+                          enabled: captionUnavailable == null,
+                          supportsBackdrop:
+                              capabilities?.supportsCaptionBackdrop ?? false,
+                          unavailableMessage: captionUnavailable,
+                          onCaptionChanged: () => setState(
+                            () => controller.captionChanged(
+                              caption.text,
+                              supportingLine.text,
+                            ),
+                          ),
+                          onSettingsChanged: (value) => setState(() {
+                            captionSettings = value;
+                            dirty = true;
+                          }),
+                          onSectionChanged: (value) =>
+                              setState(() => captionSection = value),
+                          onPreviewFractionChanged: (value) => setState(() {
+                            previewFraction = value;
+                          }),
+                          onScopeChanged: (value) => setState(() {
+                            controller.captionScopeChanged(
+                              captionSection,
+                              value ? ClipEditScope.all : ClipEditScope.clip,
+                            );
+                            dirty = true;
+                          }),
                         ),
-                      ),
-                    ],
-                    if (widget.queuedMediaId == null &&
-                        section == ImageSettingsSection.text) ...[
-                      const SizedBox(height: 8),
-                      _CaptionSettingsCard(
-                        clip: widget.clip,
-                        template: widget.template.copyWith(aspectRatio: ratio),
-                        duration: duration,
-                        caption: caption,
-                        supportingLine: supportingLine,
-                        settings: captionSettings,
-                        section: captionSection,
-                        previewFraction: previewFraction,
-                        applyToAll: applyCaptionStyleToAll,
-                        onCaptionChanged: () => setState(() => dirty = true),
-                        onSettingsChanged: (value) => setState(() {
-                          captionSettings = value;
-                          dirty = true;
-                        }),
-                        onSectionChanged: (value) =>
-                            setState(() => captionSection = value),
-                        onPreviewFractionChanged: (value) => setState(() {
-                          previewFraction = value;
-                        }),
-                        onApplyStyleToAll: _applyCaptionStyleToAll,
-                      ),
-                    ],
-                    if (widget.queuedMediaId == null &&
-                        section == ImageSettingsSection.motion) ...[
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                context.l10n.motion,
-                                style: context.textTheme.titleMedium,
-                              ),
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  for (final entry
-                                      in <(ClipMotionPreset?, String)>[
-                                        (null, context.l10n.styleDefault),
-                                        (
-                                          ClipMotionPreset.none,
-                                          context.l10n.motionNone,
-                                        ),
-                                        (
-                                          ClipMotionPreset.slowZoomIn,
-                                          context.l10n.motionZoomIn,
-                                        ),
-                                        (
-                                          ClipMotionPreset.slowZoomOut,
-                                          context.l10n.motionZoomOut,
-                                        ),
-                                        (
-                                          ClipMotionPreset.gentlePan,
-                                          context.l10n.motionPan,
-                                        ),
-                                      ])
-                                    ChoiceChip(
-                                      label: Text(entry.$2),
-                                      selected: motion == entry.$1,
-                                      onSelected: (_) => setState(() {
-                                        motion = entry.$1;
-                                        motionChanged = true;
-                                        dirty = true;
-                                      }),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              DropdownButtonFormField<ClipMotionIntensity?>(
-                                initialValue: intensity,
-                                decoration: InputDecoration(
-                                  labelText: context.l10n.motionIntensity,
+                      ],
+                      if (widget.queuedMediaId == null &&
+                          section == ImageSettingsSection.transition &&
+                          widget.next != null)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                TransitionEditorFields(
+                                  type: transition,
+                                  inheritedType:
+                                      ClipTransitionType.fromTemplate(
+                                        widget.template.transition,
+                                      ),
+                                  duration: transitionDuration,
+                                  enabled: transitionUnavailable == null,
+                                  isClamped: resolvedTransition!.wasClamped,
+                                  onTypeChanged: (value) => setState(() {
+                                    transition = value;
+                                    transitionSelectionRevision++;
+                                    dirty = true;
+                                  }),
+                                  onDurationChanged: (value) => setState(() {
+                                    transitionDuration = value;
+                                    dirty = true;
+                                  }),
                                 ),
-                                items: [
-                                  DropdownMenuItem(
-                                    value: null,
-                                    child: Text(context.l10n.styleDefault),
+                                TransitionDemo(
+                                  type:
+                                      transition ??
+                                      ClipTransitionType.fromTemplate(
+                                        widget.template.transition,
+                                      ),
+                                  duration: resolvedTransition.duration,
+                                  outgoingPath: widget.clip.sourcePath,
+                                  incomingPath: widget.next!.sourcePath,
+                                  selectionRevision:
+                                      transitionSelectionRevision,
+                                ),
+                                if (transitionUnavailable != null)
+                                  Text(
+                                    transitionUnavailable,
+                                    style: context.textTheme.bodySmall,
                                   ),
-                                  DropdownMenuItem(
-                                    value: ClipMotionIntensity.subtle,
-                                    child: Text(context.l10n.motionSubtle),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: ClipMotionIntensity.moreMovement,
-                                    child: Text(context.l10n.motionMore),
-                                  ),
-                                ],
-                                onChanged: (value) => setState(() {
-                                  intensity = value;
-                                  motionChanged = true;
-                                  dirty = true;
-                                }),
-                              ),
-                              SwitchListTile(
-                                title: Text(context.l10n.motionApplyAll),
-                                value: applyMotionToAll,
-                                onChanged: (value) => setState(() {
-                                  applyMotionToAll = value;
-                                  motionChanged = true;
-                                  dirty = true;
-                                }),
-                              ),
-                            ],
+                                ClipScopeSelector(
+                                  all: applyTransitionToAll,
+                                  enabled: transitionUnavailable == null,
+                                  clipLabel:
+                                      context.l10n.editorTransitionScopeOne,
+                                  allLabel:
+                                      context.l10n.editorTransitionScopeAll,
+                                  onChanged: (value) {
+                                    controller.transitionScopeChanged(
+                                      value
+                                          ? ClipEditScope.all
+                                          : ClipEditScope.clip,
+                                    );
+                                    controller.dirtyChanged(true);
+                                  },
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      if (widget.queuedMediaId == null &&
+                          section == ImageSettingsSection.motion) ...[
+                        ClipMotionCard(
+                          template: widget.template,
+                          motion: motion,
+                          intensity: intensity,
+                          all: applyMotionToAll,
+                          enabled: motionUnavailable == null,
+                          unavailableMessage: motionUnavailable,
+                          onMotionChanged: (value) => setState(() {
+                            motion = value;
+                            motionChanged = true;
+                            dirty = true;
+                          }),
+                          onIntensityChanged: (value) => setState(() {
+                            intensity = value;
+                            motionChanged = true;
+                            dirty = true;
+                          }),
+                          onScopeChanged: (value) => setState(() {
+                            applyMotionToAll = value;
+                            motionChanged = true;
+                            dirty = true;
+                          }),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _save,
-                    child: Text(context.l10n.editorSave),
-                  ),
+                child: Row(
+                  children: [
+                    OutlinedButton(
+                      onPressed: close,
+                      child: Text(context.l10n.cancel),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _save,
+                        child: Text(context.l10n.editorSave),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -515,267 +668,85 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
     );
   }
 
-  Future<void> _applyFramingToAll() async {
-    final apply = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(context.l10n.applyFramingToAllClipsConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.apply),
-          ),
-        ],
-      ),
-    );
-    if (apply == true && mounted) {
-      setState(() {
-        applyFramingToAll = true;
-        dirty = true;
-      });
-    }
-  }
-
-  void _save() {
-    if (widget.queuedMediaId case final mediaId?) {
-      final selection = ref.read(
-        editorMediaSelectionViewModelProvider.notifier,
-      );
-      if (fit != widget.clip.imageFit) {
-        selection.imageFitSelected(mediaId: mediaId, imageFit: fit);
-      }
-      if (crop != widget.clip.cropTransform) {
-        selection.cropTransformChanged(mediaId: mediaId, transform: crop);
-      }
-      setState(() => dirty = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.appNavigator.maybePop();
-      });
-      return;
-    }
-    final timeline = ref.read(timelineViewModelProvider.notifier);
-    if (ratio != widget.ratio) timeline.aspectRatioSelected(ratio);
-    if (applyFramingToAll) {
-      timeline.clipFramingAppliedToAll(imageFit: fit, crop: crop);
-    }
-    if (applyCaptionStyleToAll) {
-      timeline.captionStyleAppliedToAll(captionSettings);
-    }
-    if (fit != widget.clip.imageFit) {
-      timeline.clipImageFitChanged(clipId: widget.clip.clipId, imageFit: fit);
-    }
-    if (crop != widget.clip.cropTransform) {
-      timeline.clipCropChanged(clipId: widget.clip.clipId, transform: crop);
-    }
-    final changedDuration = Duration(milliseconds: (duration * 1000).round());
-    if (changedDuration != widget.clip.end - widget.clip.start) {
-      timeline.clipTimingChanged(
-        clipId: widget.clip.clipId,
-        duration: changedDuration,
-        snap: false,
-      );
-    }
-    if (caption.text != widget.clip.caption) {
-      timeline.captionChanged(
-        clipId: widget.clip.clipId,
-        caption: caption.text,
-        supportingLine: supportingLine.text,
-      );
-    }
-    if (supportingLine.text != widget.clip.captionSupportingLine) {
-      timeline.captionChanged(
-        clipId: widget.clip.clipId,
-        caption: caption.text,
-        supportingLine: supportingLine.text,
-      );
-    }
-    if (captionSettings != widget.clip.captionSettings) {
-      timeline.captionSettingsChanged(
-        clipId: widget.clip.clipId,
-        settings: captionSettings,
-      );
-    }
-    if (motionChanged) {
-      if (applyMotionToAll) {
-        timeline.clipMotionAppliedToAll(preset: motion, intensity: intensity);
-      } else {
-        timeline.clipMotionChanged(
-          clipId: widget.clip.clipId,
-          preset: motion,
-          intensity: intensity,
-        );
-      }
-    }
-    setState(() => dirty = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.appNavigator.maybePop();
-    });
-  }
-
-  Future<void> _applyCaptionStyleToAll() async {
-    final apply = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        content: Text(context.l10n.captionApplyAllStylesConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(context.l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(context.l10n.apply),
-          ),
-        ],
-      ),
-    );
-    if (apply == true && mounted) {
-      setState(() {
-        applyCaptionStyleToAll = true;
-        dirty = true;
-      });
-    }
-  }
-}
-
-class _CaptionSettingsCard extends StatelessWidget {
-  const _CaptionSettingsCard({
-    required this.clip,
-    required this.template,
-    required this.duration,
-    required this.caption,
-    required this.supportingLine,
-    required this.settings,
-    required this.section,
-    required this.previewFraction,
-    required this.applyToAll,
-    required this.onCaptionChanged,
-    required this.onSettingsChanged,
-    required this.onSectionChanged,
-    required this.onPreviewFractionChanged,
-    required this.onApplyStyleToAll,
-  });
-
-  final MediaTrackClipPayload clip;
-  final VideoTemplate template;
-  final double duration;
-  final TextEditingController caption;
-  final TextEditingController supportingLine;
-  final CaptionSettings settings;
-  final CaptionEditorSection section;
-  final double previewFraction;
-  final bool applyToAll;
-  final VoidCallback onCaptionChanged;
-  final ValueChanged<CaptionSettings> onSettingsChanged;
-  final ValueChanged<CaptionEditorSection> onSectionChanged;
-  final ValueChanged<double> onPreviewFractionChanged;
-  final VoidCallback onApplyStyleToAll;
-
-  @override
-  Widget build(BuildContext context) {
-    final clipDuration = Duration(milliseconds: (duration * 1000).round());
-    final ratio = template.aspectRatio;
-    final layout = CaptionLayout(
-      title: caption.text,
-      supportingLine: supportingLine.text,
-      template: template,
-      settings: settings,
-      width: ratio.exportWidth,
-      height: ratio.exportHeight,
-    );
-    final visibleDuration = Duration(
-      microseconds:
-          (clipDuration.inMicroseconds *
-                  (settings.endFraction - settings.startFraction))
-              .round(),
-    );
-    final previewWidth = (MediaQuery.sizeOf(context).width - 64)
-        .clamp(0.0, 560.0)
-        .toDouble();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            CaptionEditorPreview(
-              sourcePath: clip.sourcePath,
-              title: caption.text,
-              supportingLine: supportingLine.text,
-              settings: settings,
-              template: template,
-              clipDuration: clipDuration,
-              previewTime: Duration(
-                microseconds: (clipDuration.inMicroseconds * previewFraction)
-                    .round(),
-              ),
-              width: previewWidth,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              context.l10n.captionTiming,
-              style: context.textTheme.labelLarge,
-            ),
-            Slider(
-              min: 0,
-              max: 1,
-              divisions: 100,
-              value: previewFraction,
-              semanticFormatterCallback: (value) =>
-                  '${(clipDuration.inSeconds * value).toStringAsFixed(1)} s',
-              onChanged: onPreviewFractionChanged,
-            ),
-            CaptionSettingsFields(
-              settings: settings,
-              section: section,
-              onSectionChanged: onSectionChanged,
-              overflow: layout.overflow,
-              shortReadingTime: layout.readingTimeIsShort(visibleDuration),
-              clipDuration: clipDuration,
-              onChanged: onSettingsChanged,
-            ),
-            if (section == CaptionEditorSection.text) ...[
-              const SizedBox(height: 8),
-              TextField(
-                controller: caption,
-                maxLength: 100,
-                decoration: InputDecoration(
-                  labelText: context.l10n.editorOptionalCaption,
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      caption.clear();
-                      onCaptionChanged();
-                    },
-                    icon: const Icon(Icons.clear),
+  Future<void> _save() async {
+    if (applyFramingToAll ||
+        applyCaptionStyleToAll ||
+        draft.captionTextScope == ClipEditScope.all ||
+        draft.captionPositionScope == ClipEditScope.all ||
+        draft.captionTimingScope == ClipEditScope.all ||
+        applyTransitionToAll ||
+        applyMotionToAll) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(context.l10n.editorBulkConfirm),
+                const SizedBox(height: 8),
+                if (applyFramingToAll)
+                  Text(
+                    '• ${context.l10n.editorCrop} — ${context.l10n.editorScopeAll}',
                   ),
-                ),
-                onChanged: (_) => onCaptionChanged(),
-              ),
-              TextField(
-                controller: supportingLine,
-                maxLength: 100,
-                decoration: InputDecoration(
-                  labelText: context.l10n.captionSupportingLine,
-                ),
-                onChanged: (_) => onCaptionChanged(),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton.icon(
-                onPressed: onApplyStyleToAll,
-                icon: Icon(applyToAll ? Icons.check : Icons.copy_all),
-                label: Text(context.l10n.captionApplyAllStyles),
-              ),
+                if (applyCaptionStyleToAll)
+                  Text(
+                    '• ${context.l10n.captionStyle} — ${context.l10n.editorScopeAll}',
+                  ),
+                if (draft.captionTextScope == ClipEditScope.all)
+                  Text(
+                    '• ${context.l10n.captionSectionText} — ${context.l10n.editorScopeAll}',
+                  ),
+                if (draft.captionPositionScope == ClipEditScope.all)
+                  Text(
+                    '• ${context.l10n.captionSectionPosition} — ${context.l10n.editorScopeAll}',
+                  ),
+                if (draft.captionTimingScope == ClipEditScope.all)
+                  Text(
+                    '• ${context.l10n.captionSectionTiming} — ${context.l10n.editorScopeAll}',
+                  ),
+                if (applyMotionToAll)
+                  Text(
+                    '• ${context.l10n.motion} — ${context.l10n.editorScopeAll}',
+                  ),
+                if (applyTransitionToAll)
+                  Text(
+                    '• ${context.l10n.transitionToNext} — ${context.l10n.editorTransitionScopeAll}',
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(context.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(context.l10n.apply),
             ),
           ],
         ),
-      ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    final undo = controller.savePressed(
+      queuedMediaId: widget.queuedMediaId,
+      hasNext: widget.next != null,
     );
+    if (undo != null) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.editorBulkSaved),
+          action: SnackBarAction(label: context.l10n.undo, onPressed: undo),
+        ),
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.appNavigator.maybePop();
+    });
   }
 }

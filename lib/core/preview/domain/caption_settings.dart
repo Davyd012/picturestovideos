@@ -114,8 +114,9 @@ class CaptionSettings {
     CaptionTextColor? textColor,
     CaptionBackdrop? backdrop,
     bool clearPreset = false,
+    bool clearPlacement = false,
   }) => CaptionSettings(
-    placement: placement ?? this.placement,
+    placement: clearPlacement ? null : placement ?? this.placement,
     entrance: entrance ?? this.entrance,
     startFraction: startFraction ?? this.startFraction,
     endFraction: endFraction ?? this.endFraction,

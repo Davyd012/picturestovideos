@@ -1,21 +1,17 @@
 import 'dart:io';
 
-import 'package:flutter/gestures.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
-import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
-import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
-import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
-import 'package:picturestovideos/core/preview/domain/render_capabilities.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/widgets/clip_captions_editor.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
+import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
 
 class ClipsTabView extends StatelessWidget {
   const ClipsTabView({
@@ -29,22 +25,11 @@ class ClipsTabView extends StatelessWidget {
     required this.onMoveMediaToPosition,
     required this.onOpenTimeline,
     this.timelineClips = const [],
-    this.onCaptionChanged,
-    this.onMotionChanged,
-    this.onTransitionChanged,
-    this.template,
-    this.snapToMarkers = true,
-    this.onTimingChanged,
-    this.onCaptionSettingsChanged,
-    this.onApplyCaptionStyleToAll,
+    this.showTimelineClips = false,
     this.onSelectTimelineClip,
     this.onRemoveClip,
     this.onMoveClip,
     this.onReorderClip,
-    this.onFramingChanged,
-    this.renderCapabilities,
-    this.gateRenderCapabilities = false,
-    this.capabilityProbeFailed = false,
     super.key,
   });
 
@@ -60,66 +45,27 @@ class ClipsTabView extends StatelessWidget {
   final void Function(String mediaId, int position) onMoveMediaToPosition;
   final VoidCallback onOpenTimeline;
   final List<MediaTrackClipPayload> timelineClips;
-  final void Function(String clipId, String title, String supportingLine)?
-  onCaptionChanged;
-  final void Function(
-    String clipId,
-    ClipMotionPreset? preset,
-    ClipMotionIntensity? intensity,
-  )?
-  onMotionChanged;
-  final void Function(
-    String clipId,
-    ClipTransitionType? type,
-    Duration duration,
-  )?
-  onTransitionChanged;
-  final VideoTemplate? template;
-  final bool snapToMarkers;
-  final void Function(String clipId, Duration? duration, bool snap)?
-  onTimingChanged;
-  final void Function(String clipId, CaptionSettings settings)?
-  onCaptionSettingsChanged;
-  final ValueChanged<CaptionSettings>? onApplyCaptionStyleToAll;
+  final bool showTimelineClips;
   final ValueChanged<MediaTrackClipPayload>? onSelectTimelineClip;
   final ValueChanged<String>? onRemoveClip;
   final bool Function(String clipId, int position)? onMoveClip;
   final bool Function(String clipId, int position)? onReorderClip;
-  final void Function(
-    String clipId,
-    VideoTemplateImageFit fit,
-    ImageCropTransform crop,
-  )?
-  onFramingChanged;
-  final RenderCapabilities? renderCapabilities;
-  final bool gateRenderCapabilities;
-  final bool capabilityProbeFailed;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (onCaptionChanged != null)
+        if (showTimelineClips)
           Expanded(
             child: ClipCaptionsEditor(
               clips: timelineClips,
-              onCaptionChanged: onCaptionChanged!,
-              onMotionChanged: onMotionChanged,
-              onTransitionChanged: onTransitionChanged,
-              template: template,
-              snapToMarkers: snapToMarkers,
-              onTimingChanged: onTimingChanged,
-              onCaptionSettingsChanged: onCaptionSettingsChanged,
-              onApplyStyleToAll: onApplyCaptionStyleToAll,
+              onEditClip: (clip) =>
+                  context.appNavigator.goToImageSettings(clip.clipId),
               onSelectClip: onSelectTimelineClip,
               onRemoveClip: onRemoveClip,
               onMoveClip: onMoveClip,
               onReorderClip: onReorderClip,
-              onFramingChanged: onFramingChanged,
-              renderCapabilities: renderCapabilities,
-              gateRenderCapabilities: gateRenderCapabilities,
-              capabilityProbeFailed: capabilityProbeFailed,
             ),
           ),
         LayoutBuilder(
@@ -139,7 +85,7 @@ class ClipsTabView extends StatelessWidget {
                     cropTransforms: selectedCropTransforms,
                     onImageFitSelected: onImageFitSelected,
                     onCropTransformChanged: onCropTransformChanged,
-                    onApplyImageFitToAll: onApplyImageFitToAll,
+                    onApplyImageFitToAll: (fit) => _applyFitToAll(context, fit),
                     onMoveMediaToPosition: onMoveMediaToPosition,
                   ),
                 ),
@@ -159,7 +105,8 @@ class ClipsTabView extends StatelessWidget {
                         TextButton.icon(
                           onPressed: selectedMedia.isEmpty
                               ? null
-                              : () => onApplyImageFitToAll(
+                              : () => _applyFitToAll(
+                                  context,
                                   VideoTemplateImageFit.cover,
                                 ),
                           icon: const Icon(Icons.crop),
@@ -168,7 +115,8 @@ class ClipsTabView extends StatelessWidget {
                         TextButton.icon(
                           onPressed: selectedMedia.isEmpty
                               ? null
-                              : () => onApplyImageFitToAll(
+                              : () => _applyFitToAll(
+                                  context,
                                   VideoTemplateImageFit.contain,
                                 ),
                           icon: const Icon(Icons.fit_screen),
@@ -236,6 +184,57 @@ class ClipsTabView extends StatelessWidget {
 
   VideoTemplateImageFit _imageFitFor(String mediaId) {
     return selectedImageFits[mediaId] ?? VideoTemplateImageFit.cover;
+  }
+
+  Future<void> _applyFitToAll(
+    BuildContext context,
+    VideoTemplateImageFit fit,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: Text(context.l10n.applyFramingToAllClipsConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(context.l10n.apply),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final container = ProviderScope.containerOf(context);
+    final selection = container.read(
+      editorMediaSelectionViewModelProvider.notifier,
+    );
+    final before = container.read(editorMediaSelectionViewModelProvider);
+    final timeline = container.read(timelineViewModelProvider.notifier);
+    timeline.bulkEditStarted(framing: true);
+    onApplyImageFitToAll(fit);
+    timeline.bulkEditFinished();
+    final after = container.read(editorMediaSelectionViewModelProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(context.l10n.editorBulkSaved),
+        action: SnackBarAction(
+          label: context.l10n.undo,
+          onPressed: () {
+            if (timeline.bulkEditUndone()) {
+              selection.queuedFramingRestored(
+                expected: after,
+                previous: before,
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -471,7 +470,9 @@ class _ClipListItem extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: onCropTransformChanged == null
                       ? null
-                      : () => _openCropEditor(context),
+                      : () => context.appNavigator.goToQueuedImageSettings(
+                          item.id,
+                        ),
                   icon: const Icon(Icons.open_with),
                   label: Text(context.l10n.adjustCrop),
                 ),
@@ -521,17 +522,6 @@ class _ClipListItem extends StatelessWidget {
       onMoveToPosition?.call(position);
     }
   }
-
-  Future<void> _openCropEditor(BuildContext context) async {
-    final transform = await showDialog<ImageCropTransform>(
-      context: context,
-      builder: (context) =>
-          _CropEditorDialog(item: item, initialTransform: cropTransform),
-    );
-    if (transform != null) {
-      onCropTransformChanged?.call(transform);
-    }
-  }
 }
 
 class _ImageFitSelector extends StatelessWidget {
@@ -574,157 +564,6 @@ class _ImageFitSelector extends StatelessWidget {
                 onImageFitSelected!(value);
               }
             },
-    );
-  }
-}
-
-class _CropEditorDialog extends StatefulWidget {
-  const _CropEditorDialog({required this.item, required this.initialTransform});
-
-  final LibraryMediaItem item;
-  final ImageCropTransform initialTransform;
-
-  @override
-  State<_CropEditorDialog> createState() => _CropEditorDialogState();
-}
-
-class _CropEditorDialogState extends State<_CropEditorDialog> {
-  late ImageCropTransform _transform;
-  late ImageCropTransform _gestureStartTransform;
-  Offset _gestureStartPoint = Offset.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _transform = widget.initialTransform;
-    _gestureStartTransform = _transform;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(context.l10n.adjustCrop),
-      content: SizedBox(
-        width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: ClipRect(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Listener(
-                      onPointerSignal: (event) {
-                        if (event is PointerScrollEvent) {
-                          final change = event.scrollDelta.dy > 0 ? -0.1 : 0.1;
-                          setState(() {
-                            _transform = _transform.copyWith(
-                              zoom: _transform.zoom + change,
-                            );
-                          });
-                        }
-                      },
-                      child: GestureDetector(
-                        onScaleStart: (details) {
-                          _gestureStartTransform = _transform;
-                          _gestureStartPoint = details.focalPoint;
-                        },
-                        onScaleUpdate: (details) {
-                          final delta = details.focalPoint - _gestureStartPoint;
-                          setState(() {
-                            _transform = _gestureStartTransform.copyWith(
-                              zoom: _gestureStartTransform.zoom * details.scale,
-                              focalX:
-                                  _gestureStartTransform.focalX -
-                                  delta.dx / (constraints.maxWidth / 2),
-                              focalY:
-                                  _gestureStartTransform.focalY -
-                                  delta.dy / (constraints.maxHeight / 2),
-                            );
-                          });
-                        },
-                        child: _CropPreview(
-                          item: widget.item,
-                          transform: _transform,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.zoom_in),
-                Expanded(
-                  child: Slider(
-                    min: 1,
-                    max: ImageCropTransform.maxZoom,
-                    value: _transform.zoom,
-                    onChanged: (zoom) {
-                      setState(() {
-                        _transform = _transform.copyWith(zoom: zoom);
-                      });
-                    },
-                  ),
-                ),
-                Text('${_transform.zoom.toStringAsFixed(1)}×'),
-              ],
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            setState(() {
-              _transform = ImageCropTransform.centered;
-            });
-          },
-          child: Text(context.l10n.reset),
-        ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(context.l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_transform),
-          child: Text(context.l10n.apply),
-        ),
-      ],
-    );
-  }
-}
-
-class _CropPreview extends StatelessWidget {
-  const _CropPreview({required this.item, required this.transform});
-
-  final LibraryMediaItem item;
-  final ImageCropTransform transform;
-
-  @override
-  Widget build(BuildContext context) {
-    final image = item.thumbnailBytes.isNotEmpty
-        ? Image.memory(
-            item.thumbnailBytes,
-            fit: BoxFit.cover,
-            alignment: Alignment(transform.focalX, transform.focalY),
-          )
-        : Image.file(
-            File(item.sourcePath),
-            fit: BoxFit.cover,
-            alignment: Alignment(transform.focalX, transform.focalY),
-          );
-    return ColoredBox(
-      color: context.colors.scrim,
-      child: Transform.scale(
-        scale: transform.zoom,
-        alignment: Alignment(transform.focalX, transform.focalY),
-        child: image,
-      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/commons/navigation/app_route_args.dart';
 import 'package:picturestovideos/commons/navigation/app_routes.dart';
+import 'package:picturestovideos/features/editor/image_settings_screen.dart';
 
 class AppNavigator {
   AppNavigator._();
@@ -64,15 +65,37 @@ class AppNavigator {
   Future<T?> goToImageSettings<T extends Object?>(
     String clipId, {
     ImageSettingsSection section = ImageSettingsSection.framing,
-  }) => pushNamed<T>(
-    AppRoutes.imageSettings,
-    arguments: ImageSettingsRouteArgs.forClip(clipId, section: section),
+  }) => _showImageSettings<T>(
+    ImageSettingsRouteArgs.forClip(clipId, section: section),
   );
+
+  Future<T?> _showImageSettings<T extends Object?>(
+    ImageSettingsRouteArgs args,
+  ) {
+    final context = navigatorKey.currentContext!;
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return pushNamed<T>(AppRoutes.imageSettings, arguments: args);
+    }
+    return showGeneralDialog<T>(
+      context: context,
+      barrierDismissible: false,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (context, _, _) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 900),
+          child: ImageSettingsScreen(args: args),
+        ),
+      ),
+      transitionBuilder: (context, animation, _, child) =>
+          MediaQuery.disableAnimationsOf(context)
+          ? child
+          : FadeTransition(opacity: animation, child: child),
+    );
+  }
+
   Future<T?> goToQueuedImageSettings<T extends Object?>(String mediaId) =>
-      pushNamed<T>(
-        AppRoutes.imageSettings,
-        arguments: ImageSettingsRouteArgs.forQueuedMedia(mediaId),
-      );
+      _showImageSettings<T>(ImageSettingsRouteArgs.forQueuedMedia(mediaId));
 
   Future<T?> goToDownload<T extends Object?>({bool replace = false}) {
     return replace

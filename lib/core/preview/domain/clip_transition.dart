@@ -6,7 +6,8 @@ import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.d
 enum ClipTransitionType {
   cut,
   dissolve,
-  slide;
+  slide,
+  zoom;
 
   static ClipTransitionType fromTemplate(VideoTemplateTransition transition) =>
       switch (transition) {

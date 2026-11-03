@@ -71,6 +71,32 @@ void main() {
   });
 
   test(
+    'reverse pan travels in the opposite direction and survives serialization',
+    () {
+      const pan = ClipMotion(
+        preset: ClipMotionPreset.gentlePanReverse,
+        intensity: ClipMotionIntensity.subtle,
+      );
+      expect(pan.horizontalAnchorAt(0, 0), 1);
+      expect(pan.horizontalAnchorAt(1, 0), 0);
+      const clip = MediaTrackClipPayload(
+        mediaId: 'p',
+        title: '',
+        tagline: '',
+        start: Duration.zero,
+        end: Duration(seconds: 3),
+        sourcePath: '',
+        imageFit: VideoTemplateImageFit.cover,
+        motionOverride: ClipMotionPreset.gentlePanReverse,
+      );
+      expect(
+        MediaTrackClipPayload.fromJson(clip.toJson()).motionOverride,
+        ClipMotionPreset.gentlePanReverse,
+      );
+    },
+  );
+
+  test(
     'motion overrides survive serialization and can return to style defaults',
     () {
       const clip = MediaTrackClipPayload(

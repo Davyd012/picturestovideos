@@ -39,6 +39,7 @@ import 'package:picturestovideos/features/projects/project_media_recovery_card.d
 import 'package:picturestovideos/features/timeline/timeline_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/shared/extensions/build_context_navigation_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/widgets/app_shell_scaffold.dart';
 
 class AudioEditorScreen extends ConsumerStatefulWidget {
@@ -404,17 +405,28 @@ class _EditorTabBody extends ConsumerWidget {
             .read(timelineViewModelProvider.notifier)
             .timelineScaleChanged(scale),
         onCurrentPointChanged: (position) => _seekTo(ref, position),
+        selectedMarker: timeline?.selectedMarker,
+        onMarkerSelected: (time) {
+          ref
+              .read(timelineViewModelProvider.notifier)
+              .selectImageMarker(time: time);
+          _seekTo(ref, time);
+        },
+        onMarkerDragStarted: (time) {
+          final timelineViewModel = ref.read(
+            timelineViewModelProvider.notifier,
+          );
+          timelineViewModel.markerEditGestureStarted();
+          timelineViewModel.selectImageMarker(time: time);
+        },
+        onMarkerMoved: (time) => ref
+            .read(timelineViewModelProvider.notifier)
+            .moveSelectedImageMarker(time),
+        onMarkerMoveFinished: () => _showMarkerUndo(context, ref),
         audioDuration: audioDuration,
       ),
       EditorTab.clips => ClipsTabView(
-        renderCapabilities: renderCapabilityState.asData?.value,
-        gateRenderCapabilities: true,
-        capabilityProbeFailed: renderCapabilityState.hasError,
-        onFramingChanged: (clipId, fit, crop) {
-          final timeline = ref.read(timelineViewModelProvider.notifier);
-          timeline.clipImageFitChanged(clipId: clipId, imageFit: fit);
-          timeline.clipCropChanged(clipId: clipId, transform: crop);
-        },
+        showTimelineClips: true,
         timelineClips: timeline?.project == null
             ? const []
             : ref
@@ -423,19 +435,6 @@ class _EditorTabBody extends ConsumerWidget {
                     beatMap: timeline!.project!.beatMap,
                     project: timeline!.project,
                   ),
-        onCaptionChanged: (clipId, title, supportingLine) => ref
-            .read(timelineViewModelProvider.notifier)
-            .captionChanged(
-              clipId: clipId,
-              caption: title,
-              supportingLine: supportingLine,
-            ),
-        onCaptionSettingsChanged: (clipId, settings) => ref
-            .read(timelineViewModelProvider.notifier)
-            .captionSettingsChanged(clipId: clipId, settings: settings),
-        onApplyCaptionStyleToAll: (settings) => ref
-            .read(timelineViewModelProvider.notifier)
-            .captionStyleAppliedToAll(settings),
         onSelectTimelineClip: (clip) =>
             _seekTo(ref, clip.start + ((clip.end - clip.start) ~/ 2)),
         onRemoveClip: (clipId) => ref
@@ -447,25 +446,6 @@ class _EditorTabBody extends ConsumerWidget {
         onReorderClip: (clipId, position) => ref
             .read(timelineViewModelProvider.notifier)
             .clipMoved(clipId: clipId, position: position),
-        onMotionChanged: (clipId, preset, intensity) => ref
-            .read(timelineViewModelProvider.notifier)
-            .clipMotionChanged(
-              clipId: clipId,
-              preset: preset,
-              intensity: intensity,
-            ),
-        template: timeline?.selectedTemplate,
-        snapToMarkers: timeline?.project?.snapToMarkers ?? true,
-        onTimingChanged: (clipId, duration, snap) => ref
-            .read(timelineViewModelProvider.notifier)
-            .clipTimingChanged(clipId: clipId, duration: duration, snap: snap),
-        onTransitionChanged: (clipId, type, duration) => ref
-            .read(timelineViewModelProvider.notifier)
-            .clipTransitionChanged(
-              clipId: clipId,
-              type: type,
-              duration: duration,
-            ),
         selectedMedia: selectedMedia,
         selectedImageFits: selectedImageFits,
         selectedCropTransforms: selectedCropTransforms,
@@ -489,11 +469,23 @@ class _EditorTabBody extends ConsumerWidget {
             .tabSelected(EditorTab.timeline),
       ),
       EditorTab.markers => MarkersTabView(
-        beatMap: beatMap,
         project: timeline?.project,
-        events: events,
+        selectedMedia: selectedMedia,
         selectedMarker: timeline?.selectedMarker,
-        onAddMarker: () => _addMarkerAtCurrentPoint(ref),
+        onAddMarker: () {
+          final before = ref
+              .read(timelineViewModelProvider)
+              .asData
+              ?.value
+              .project;
+          _addMarkerAtCurrentPoint(ref);
+          final after = ref
+              .read(timelineViewModelProvider)
+              .asData
+              ?.value
+              .project;
+          if (!identical(before, after)) _showMarkerUndo(context, ref);
+        },
         onDeleteMarker: () => ref
             .read(timelineViewModelProvider.notifier)
             .deleteSelectedImageMarker(),
@@ -508,6 +500,20 @@ class _EditorTabBody extends ConsumerWidget {
               .selectImageMarker(time: time);
           await _seekTo(ref, time);
         },
+        onMarkerDeletedAt: (time) => ref
+            .read(timelineViewModelProvider.notifier)
+            .deleteImageMarkerAt(time),
+        onMarkerTimeChanged: (time) => ref
+            .read(timelineViewModelProvider.notifier)
+            .moveSelectedImageMarker(time),
+        onApplyMarkers: () => ref
+            .read(timelineViewModelProvider.notifier)
+            .applyMarkersToImages(
+              selectedMedia: selectedMedia,
+              selectedImageFits: selectedImageFits,
+              selectedCropTransforms: selectedCropTransforms,
+            ),
+        onUndoAvailable: () => _showMarkerUndo(context, ref),
       ),
       EditorTab.tools => ToolsTabView(
         renderCapabilities: renderCapabilityState.asData?.value,
@@ -553,16 +559,19 @@ class _EditorTabBody extends ConsumerWidget {
   }
 
   void _addMarkerAtCurrentPoint(WidgetRef ref) {
-    final resolvedBeatMap = beatMap;
-    if (resolvedBeatMap == null) {
-      return;
-    }
+    final resolvedBeatMap =
+        beatMap ??
+        BeatMap(
+          beats: const [],
+          bpm: 0,
+          averageBeatInterval: const Duration(seconds: 2),
+        );
     ref
         .read(timelineViewModelProvider.notifier)
         .addImageMarkerAt(
           time: playback?.currentTime ?? Duration.zero,
           beatMap: resolvedBeatMap,
-          fallbackMarkerEvents: events,
+          fallbackMarkerEvents: const [],
         );
   }
 
@@ -610,6 +619,19 @@ class _EditorTabBody extends ConsumerWidget {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
   }
+}
+
+void _showMarkerUndo(BuildContext context, WidgetRef ref) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(context.l10n.markerChangeApplied),
+      action: SnackBarAction(
+        label: context.l10n.undo,
+        onPressed: () =>
+            ref.read(timelineViewModelProvider.notifier).undoMarkerEdit(),
+      ),
+    ),
+  );
 }
 
 String _eventStatusText(AsyncValue<EventSystemState> eventState) {

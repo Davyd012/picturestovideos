@@ -70,6 +70,31 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get editorSave => 'Save';
   @override
+  String get editorScope => 'Applies to';
+  @override
+  String get editorScopeClip => 'This image';
+  @override
+  String get editorScopeAll => 'All images';
+  @override
+  String get editorBulkSaved => 'Settings applied to the selected scope';
+  @override
+  String get transitionDemo => 'Transition preview';
+  @override
+  String get transitionZoom => 'Zoom';
+  @override
+  String get editorTransitionScopeOne => 'This transition';
+  @override
+  String get editorTransitionScopeAll => 'All transitions';
+  @override
+  String get motionPanForward => 'Pan right';
+  @override
+  String get motionPanReverse => 'Pan left';
+  @override
+  String editorImageIndex(int index, int total) => 'Image $index of $total';
+  @override
+  String get editorBulkConfirm =>
+      'The selected settings will replace individual choices in the selected scope. Continue?';
+  @override
   String get editorDiscardChanges => 'Discard unsaved changes?';
   @override
   String get editorOutputRatio => 'Video aspect ratio';
@@ -582,6 +607,56 @@ class AppLocalizationEn extends AppLocalizations {
       'Import images in the Library to list them here.';
   @override
   String markerCount(int count) => '$count markers';
+  @override
+  String get markersEmptyTitle => 'No markers yet';
+  @override
+  String get markersEmptyHint =>
+      'Play the music and add a marker where an image should start.';
+  @override
+  String get addMarker => 'Add marker';
+  @override
+  String get editMarkerTime => 'Edit time';
+  @override
+  String get markerTimeFormatHint => 'Use mm:ss.SSS';
+  @override
+  String get markerLinkedImageMoves =>
+      'Moving this marker also changes the image start.';
+  @override
+  String get unassignedMarker => 'Unassigned';
+  @override
+  String get goToMarker => 'Go to marker';
+  @override
+  String markerNudge(String amount) => 'Move marker $amount';
+  @override
+  String get marker => 'Marker';
+  @override
+  String get saveMarkerPreset => 'Save marker preset';
+  @override
+  String get clearMarkers => 'Clear all markers';
+  @override
+  String get deleteMarkerAtPlayhead => 'Delete marker at playhead';
+  @override
+  String get deleteSelected => 'Delete selected';
+  @override
+  String get applyMarkersToImages => 'Apply markers to images';
+  @override
+  String get applyMarkersDescription =>
+      'Image starts will move to the marker times. You can undo this change.';
+  @override
+  String get markerAssignmentPreview => 'Assignment preview';
+  @override
+  String markersUnassignedCount(int count) =>
+      '$count markers will stay unassigned';
+  @override
+  String imagesUnassignedCount(int count) =>
+      '$count images will keep their current timing';
+  @override
+  String get clearMarkersConfirmation =>
+      'Remove all markers and unlink images? Image timing will stay as it is.';
+  @override
+  String get markerChangeApplied => 'Marker change applied';
+  @override
+  String get invalidMarkerTime => 'Enter a valid time in mm:ss.SSS format.';
   @override
   String get open => 'Open';
   @override

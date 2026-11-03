@@ -70,6 +70,31 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get editorSave => 'Lagre';
   @override
+  String get editorScope => 'Gjelder for';
+  @override
+  String get editorScopeClip => 'Dette bildet';
+  @override
+  String get editorScopeAll => 'Alle bilder';
+  @override
+  String get editorBulkSaved => 'Innstillingene ble brukt på valgt omfang';
+  @override
+  String get transitionDemo => 'Forhåndsvisning av overgang';
+  @override
+  String get transitionZoom => 'Zoom';
+  @override
+  String get editorTransitionScopeOne => 'Denne overgangen';
+  @override
+  String get editorTransitionScopeAll => 'Alle overganger';
+  @override
+  String get motionPanForward => 'Panorer mot høyre';
+  @override
+  String get motionPanReverse => 'Panorer mot venstre';
+  @override
+  String editorImageIndex(int index, int total) => 'Bilde $index av $total';
+  @override
+  String get editorBulkConfirm =>
+      'De valgte innstillingene erstatter individuelle valg i valgt omfang. Fortsette?';
+  @override
   String get editorDiscardChanges => 'Forkaste ulagrede endringer?';
   @override
   String get editorOutputRatio => 'Videoformat';
@@ -168,6 +193,57 @@ class AppLocalizationNo extends AppLocalizationEn {
       'Importer bilder i biblioteket for å vise dem her.';
   @override
   String markerCount(int count) => '$count markører';
+  @override
+  String get markersEmptyTitle => 'Ingen markører ennå';
+  @override
+  String get markersEmptyHint =>
+      'Spill av musikken og legg til en markør der et bilde skal starte.';
+  @override
+  String get addMarker => 'Legg til markør';
+  @override
+  String get editMarkerTime => 'Rediger tid';
+  @override
+  String get markerTimeFormatHint => 'Bruk mm:ss.SSS';
+  @override
+  String get markerLinkedImageMoves =>
+      'Når du flytter markøren, flyttes også starten på bildet.';
+  @override
+  String get unassignedMarker => 'Ikke tilordnet';
+  @override
+  String get goToMarker => 'Gå til markør';
+  @override
+  String markerNudge(String amount) => 'Flytt markør $amount';
+  @override
+  String get marker => 'Markør';
+  @override
+  String get saveMarkerPreset => 'Lagre markørforvalg';
+  @override
+  String get clearMarkers => 'Fjern alle markører';
+  @override
+  String get deleteMarkerAtPlayhead => 'Slett markør ved avspillingshodet';
+  @override
+  String get deleteSelected => 'Slett valgte';
+  @override
+  String get applyMarkersToImages => 'Plasser bilder ved markører';
+  @override
+  String get applyMarkersDescription =>
+      'Bildestartene flyttes til markørtidene. Du kan angre endringen.';
+  @override
+  String get markerAssignmentPreview => 'Forhåndsvis tilordning';
+  @override
+  String markersUnassignedCount(int count) =>
+      '$count markører blir ikke tilordnet';
+  @override
+  String imagesUnassignedCount(int count) =>
+      '$count bilder beholder gjeldende tid';
+  @override
+  String get clearMarkersConfirmation =>
+      'Fjerne alle markører og koblinger? Bildetidene beholdes.';
+  @override
+  String get markerChangeApplied => 'Markørendringen er utført';
+  @override
+  String get invalidMarkerTime =>
+      'Skriv inn en gyldig tid i formatet mm:ss.SSS.';
   @override
   String get open => 'Åpne';
   @override

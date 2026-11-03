@@ -11,6 +11,7 @@ import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/preview/domain/clip_motion.dart';
+import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/timeline/application/project_serializer.dart';
@@ -24,6 +25,182 @@ import 'package:picturestovideos/features/timeline/timeline_state.dart';
 import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 
 void main() {
+  test('bulk transitions only affect boundaries and can be undone', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final vm = container.read(timelineViewModelProvider.notifier);
+    vm.appendQueuedMedia(
+      items: [
+        _mediaItem('one', 'one.jpg'),
+        _mediaItem('two', 'two.jpg'),
+        _mediaItem('three', 'three.jpg'),
+      ],
+      imageFits: const {},
+      cropTransforms: const {},
+    );
+    List<MediaTrackClipPayload> clips() => _trackEvents(
+      container.read(timelineViewModelProvider).value!.project,
+      'track-media',
+    )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+    vm.bulkEditStarted(transition: true);
+    vm.clipTransitionAppliedToAll(
+      type: ClipTransitionType.slide,
+      duration: const Duration(milliseconds: 500),
+    );
+    vm.bulkEditFinished();
+    expect(
+      clips()
+          .take(2)
+          .every((clip) => clip.transitionOverride == ClipTransitionType.slide),
+      isTrue,
+    );
+    expect(clips().last.transitionOverride, isNull);
+    vm.clipTransitionChanged(
+      clipId: clips().first.clipId,
+      type: ClipTransitionType.cut,
+      duration: const Duration(milliseconds: 300),
+    );
+    vm.bulkEditUndone();
+    expect(clips().first.transitionOverride, ClipTransitionType.cut);
+    expect(clips()[1].transitionOverride, isNull);
+  });
+  test('caption bulk properties and undo remain independent', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final vm = container.read(timelineViewModelProvider.notifier);
+    vm.appendQueuedMedia(
+      items: [_mediaItem('one', 'one.jpg'), _mediaItem('two', 'two.jpg')],
+      imageFits: const {},
+      cropTransforms: const {},
+    );
+    List<MediaTrackClipPayload> clips() => _trackEvents(
+      container.read(timelineViewModelProvider).value!.project,
+      'track-media',
+    )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+    vm.captionChanged(
+      clipId: clips().last.clipId,
+      caption: 'Individual',
+      supportingLine: '',
+    );
+    vm.captionSettingsChanged(
+      clipId: clips().last.clipId,
+      settings: const CaptionSettings(
+        placement: CaptionPlacement.top,
+        startFraction: 0.1,
+        sizeScale: 1.3,
+      ),
+    );
+    vm.bulkEditStarted(
+      captionText: true,
+      captionPosition: true,
+      captionTiming: true,
+    );
+    vm.captionTextAppliedToAll('Shared', 'Subtitle');
+    vm.captionPositionAppliedToAll(
+      const CaptionSettings(placement: CaptionPlacement.bottom),
+    );
+    vm.captionTimingAppliedToAll(
+      const CaptionSettings(startFraction: 0.25, endFraction: 0.75),
+    );
+    vm.bulkEditFinished();
+    expect(clips().last.caption, 'Shared');
+    expect(clips().last.captionSettings.placement, CaptionPlacement.bottom);
+    expect(clips().last.captionSettings.sizeScale, 1.3);
+    vm.captionChanged(
+      clipId: clips().first.clipId,
+      caption: 'Later',
+      supportingLine: '',
+    );
+    vm.bulkEditUndone();
+    expect(clips().first.caption, 'Later');
+    expect(clips().last.caption, 'Individual');
+    expect(clips().first.captionSettings.placement, isNull);
+    expect(clips().last.captionSettings.placement, CaptionPlacement.top);
+    expect(clips().last.captionSettings.startFraction, 0.1);
+    expect(clips().last.captionSettings.sizeScale, 1.3);
+  });
+  test('bulk undo restores framing and caption style without replacing later caption timing', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final vm = container.read(timelineViewModelProvider.notifier);
+    vm.appendQueuedMedia(
+      items: [_mediaItem('one', 'one.jpg'), _mediaItem('two', 'two.jpg')],
+      imageFits: const {},
+      cropTransforms: const {},
+    );
+    List<MediaTrackClipPayload> clips() => _trackEvents(
+      container.read(timelineViewModelProvider).value!.project,
+      'track-media',
+    )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+    vm.bulkEditStarted(framing: true, captionStyle: true);
+    vm.clipFramingAppliedToAll(
+      imageFit: VideoTemplateImageFit.contain,
+      crop: ImageCropTransform.centered,
+    );
+    vm.captionStyleAppliedToAll(const CaptionSettings(sizeScale: 1.2));
+    vm.bulkEditFinished();
+    final first = clips().first;
+    vm.captionSettingsChanged(
+      clipId: first.clipId,
+      settings: first.captionSettings.copyWith(startFraction: 0.2),
+    );
+    vm.clipImageFitChanged(
+      clipId: first.clipId,
+      imageFit: VideoTemplateImageFit.cover,
+    );
+    vm.bulkEditUndone();
+    expect(clips().first.captionSettings.startFraction, 0.2);
+    expect(clips().first.captionSettings.sizeScale, 1);
+    expect(clips().last.captionSettings.sizeScale, 1);
+    expect(clips().last.imageFit, VideoTemplateImageFit.cover);
+  });
+  test(
+    'bulk undo restores the previous project and protects later edits',
+    () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      await container.read(timelineViewModelProvider.future);
+      final vm = container.read(timelineViewModelProvider.notifier);
+      vm.appendQueuedMedia(
+        items: [_mediaItem('one', 'one.jpg'), _mediaItem('two', 'two.jpg')],
+        imageFits: const {},
+        cropTransforms: const {},
+      );
+      List<MediaTrackClipPayload> clips() => _trackEvents(
+        container.read(timelineViewModelProvider).value!.project,
+        'track-media',
+      )!.map((e) => e.payload as MediaTrackClipPayload).toList();
+      vm.bulkEditStarted(motion: true);
+      vm.clipMotionAppliedToAll(preset: ClipMotionPreset.gentlePan);
+      vm.bulkEditFinished();
+      vm.bulkEditUndone();
+      expect(clips().every((clip) => clip.motionOverride == null), isTrue);
+
+      vm.bulkEditStarted(motion: true);
+      vm.clipMotionAppliedToAll(preset: ClipMotionPreset.gentlePan);
+      vm.bulkEditFinished();
+      vm.aspectRatioSelected(VideoTemplateAspectRatio.square);
+      vm.clipMotionChanged(
+        clipId: clips().first.clipId,
+        preset: ClipMotionPreset.slowZoomIn,
+      );
+      vm.bulkEditUndone();
+      expect(
+        container
+            .read(timelineViewModelProvider)
+            .value!
+            .project!
+            .template
+            .aspectRatio,
+        VideoTemplateAspectRatio.square,
+      );
+      expect(clips().first.motionOverride, ClipMotionPreset.slowZoomIn);
+      expect(clips().last.motionOverride, isNull);
+    },
+  );
   test(
     'appending queue preserves edited clips and ignores duplicates',
     () async {

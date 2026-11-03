@@ -11,6 +11,7 @@ class TransitionEditorFields extends StatelessWidget {
     required this.onTypeChanged,
     required this.onDurationChanged,
     this.enabled = true,
+    this.inheritedType,
     super.key,
   });
   final ClipTransitionType? type;
@@ -19,6 +20,7 @@ class TransitionEditorFields extends StatelessWidget {
   final ValueChanged<ClipTransitionType?> onTypeChanged;
   final ValueChanged<Duration> onDurationChanged;
   final bool enabled;
+  final ClipTransitionType? inheritedType;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +34,11 @@ class TransitionEditorFields extends StatelessWidget {
           items: [
             DropdownMenuItem(
               value: null,
-              child: Text(context.l10n.styleDefault),
+              child: Text(
+                inheritedType == null
+                    ? context.l10n.styleDefault
+                    : '${context.l10n.styleDefault}: ${_typeLabel(context, inheritedType!)}',
+              ),
             ),
             DropdownMenuItem(
               value: ClipTransitionType.cut,
@@ -46,12 +52,23 @@ class TransitionEditorFields extends StatelessWidget {
               value: ClipTransitionType.slide,
               child: Text(context.l10n.transitionSlide),
             ),
+            DropdownMenuItem(
+              value: ClipTransitionType.zoom,
+              child: Text(context.l10n.transitionZoom),
+            ),
           ],
           onChanged: enabled ? onTypeChanged : null,
         ),
-        Text(
-          context.l10n.transitionDuration,
-          style: context.textTheme.labelLarge,
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                context.l10n.transitionDuration,
+                style: context.textTheme.labelLarge,
+              ),
+            ),
+            Text('${(duration.inMilliseconds / 1000).toStringAsFixed(1)} s'),
+          ],
         ),
         Slider(
           value: duration.inMilliseconds.clamp(100, 2000).toDouble(),
@@ -72,4 +89,12 @@ class TransitionEditorFields extends StatelessWidget {
       ],
     );
   }
+
+  String _typeLabel(BuildContext context, ClipTransitionType type) =>
+      switch (type) {
+        ClipTransitionType.cut => context.l10n.transitionCut,
+        ClipTransitionType.dissolve => context.l10n.transitionDissolve,
+        ClipTransitionType.slide => context.l10n.transitionSlide,
+        ClipTransitionType.zoom => context.l10n.transitionZoom,
+      };
 }

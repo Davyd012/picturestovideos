@@ -71,7 +71,7 @@ void main() {
       ),
     );
 
-    expect(find.text('2.0 times'), findsOneWidget);
+    expect(find.text('2.00 times'), findsOneWidget);
     expect(find.text('50% toward the right edge'), findsOneWidget);
     expect(find.text('25% toward the top edge'), findsOneWidget);
     expect(find.bySemanticsLabel('Framing preview'), findsOneWidget);
@@ -159,6 +159,36 @@ void main() {
 
     expect(updatedCrop, isNotNull);
     expect(updatedCrop!.zoom, greaterThan(1));
+  });
+
+  testWidgets('double tapping a slider resets that value', (tester) async {
+    var crop = const ImageCropTransform(zoom: 2, focalX: 0.5);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: StatefulBuilder(
+              builder: (context, setState) => ClipFramingFields(
+                imageFit: VideoTemplateImageFit.cover,
+                crop: crop,
+                sourcePath: '',
+                aspectRatio: 16 / 9,
+                onFitChanged: (_) {},
+                onCropChanged: (value) => setState(() => crop = value),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final zoom = find.byType(Slider).first;
+    await tester.ensureVisible(zoom);
+    await tester.tap(zoom);
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(zoom);
+    await tester.pump();
+    expect(crop.zoom, 1);
+    expect(crop.focalX, 0.5);
   });
 
   test('framing labels and values are localized', () {

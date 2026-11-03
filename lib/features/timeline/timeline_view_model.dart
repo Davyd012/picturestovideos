@@ -19,6 +19,7 @@ import 'package:picturestovideos/core/timeline/domain/clip_id.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
+import 'package:picturestovideos/core/timeline/domain/timeline_marker_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/sequence_pacing.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
@@ -36,6 +37,189 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   static const _currentPointDeleteTolerance = Duration(milliseconds: 250);
   ProjectTimeline? _pacingUndoProject;
   ProjectTimeline? _pacingAppliedProject;
+  ProjectTimeline? _bulkEditBefore;
+  ProjectTimeline? _bulkEditAfter;
+  bool _bulkEditPending = false;
+  bool _undoFraming = false;
+  bool _undoCaptionStyle = false;
+  bool _undoCaptionText = false;
+  bool _undoCaptionPosition = false;
+  bool _undoCaptionTiming = false;
+  bool _undoMotion = false;
+  bool _undoTransition = false;
+  ProjectTimeline? _markerUndoBefore;
+  ProjectTimeline? _markerUndoAfter;
+  bool _hasMarkerUndo = false;
+
+  void bulkEditStarted({
+    bool framing = false,
+    bool captionStyle = false,
+    bool captionText = false,
+    bool captionPosition = false,
+    bool captionTiming = false,
+    bool motion = false,
+    bool transition = false,
+  }) {
+    _bulkEditBefore = _currentState.project;
+    _bulkEditAfter = null;
+    _bulkEditPending = true;
+    _undoFraming = framing;
+    _undoCaptionStyle = captionStyle;
+    _undoCaptionText = captionText;
+    _undoCaptionPosition = captionPosition;
+    _undoCaptionTiming = captionTiming;
+    _undoMotion = motion;
+    _undoTransition = transition;
+  }
+
+  void bulkEditFinished() {
+    _bulkEditAfter = _currentState.project;
+  }
+
+  bool bulkEditUndone() {
+    final before = _bulkEditBefore;
+    final after = _bulkEditAfter;
+    final current = _currentState;
+    final project = current.project;
+    if (!_bulkEditPending ||
+        (before == null && project != null) ||
+        (before != null &&
+            (project == null || after == null || project.id != after.id))) {
+      return false;
+    }
+    _bulkEditPending = false;
+    _bulkEditBefore = null;
+    _bulkEditAfter = null;
+    if (before == null) return true;
+    Map<String, MediaTrackClipPayload> clips(ProjectTimeline source) => {
+      for (final track in source.tracks)
+        if (track.id == 'track-media')
+          for (final event in track.events)
+            if (event.payload case final MediaTrackClipPayload clip)
+              clip.clipId: clip,
+    };
+    final originals = clips(before);
+    final applied = clips(after!);
+    final updated = project!.copyWith(
+      tracks: List.unmodifiable([
+        for (final track in project.tracks)
+          if (track.id != 'track-media')
+            track
+          else
+            track.copyWith(
+              events: List.unmodifiable([
+                for (final event in track.events)
+                  if (event.payload case final MediaTrackClipPayload clip)
+                    BeatEvent(
+                      time: event.time,
+                      type: event.type,
+                      payload: _undoBulkClip(
+                        clip,
+                        originals[clip.clipId],
+                        applied[clip.clipId],
+                      ),
+                    )
+                  else
+                    event,
+              ]),
+            ),
+      ]),
+    );
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+      ),
+    );
+    return true;
+  }
+
+  MediaTrackClipPayload _undoBulkClip(
+    MediaTrackClipPayload current,
+    MediaTrackClipPayload? before,
+    MediaTrackClipPayload? after,
+  ) {
+    if (before == null ||
+        after == null ||
+        before.mediaId != current.mediaId ||
+        after.mediaId != current.mediaId) {
+      return current;
+    }
+    var result = current;
+    if (_undoFraming &&
+        current.imageFit == after.imageFit &&
+        current.cropTransform == after.cropTransform) {
+      result = result.copyWith(
+        imageFit: before.imageFit,
+        cropTransform: before.cropTransform,
+      );
+    }
+    bool sameStyle(CaptionSettings a, CaptionSettings b) =>
+        a.preset == b.preset &&
+        a.sizeScale == b.sizeScale &&
+        a.textColor == b.textColor &&
+        a.backdrop == b.backdrop;
+    if (_undoCaptionStyle &&
+        sameStyle(current.captionSettings, after.captionSettings)) {
+      result = result.copyWith(
+        captionSettings: current.captionSettings.copyStyleFrom(
+          before.captionSettings,
+        ),
+      );
+    }
+    if (_undoCaptionText &&
+        current.caption == after.caption &&
+        current.captionSupportingLine == after.captionSupportingLine) {
+      result = result.copyWith(
+        caption: before.caption,
+        captionSupportingLine: before.captionSupportingLine,
+      );
+    }
+    if (_undoCaptionPosition &&
+        current.captionSettings.placement == after.captionSettings.placement) {
+      result = result.copyWith(
+        captionSettings: result.captionSettings.copyWith(
+          placement: before.captionSettings.placement,
+          clearPlacement: before.captionSettings.placement == null,
+        ),
+      );
+    }
+    if (_undoCaptionTiming &&
+        current.captionSettings.entrance == after.captionSettings.entrance &&
+        current.captionSettings.startFraction ==
+            after.captionSettings.startFraction &&
+        current.captionSettings.endFraction ==
+            after.captionSettings.endFraction) {
+      result = result.copyWith(
+        captionSettings: result.captionSettings.copyWith(
+          entrance: before.captionSettings.entrance,
+          startFraction: before.captionSettings.startFraction,
+          endFraction: before.captionSettings.endFraction,
+        ),
+      );
+    }
+    if (_undoMotion &&
+        current.motionOverride == after.motionOverride &&
+        current.motionIntensity == after.motionIntensity &&
+        current.useStyleMotionIntensity == after.useStyleMotionIntensity) {
+      result = result.copyWith(
+        motionOverride: before.motionOverride,
+        clearMotionOverride: before.motionOverride == null,
+        motionIntensity: before.motionIntensity,
+        useStyleMotionIntensity: before.useStyleMotionIntensity,
+      );
+    }
+    if (_undoTransition &&
+        current.transitionOverride == after.transitionOverride &&
+        current.transitionDuration == after.transitionDuration) {
+      result = result.copyWith(
+        transitionOverride: before.transitionOverride,
+        clearTransitionOverride: before.transitionOverride == null,
+        transitionDuration: before.transitionDuration,
+      );
+    }
+    return result;
+  }
 
   @override
   Future<TimelineState> build() async {
@@ -52,14 +236,12 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     String? audioSourcePath,
     Duration? audioDuration,
   }) async {
+    _bulkEditPending = false;
     _pacingUndoProject = null;
     _pacingAppliedProject = null;
     final currentState = _currentState;
     final currentProject = currentState.project;
-    final markerEvents = _resolveMarkerEvents(
-      currentProject: currentProject,
-      fallbackEvents: events,
-    );
+    final markerEvents = _resolveMarkerEvents(currentProject: currentProject);
     ref
         .read(appLoggerProvider)
         .info(
@@ -201,7 +383,9 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         BeatEvent(
           time: marker.time + offset,
           type: marker.type,
-          payload: marker.payload,
+          payload: marker.payload is TimelineMarkerPayload
+              ? (marker.payload as TimelineMarkerPayload).name
+              : marker.payload,
         ),
     ];
     if (markers.isEmpty) {
@@ -226,35 +410,134 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     Map<String, VideoTemplateImageFit> selectedImageFits = const {},
     Map<String, ImageCropTransform> selectedCropTransforms = const {},
   }) {
-    final currentState = _currentState;
-    final project = currentState.project;
-    if (project == null) {
-      return;
-    }
+    // Queue edits never move clips implicitly. Applying markers is explicit.
+  }
 
-    if (project.hasManualEdits) {
-      return;
-    }
+  int applyMarkersToImages({
+    required List<LibraryMediaItem> selectedMedia,
+    Map<String, VideoTemplateImageFit> selectedImageFits = const {},
+    Map<String, ImageCropTransform> selectedCropTransforms = const {},
+  }) {
+    final current = _currentState;
+    final project = current.project;
+    if (project == null || selectedMedia.isEmpty) return 0;
     final markers = _markerEventsFromProject(project);
-
-    final updatedProject = ref
-        .read(buildProjectTimelineUseCaseProvider)
-        .call(
-          beatMap: project.beatMap,
-          events: markers,
-          selectedMedia: selectedMedia,
-          selectedImageFits: selectedImageFits,
-          selectedCropTransforms: selectedCropTransforms,
-          template: currentState.selectedTemplate,
-          previousProject: project,
-        );
+    if (markers.isEmpty) return 0;
+    final mediaTrack =
+        _trackById(project.tracks, 'track-media') ??
+        const TimelineTrack(id: 'track-media', name: 'Images', events: []);
+    final oldClips = [
+      for (final event in mediaTrack.events)
+        if (event.payload is MediaTrackClipPayload)
+          event.payload as MediaTrackClipPayload,
+    ];
+    final available = [...oldClips];
+    final assignments = <({BeatEvent marker, MediaTrackClipPayload clip})>[];
+    final count = selectedMedia.length < markers.length
+        ? selectedMedia.length
+        : markers.length;
+    for (var index = 0; index < count; index++) {
+      final item = selectedMedia[index];
+      final oldIndex = available.indexWhere((clip) => clip.mediaId == item.id);
+      final existing = oldIndex < 0 ? null : available.removeAt(oldIndex);
+      final clip =
+          existing ??
+          MediaTrackClipPayload(
+            clipId: newClipId(),
+            mediaId: item.id,
+            title: item.title,
+            tagline: item.tagline,
+            start: markers[index].time,
+            end:
+                markers[index].time +
+                current.selectedTemplate.defaultSlideDuration,
+            sourcePath: item.sourcePath,
+            imageFit:
+                selectedImageFits[item.id] ?? current.selectedTemplate.imageFit,
+            cropTransform:
+                selectedCropTransforms[item.id] ?? ImageCropTransform.centered,
+          );
+      assignments.add((marker: markers[index], clip: clip));
+    }
+    if (assignments.isEmpty) return 0;
+    final lastMarkerEnd =
+        assignments.last.marker.time +
+        current.selectedTemplate.defaultSlideDuration;
+    final existingEnd = project.videoDuration;
+    final projectEnd = existingEnd == null || existingEnd < lastMarkerEnd
+        ? lastMarkerEnd
+        : existingEnd;
+    final newMediaEvents = <BeatEvent>[];
+    for (var index = 0; index < assignments.length; index++) {
+      final assignment = assignments[index];
+      final start = assignment.marker.time;
+      final end = index + 1 < assignments.length
+          ? assignments[index + 1].marker.time
+          : projectEnd;
+      if (end <= start) continue;
+      newMediaEvents.add(
+        BeatEvent(
+          time: start,
+          type: 'image',
+          payload: assignment.clip.copyWith(start: start, end: end),
+        ),
+      );
+    }
+    final assignedClipIds = assignments
+        .map((value) => value.clip.clipId)
+        .toSet();
+    newMediaEvents.addAll([
+      for (final event in mediaTrack.events)
+        if (event.payload is! MediaTrackClipPayload ||
+            !assignedClipIds.contains(
+              (event.payload as MediaTrackClipPayload).clipId,
+            ))
+          event,
+    ]);
+    final linkByTime = <Duration, String>{
+      for (var index = 0; index < assignments.length; index++)
+        assignments[index].marker.time: assignments[index].clip.clipId,
+    };
+    final markerTrack = _trackById(project.tracks, 'track-markers')!;
+    final updatedMarkers = [
+      for (final event in markerTrack.events)
+        () {
+          final payload = event.payload is TimelineMarkerPayload
+              ? event.payload as TimelineMarkerPayload
+              : TimelineMarkerPayload(id: newClipId());
+          final clipId = linkByTime[event.time];
+          return BeatEvent(
+            time: event.time,
+            type: event.type,
+            payload: clipId == null
+                ? payload.copyWith(unlink: true)
+                : payload.copyWith(linkedClipId: clipId),
+          );
+        }(),
+    ];
+    final updated = project.copyWith(
+      hasManualEdits: true,
+      tracks: List.unmodifiable([
+        for (final track in project.tracks)
+          if (track.id == 'track-markers')
+            track.copyWith(events: _sortedEvents(updatedMarkers))
+          else if (track.id == 'track-media')
+            track.copyWith(events: _sortedEvents(newMediaEvents))
+          else
+            track,
+        if (_trackById(project.tracks, 'track-media') == null)
+          mediaTrack.copyWith(events: _sortedEvents(newMediaEvents)),
+      ]),
+    );
+    _rememberMarkerUndo(project, updated);
     _emit(
-      currentState.copyWith(
-        project: updatedProject,
-        serializedProject: _serialize(updatedProject),
-        nextQueuedMediaIndex: 0,
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+        nextQueuedMediaIndex: count,
       ),
     );
+    return count;
   }
 
   /// Appends queued media that is not already represented on the timeline.
@@ -368,6 +651,8 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         duration: duration,
         snap: snap,
       );
+      updated = _syncLinkedMarkerTimes(updated);
+      if (!identical(updated, project)) _rememberMarkerUndo(project, updated);
     }
     _emit(
       currentState.copyWith(
@@ -392,10 +677,25 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
               events: fallbackMarkerEvents,
               template: currentState.selectedTemplate,
             );
+    final existingMarker = _markerEventsFromProject(project)
+        .where((event) => event.time == time)
+        .firstOrNull;
+    if (existingMarker != null) {
+      final payload = existingMarker.payload;
+      _emit(
+        currentState.copyWith(
+          selectedMarker: TimelineMarkerSelection(
+            time: time,
+            markerId: payload is TimelineMarkerPayload ? payload.id : null,
+          ),
+        ),
+      );
+      return;
+    }
     final markerEvent = BeatEvent(
       time: time,
       type: 'marker',
-      payload: 'Marker ${_markerCount(project.tracks) + 1}',
+      payload: TimelineMarkerPayload(id: newClipId()),
     );
     final updatedProject = project.copyWith(
       beatMap: beatMap,
@@ -404,12 +704,16 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         markerEvent: markerEvent,
       ),
     );
+    _rememberMarkerUndo(project, updatedProject);
 
     _emit(
       currentState.copyWith(
         project: updatedProject,
         serializedProject: _serialize(updatedProject),
-        selectedMarker: TimelineMarkerSelection(time: time),
+        selectedMarker: TimelineMarkerSelection(
+          time: time,
+          markerId: (markerEvent.payload as TimelineMarkerPayload).id,
+        ),
       ),
     );
   }
@@ -440,11 +744,14 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         );
     final mediaIndex = currentState.nextQueuedMediaIndex % selectedMedia.length;
     final item = selectedMedia[mediaIndex];
-    final markerEvent = BeatEvent(
-      time: time,
-      type: 'marker',
-      payload: item.title,
-    );
+    final existingMarker = _markerEventsFromProject(project)
+        .where((event) => event.time == time)
+        .firstOrNull;
+    final existingMarkerPayload = existingMarker?.payload;
+    if (existingMarkerPayload is TimelineMarkerPayload &&
+        existingMarkerPayload.linkedClipId != null) {
+      return;
+    }
     final mediaEvent = BeatEvent(
       time: time,
       type: 'image',
@@ -463,6 +770,17 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
             selectedCropTransforms[item.id] ?? ImageCropTransform.centered,
       ),
     );
+    final markerEvent = BeatEvent(
+      time: time,
+      type: 'marker',
+      payload: TimelineMarkerPayload(
+        id: existingMarkerPayload is TimelineMarkerPayload
+            ? existingMarkerPayload.id
+            : newClipId(),
+        linkedClipId: (mediaEvent.payload as MediaTrackClipPayload).clipId,
+        name: item.title,
+      ),
+    );
     final tracksWithMarker = _upsertMarkerTrack(
       tracks: project.tracks,
       markerEvent: markerEvent,
@@ -476,12 +794,17 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         beatMap: beatMap ?? project.beatMap,
       ),
     );
+    _rememberMarkerUndo(project, updatedProject);
 
     _emit(
       currentState.copyWith(
         project: updatedProject,
         serializedProject: _serialize(updatedProject),
-        selectedMarker: TimelineMarkerSelection(time: time, mediaId: item.id),
+        selectedMarker: TimelineMarkerSelection(
+          time: time,
+          mediaId: item.id,
+          markerId: (markerEvent.payload as TimelineMarkerPayload).id,
+        ),
         nextQueuedMediaIndex: currentState.nextQueuedMediaIndex + 1,
       ),
     );
@@ -489,9 +812,133 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
 
   void selectImageMarker({required Duration time, String? mediaId}) {
     final currentState = _currentState;
+    final marker = _markerEventsFromProject(currentState.project)
+        .where((event) => event.time == time)
+        .firstOrNull;
+    final payload = marker?.payload;
     _emit(
       currentState.copyWith(
-        selectedMarker: TimelineMarkerSelection(time: time, mediaId: mediaId),
+        selectedMarker: TimelineMarkerSelection(
+          time: time,
+          mediaId: mediaId,
+          markerId: payload is TimelineMarkerPayload ? payload.id : null,
+        ),
+      ),
+    );
+  }
+
+  /// Moves a marker and, when linked, its image start as one project edit.
+  void moveSelectedImageMarker(Duration time) {
+    final current = _currentState;
+    final project = current.project;
+    final selection = current.selectedMarker;
+    if (project == null || selection == null || time.isNegative) return;
+    if (time > const Duration(hours: 24) ||
+        project.videoDuration != null && time > project.videoDuration!) {
+      return;
+    }
+    final oldTime = selection.time;
+    if (time == oldTime) return;
+    final markerTrack = _trackById(project.tracks, 'track-markers');
+    if (markerTrack == null) return;
+    final marker = markerTrack.events
+        .where(
+          (event) => selection.markerId != null
+              ? event.payload is TimelineMarkerPayload &&
+                    (event.payload as TimelineMarkerPayload).id ==
+                        selection.markerId
+              : event.time == oldTime,
+        )
+        .firstOrNull;
+    if (marker == null) return;
+    final markerPayload = marker.payload;
+    final linkedClipId = markerPayload is TimelineMarkerPayload
+        ? markerPayload.linkedClipId
+        : null;
+    final mediaTrack = _trackById(project.tracks, 'track-media');
+    final mediaEvents = [...?mediaTrack?.events];
+    if (markerTrack.events.any(
+      (event) => event != marker && event.time == time,
+    )) {
+      return;
+    }
+    if (linkedClipId != null) {
+      final index = mediaEvents.indexWhere(
+        (event) =>
+            event.payload is MediaTrackClipPayload &&
+            (event.payload as MediaTrackClipPayload).clipId == linkedClipId,
+      );
+      if (index < 0) return;
+      final clip = mediaEvents[index].payload as MediaTrackClipPayload;
+      final newEnd = clip.end;
+      if (newEnd - time < EditClipBoundaryUseCase.minimumClipDuration) return;
+      if (index + 1 < mediaEvents.length &&
+          mediaEvents[index + 1].payload is MediaTrackClipPayload &&
+          (mediaEvents[index + 1].payload as MediaTrackClipPayload).start <
+              newEnd) {
+        return;
+      }
+      for (var otherIndex = 0; otherIndex < mediaEvents.length; otherIndex++) {
+        if (otherIndex == index || otherIndex == index - 1) continue;
+        final otherPayload = mediaEvents[otherIndex].payload;
+        if (otherPayload is MediaTrackClipPayload &&
+            time < otherPayload.end &&
+            newEnd > otherPayload.start) {
+          return;
+        }
+      }
+      mediaEvents[index] = BeatEvent(
+        time: time,
+        type: mediaEvents[index].type,
+        payload: clip.copyWith(start: time, end: newEnd),
+      );
+      if (index > 0 &&
+          mediaEvents[index - 1].payload is MediaTrackClipPayload) {
+        final previousEvent = mediaEvents[index - 1];
+        final previous = previousEvent.payload as MediaTrackClipPayload;
+        if (previous.end == clip.start &&
+            time - previous.start >=
+                EditClipBoundaryUseCase.minimumClipDuration) {
+          mediaEvents[index - 1] = BeatEvent(
+            time: previousEvent.time,
+            type: previousEvent.type,
+            payload: previous.copyWith(end: time),
+          );
+        } else if (previous.end == clip.start) {
+          return;
+        }
+      }
+    }
+    final markerEvents = [
+      for (final event in markerTrack.events)
+        if (event == marker)
+          BeatEvent(time: time, type: event.type, payload: event.payload)
+        else
+          event,
+    ];
+    final updated = project.copyWith(
+      hasManualEdits: true,
+      tracks: List.unmodifiable([
+        for (final track in project.tracks)
+          if (track.id == 'track-markers')
+            track.copyWith(events: _sortedEvents(markerEvents))
+          else if (track.id == 'track-media' && linkedClipId != null)
+            track.copyWith(events: _sortedEvents(mediaEvents))
+          else
+            track,
+      ]),
+    );
+    _rememberMarkerUndo(project, updated);
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
+        selectedMarker: TimelineMarkerSelection(
+          time: time,
+          markerId: markerPayload is TimelineMarkerPayload
+              ? markerPayload.id
+              : null,
+        ),
       ),
     );
   }
@@ -518,7 +965,44 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     _editClip(clipId, (clip) => clip.copyWith(captionSettings: settings));
   }
 
-  void captionStyleAppliedToAll(CaptionSettings style) {
+  void captionTextAppliedToAll(String caption, String supportingLine) =>
+      _applyCaptionToAll(
+        (clip) => clip.copyWith(
+          caption: caption,
+          captionSupportingLine: supportingLine,
+        ),
+      );
+
+  void captionPositionAppliedToAll(CaptionSettings settings) =>
+      _applyCaptionToAll(
+        (clip) => clip.copyWith(
+          captionSettings: clip.captionSettings.copyWith(
+            placement: settings.placement,
+            clearPlacement: settings.placement == null,
+          ),
+        ),
+      );
+
+  void captionTimingAppliedToAll(CaptionSettings settings) =>
+      _applyCaptionToAll(
+        (clip) => clip.copyWith(
+          captionSettings: clip.captionSettings.copyWith(
+            entrance: settings.entrance,
+            startFraction: settings.startFraction,
+            endFraction: settings.endFraction,
+          ),
+        ),
+      );
+
+  void captionStyleAppliedToAll(CaptionSettings style) => _applyCaptionToAll(
+    (clip) => clip.copyWith(
+      captionSettings: clip.captionSettings.copyStyleFrom(style),
+    ),
+  );
+
+  void _applyCaptionToAll(
+    MediaTrackClipPayload Function(MediaTrackClipPayload) apply,
+  ) {
     final currentState = _currentState;
     final project = currentState.project;
     if (project == null) return;
@@ -532,11 +1016,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
                   BeatEvent(
                     time: event.time,
                     type: event.type,
-                    payload: (event.payload as MediaTrackClipPayload).copyWith(
-                      captionSettings: (event.payload as MediaTrackClipPayload)
-                          .captionSettings
-                          .copyStyleFrom(style),
-                    ),
+                    payload: apply(event.payload as MediaTrackClipPayload),
                   )
                 else
                   event,
@@ -568,12 +1048,14 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     final current = _currentState;
     final project = current.project;
     if (project == null) return false;
-    final updated = const MoveTimelineClipUseCase().call(
+    final moved = const MoveTimelineClipUseCase().call(
       project,
       clipId,
       position,
     );
-    if (identical(updated, project)) return false;
+    if (identical(moved, project)) return false;
+    final updated = _syncLinkedMarkerTimes(moved);
+    if (!identical(updated, project)) _rememberMarkerUndo(project, updated);
     _emit(
       current.copyWith(
         project: updated,
@@ -600,7 +1082,25 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     }
     final updatedTracks = [
       for (final track in project.tracks)
-        if (track.id != 'track-media')
+        if (track.id == 'track-markers')
+          track.copyWith(
+            events: List.unmodifiable([
+              for (final event in track.events)
+                if (event.payload is TimelineMarkerPayload &&
+                    (event.payload as TimelineMarkerPayload).linkedClipId ==
+                        clipId)
+                  BeatEvent(
+                    time: event.time,
+                    type: event.type,
+                    payload: (event.payload as TimelineMarkerPayload).copyWith(
+                      unlink: true,
+                    ),
+                  )
+                else
+                  event,
+            ]),
+          )
+        else if (track.id != 'track-media')
           track
         else
           track.copyWith(
@@ -614,9 +1114,11 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
           ),
     ];
 
-    final updated = project.copyWith(
-      tracks: List.unmodifiable(updatedTracks),
-      hasManualEdits: true,
+    final updated = _syncLinkedMarkerTimes(
+      project.copyWith(
+        tracks: List.unmodifiable(updatedTracks),
+        hasManualEdits: true,
+      ),
     );
     _emit(
       currentState.copyWith(
@@ -698,6 +1200,61 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         transitionDuration: Duration(
           milliseconds: duration.inMilliseconds.clamp(100, 2000),
         ),
+      ),
+    );
+  }
+
+  void clipTransitionAppliedToAll({
+    ClipTransitionType? type,
+    required Duration duration,
+  }) {
+    final current = _currentState;
+    final project = current.project;
+    if (project == null) return;
+    final tracks = [
+      for (final track in project.tracks)
+        if (track.id != 'track-media')
+          track
+        else
+          (() {
+            final last = track.events.lastIndexWhere(
+              (event) => event.payload is MediaTrackClipPayload,
+            );
+            return track.copyWith(
+              events: List.unmodifiable([
+                for (var i = 0; i < track.events.length; i++)
+                  if (i != last &&
+                      track.events[i].payload is MediaTrackClipPayload)
+                    BeatEvent(
+                      time: track.events[i].time,
+                      type: track.events[i].type,
+                      payload:
+                          (track.events[i].payload as MediaTrackClipPayload)
+                              .copyWith(
+                                transitionOverride: type,
+                                clearTransitionOverride: type == null,
+                                transitionDuration: Duration(
+                                  milliseconds: duration.inMilliseconds.clamp(
+                                    100,
+                                    2000,
+                                  ),
+                                ),
+                              ),
+                    )
+                  else
+                    track.events[i],
+              ]),
+            );
+          })(),
+    ];
+    final updated = project.copyWith(
+      tracks: List.unmodifiable(tracks),
+      hasManualEdits: true,
+    );
+    _emit(
+      current.copyWith(
+        project: updated,
+        serializedProject: _serialize(updated),
       ),
     );
   }
@@ -943,6 +1500,48 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     _emit(currentState.copyWith(clearSelectedMarker: true));
   }
 
+  ProjectTimeline _syncLinkedMarkerTimes(ProjectTimeline project) {
+    final starts = <String, Duration>{};
+    for (final track in project.tracks) {
+      if (track.id != 'track-media') continue;
+      for (final event in track.events) {
+        final clip = event.payload;
+        if (clip is MediaTrackClipPayload) starts[clip.clipId] = clip.start;
+      }
+    }
+    var changed = false;
+    final tracks = [
+      for (final track in project.tracks)
+        if (track.id != 'track-markers')
+          track
+        else
+          track.copyWith(
+            events: List.unmodifiable([
+              for (final event in track.events)
+                _syncMarkerEvent(event, starts, () => changed = true),
+            ]),
+          ),
+    ];
+    return changed
+        ? project.copyWith(tracks: List.unmodifiable(tracks))
+        : project;
+  }
+
+  BeatEvent _syncMarkerEvent(
+    BeatEvent event,
+    Map<String, Duration> starts,
+    void Function() onChanged,
+  ) {
+    final marker = event.payload;
+    if (marker is! TimelineMarkerPayload || marker.linkedClipId == null) {
+      return event;
+    }
+    final start = starts[marker.linkedClipId];
+    if (start == null || start == event.time) return event;
+    onChanged();
+    return BeatEvent(time: start, type: event.type, payload: marker);
+  }
+
   void deleteSelectedImageMarker() {
     final currentState = _currentState;
     final selection = currentState.selectedMarker;
@@ -957,6 +1556,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
         selection: selection,
       ),
     );
+    _rememberMarkerUndo(project, updatedProject);
     _emit(
       currentState.copyWith(
         project: updatedProject,
@@ -981,6 +1581,7 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     final updatedProject = project.copyWith(
       tracks: _deleteMarkerAtTime(tracks: project.tracks, time: markerTime),
     );
+    _rememberMarkerUndo(project, updatedProject);
     _emit(
       currentState.copyWith(
         project: updatedProject,
@@ -1000,21 +1601,23 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     final updatedProject = project.copyWith(
       tracks: _clearMarkerTracks(project.tracks),
     );
+    _rememberMarkerUndo(project, updatedProject);
     _emit(
       currentState.copyWith(
         project: updatedProject,
         serializedProject: _serialize(updatedProject),
-        nextQueuedMediaIndex: 0,
         clearSelectedMarker: true,
       ),
     );
   }
 
   void reset() {
+    _bulkEditPending = false;
     state = const AsyncData(TimelineState.initial());
   }
 
   void projectOpened(ProjectTimeline project) {
+    _bulkEditPending = false;
     _emit(
       TimelineState(
         project: project,
@@ -1042,6 +1645,60 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
 
   void _emit(TimelineState nextState) {
     state = AsyncData(nextState);
+  }
+
+  void _rememberMarkerUndo(ProjectTimeline before, ProjectTimeline after) {
+    if (!_hasMarkerUndo || !identical(before, _markerUndoAfter)) {
+      _markerUndoBefore = before;
+    }
+    _markerUndoAfter = after;
+    _hasMarkerUndo = true;
+  }
+
+  void markerEditGestureStarted() {
+    _hasMarkerUndo = false;
+    _markerUndoBefore = null;
+    _markerUndoAfter = null;
+  }
+
+  bool undoMarkerEdit() {
+    final current = _currentState;
+    final before = _markerUndoBefore;
+    if (!_hasMarkerUndo ||
+        before == null ||
+        !identical(current.project, _markerUndoAfter)) {
+      return false;
+    }
+    _hasMarkerUndo = false;
+    _markerUndoBefore = null;
+    _markerUndoAfter = null;
+    final oldSelection = current.selectedMarker;
+    final restoredMarker = oldSelection == null
+        ? null
+        : _markerEventsFromProject(before).where((event) {
+            final payload = event.payload;
+            return oldSelection.markerId != null &&
+                    payload is TimelineMarkerPayload
+                ? payload.id == oldSelection.markerId
+                : event.time == oldSelection.time;
+          }).firstOrNull;
+    final restoredPayload = restoredMarker?.payload;
+    _emit(
+      current.copyWith(
+        project: before,
+        serializedProject: _serialize(before),
+        selectedMarker: restoredMarker == null
+            ? null
+            : TimelineMarkerSelection(
+                time: restoredMarker.time,
+                markerId: restoredPayload is TimelineMarkerPayload
+                    ? restoredPayload.id
+                    : null,
+              ),
+        clearSelectedMarker: restoredMarker == null,
+      ),
+    );
+    return true;
   }
 
   Map<String, Object?> _serialize(ProjectTimeline project) {
@@ -1075,6 +1732,22 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     required List<TimelineTrack> tracks,
     required TimelineMarkerSelection selection,
   }) {
+    if (selection.markerId != null) {
+      return List.unmodifiable([
+        for (final track in tracks)
+          track.copyWith(
+            events: track.id == 'track-markers'
+                ? List.unmodifiable([
+                    for (final event in track.events)
+                      if (event.payload is! TimelineMarkerPayload ||
+                          (event.payload as TimelineMarkerPayload).id !=
+                              selection.markerId)
+                        event,
+                  ])
+                : track.events,
+          ),
+      ]);
+    }
     return _deleteMarkerAtTime(tracks: tracks, time: selection.time);
   }
 
@@ -1194,13 +1867,12 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
 
   List<BeatEvent> _resolveMarkerEvents({
     required ProjectTimeline? currentProject,
-    required List<BeatEvent> fallbackEvents,
   }) {
     final currentMarkers = _markerEventsFromProject(currentProject);
     if (currentProject != null) {
       return currentMarkers;
     }
-    return _sortedEvents(fallbackEvents);
+    return const [];
   }
 
   List<BeatEvent> _markerEventsFromProject(ProjectTimeline? project) {
@@ -1208,10 +1880,6 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
       _trackById(project?.tracks ?? const [], 'track-markers')?.events ??
           const [],
     );
-  }
-
-  int _markerCount(List<TimelineTrack> tracks) {
-    return _trackById(tracks, 'track-markers')?.events.length ?? 0;
   }
 
   TimelineTrack? _trackById(List<TimelineTrack> tracks, String id) {

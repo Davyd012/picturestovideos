@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
@@ -14,6 +15,8 @@ class ClipFramingFields extends StatelessWidget {
     required this.aspectRatio,
     required this.onFitChanged,
     required this.onCropChanged,
+    this.showPreview = true,
+    this.showFitSelector = true,
     super.key,
   });
 
@@ -23,42 +26,47 @@ class ClipFramingFields extends StatelessWidget {
   final double aspectRatio;
   final ValueChanged<VideoTemplateImageFit> onFitChanged;
   final ValueChanged<ImageCropTransform> onCropChanged;
+  final bool showPreview;
+  final bool showFitSelector;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Semantics(
-          image: true,
-          label: context.l10n.framingPreview,
-          child: ExcludeSemantics(
-            child: AspectRatio(
-              aspectRatio: aspectRatio,
-              child: ClipRect(
-                child: ColoredBox(
-                  color: context.colors.scrim,
-                  child: sourcePath.isEmpty
-                      ? const SizedBox.expand()
-                      : Transform.scale(
-                          scale: imageFit == VideoTemplateImageFit.contain
-                              ? 1
-                              : crop.zoom,
-                          alignment: Alignment(crop.focalX, crop.focalY),
-                          child: Image.file(
-                            File(sourcePath),
-                            fit: imageFit == VideoTemplateImageFit.contain
-                                ? BoxFit.contain
-                                : BoxFit.cover,
+        if (showPreview)
+          Semantics(
+            image: true,
+            label: context.l10n.framingPreview,
+            child: ExcludeSemantics(
+              child: AspectRatio(
+                aspectRatio: aspectRatio,
+                child: ClipRect(
+                  child: ColoredBox(
+                    color: context.colors.scrim,
+                    child: sourcePath.isEmpty
+                        ? const SizedBox.expand()
+                        : Transform.scale(
+                            scale: imageFit == VideoTemplateImageFit.contain
+                                ? 1
+                                : crop.zoom,
                             alignment: Alignment(crop.focalX, crop.focalY),
-                            errorBuilder: (context, error, stackTrace) =>
-                                Center(child: Text(context.l10n.missingImage)),
+                            child: Image.file(
+                              File(sourcePath),
+                              fit: imageFit == VideoTemplateImageFit.contain
+                                  ? BoxFit.contain
+                                  : BoxFit.cover,
+                              alignment: Alignment(crop.focalX, crop.focalY),
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Center(
+                                    child: Text(context.l10n.missingImage),
+                                  ),
+                            ),
                           ),
-                        ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: TextButton.icon(
@@ -69,32 +77,33 @@ class ClipFramingFields extends StatelessWidget {
             label: Text(context.l10n.centerImage),
           ),
         ),
-        DropdownButtonFormField<VideoTemplateImageFit>(
-          initialValue: imageFit,
-          isExpanded: true,
-          decoration: InputDecoration(labelText: context.l10n.adjustCrop),
-          items: [
-            DropdownMenuItem(
-              value: VideoTemplateImageFit.cover,
-              child: Text(
-                context.l10n.fillFrameCrop,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        if (showFitSelector)
+          DropdownButtonFormField<VideoTemplateImageFit>(
+            initialValue: imageFit,
+            isExpanded: true,
+            decoration: InputDecoration(labelText: context.l10n.adjustCrop),
+            items: [
+              DropdownMenuItem(
+                value: VideoTemplateImageFit.cover,
+                child: Text(
+                  context.l10n.fillFrameCrop,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            DropdownMenuItem(
-              value: VideoTemplateImageFit.contain,
-              child: Text(
-                context.l10n.fullImage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              DropdownMenuItem(
+                value: VideoTemplateImageFit.contain,
+                child: Text(
+                  context.l10n.fullImage,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
-          onChanged: (value) {
-            if (value != null) onFitChanged(value);
-          },
-        ),
+            ],
+            onChanged: (value) {
+              if (value != null) onFitChanged(value);
+            },
+          ),
         if (imageFit == VideoTemplateImageFit.contain)
           Text(
             context.l10n.cropOnlyForFill,
@@ -109,8 +118,9 @@ class ClipFramingFields extends StatelessWidget {
           1,
           ImageCropTransform.maxZoom,
           (value) => crop.copyWith(zoom: value),
+          resetValue: 1,
           valueFormatter: (value) =>
-              context.l10n.cropZoomValue(value.toStringAsFixed(1)),
+              context.l10n.cropZoomValue(value.toStringAsFixed(2)),
           enabled: imageFit == VideoTemplateImageFit.cover,
         ),
         _slider(
@@ -120,6 +130,7 @@ class ClipFramingFields extends StatelessWidget {
           -1,
           1,
           (value) => crop.copyWith(focalX: value),
+          resetValue: 0,
           valueFormatter: (value) => _positionValue(
             context,
             value,
@@ -135,6 +146,7 @@ class ClipFramingFields extends StatelessWidget {
           -1,
           1,
           (value) => crop.copyWith(focalY: value),
+          resetValue: 0,
           valueFormatter: (value) => _positionValue(
             context,
             value,
@@ -154,6 +166,7 @@ class ClipFramingFields extends StatelessWidget {
     double min,
     double max,
     ImageCropTransform Function(double) update, {
+    required double resetValue,
     required String Function(double) valueFormatter,
     required bool enabled,
   }) {
@@ -162,21 +175,38 @@ class ClipFramingFields extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(label),
-              ExcludeSemantics(
-                child: Text(formattedValue, style: context.textTheme.bodySmall),
+              Expanded(child: Text(label)),
+              Flexible(
+                child: ExcludeSemantics(
+                  child: Text(
+                    formattedValue,
+                    style: context.textTheme.bodyMedium,
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: context.l10n.captionReset,
+                onPressed: enabled
+                    ? () => onCropChanged(update(resetValue))
+                    : null,
+                icon: const Icon(Icons.restart_alt),
               ),
             ],
           ),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            semanticFormatterCallback: valueFormatter,
-            onChanged: enabled ? (value) => onCropChanged(update(value)) : null,
+          _ResettableSlider(
+            onReset: enabled ? () => onCropChanged(update(resetValue)) : null,
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              semanticFormatterCallback: valueFormatter,
+              onChanged: enabled
+                  ? (value) => onCropChanged(update(value))
+                  : null,
+            ),
           ),
         ],
       ),
@@ -194,4 +224,68 @@ class ClipFramingFields extends StatelessWidget {
     final percent = (value.abs() * 100).round().toString();
     return context.l10n.cropOffsetValue(direction, percent);
   }
+}
+
+class _ResettableSlider extends StatefulWidget {
+  const _ResettableSlider({required this.child, required this.onReset});
+  final Widget child;
+  final VoidCallback? onReset;
+
+  @override
+  State<_ResettableSlider> createState() => _ResettableSliderState();
+}
+
+class _ResettableSliderState extends State<_ResettableSlider> {
+  Duration? _lastTap;
+  Offset? _lastPosition;
+  Offset? _downPosition;
+  Duration? _downTime;
+  bool _moved = false;
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: (event) {
+      _downPosition = event.position;
+      _downTime = event.timeStamp;
+      _moved = false;
+    },
+    onPointerMove: (event) {
+      if (_downPosition != null &&
+          (event.position - _downPosition!).distance > kTouchSlop) {
+        _moved = true;
+      }
+    },
+    onPointerCancel: (_) {
+      _downPosition = null;
+      _downTime = null;
+      _lastTap = null;
+    },
+    onPointerUp: (event) {
+      if (_downPosition == null ||
+          _downTime == null ||
+          _moved ||
+          widget.onReset == null ||
+          event.timeStamp - _downTime! > kDoubleTapTimeout) {
+        _lastTap = null;
+        _downPosition = null;
+        _downTime = null;
+        return;
+      }
+      final previous = _lastTap;
+      if (previous != null &&
+          event.timeStamp >= previous &&
+          event.timeStamp - previous <= kDoubleTapTimeout &&
+          _lastPosition != null &&
+          (event.position - _lastPosition!).distance <= kDoubleTapSlop) {
+        _lastTap = null;
+        widget.onReset!();
+      } else {
+        _lastTap = event.timeStamp;
+        _lastPosition = event.position;
+      }
+      _downPosition = null;
+      _downTime = null;
+    },
+    child: widget.child,
+  );
 }

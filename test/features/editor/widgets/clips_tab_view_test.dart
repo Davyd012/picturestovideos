@@ -1,12 +1,83 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/features/editor/widgets/clips_tab_view.dart';
+import 'package:picturestovideos/features/editor/editor_media_selection_view_model.dart';
+import 'package:picturestovideos/features/timeline/timeline_view_model.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 
 void main() {
+  testWidgets('queue bulk framing requires confirmation and supports undo', (
+    tester,
+  ) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final items = [
+      _mediaItem(id: 'first', title: 'First.png'),
+      _mediaItem(id: 'second', title: 'Second.png'),
+    ];
+    container
+        .read(editorMediaSelectionViewModelProvider.notifier)
+        .addAllMedia(items);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ClipsTabView(
+                selectedMedia: items,
+                selectedImageFits: const {},
+                selectedCropTransforms: const {},
+                onReorderMedia: (_, _) {},
+                onImageFitSelected: (_, _) {},
+                onCropTransformChanged: (_, _) {},
+                onApplyImageFitToAll: (fit) => container
+                    .read(editorMediaSelectionViewModelProvider.notifier)
+                    .imageFitSelectedForAll(fit),
+                onMoveMediaToPosition: (_, _) {},
+                onOpenTimeline: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Queued images (2)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bulk image tools'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Full image for all'));
+    await tester.tap(find.text('Full image for all'));
+    await tester.pumpAndSettle();
+    expect(
+      container
+          .read(editorMediaSelectionViewModelProvider)
+          .imageFitFor('first'),
+      VideoTemplateImageFit.cover,
+    );
+    await tester.tap(find.text('Apply').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      container
+          .read(editorMediaSelectionViewModelProvider)
+          .imageFitFor('first'),
+      VideoTemplateImageFit.contain,
+    );
+    await tester.tap(find.text('Undo'));
+    await tester.pump();
+    expect(
+      container
+          .read(editorMediaSelectionViewModelProvider)
+          .imageFitFor('first'),
+      VideoTemplateImageFit.cover,
+    );
+  });
   testWidgets('clips tab exposes reorder item callback', (tester) async {
     int? oldIndex;
     int? newIndex;

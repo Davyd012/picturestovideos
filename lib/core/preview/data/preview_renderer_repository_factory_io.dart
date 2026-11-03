@@ -560,9 +560,11 @@ List<String> _transitionArguments({
     if (transition.duration <= Duration.zero) {
       filters.add('[$previous][$next]concat=n=2:v=1:a=0[$output]');
     } else {
-      final effect = transition.type == ClipTransitionType.slide
-          ? 'slideleft'
-          : 'fade';
+      final effect = switch (transition.type) {
+        ClipTransitionType.slide => 'slideleft',
+        ClipTransitionType.zoom => 'zoomin',
+        ClipTransitionType.cut || ClipTransitionType.dissolve => 'fade',
+      };
       filters.add(
         '[$previous][$next]xfade=transition=$effect:duration=${seconds(transition.duration)}:offset=${seconds(transition.start)}[$output]',
       );

@@ -51,9 +51,16 @@ class ScreenFactory {
             builder: (_) => _UnknownRouteScreen(routeName: settings.name),
           );
         }
-        return _buildRoute(
+        return PageRouteBuilder<dynamic>(
           settings: settings,
-          builder: (_) => ImageSettingsScreen(args: args),
+          transitionDuration: const Duration(milliseconds: 220),
+          reverseTransitionDuration: const Duration(milliseconds: 220),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              ImageSettingsScreen(args: args),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              MediaQuery.disableAnimationsOf(context)
+              ? child
+              : FadeTransition(opacity: animation, child: child),
         );
       case AppRoutes.download:
         return _buildRoute(

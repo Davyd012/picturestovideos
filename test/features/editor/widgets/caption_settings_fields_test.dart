@@ -4,6 +4,31 @@ import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/features/editor/widgets/caption_settings_fields.dart';
 
 void main() {
+  testWidgets('caption placement can return to the project default', (
+    tester,
+  ) async {
+    CaptionSettings? selected;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CaptionSettingsFields(
+            settings: const CaptionSettings(placement: CaptionPlacement.top),
+            inheritedPlacement: CaptionPlacement.bottom,
+            section: CaptionEditorSection.position,
+            overflow: false,
+            shortReadingTime: false,
+            onChanged: (value) => selected = value,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byType(DropdownButtonFormField<CaptionPlacement?>));
+    await tester.pumpAndSettle();
+    expect(find.text('Style default: Bottom'), findsOneWidget);
+    await tester.tap(find.text('Style default: Bottom'));
+    await tester.pumpAndSettle();
+    expect(selected?.placement, isNull);
+  });
   testWidgets('exposes caption placement, entrance, timing and warnings', (
     tester,
   ) async {

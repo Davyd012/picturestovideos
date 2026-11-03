@@ -6,6 +6,7 @@ import 'package:picturestovideos/core/audio/domain/beat_map.dart';
 import 'package:picturestovideos/core/preview/application/resolve_editor_preview_frame_use_case.dart';
 import 'package:picturestovideos/core/preview/domain/editor_preview_frame.dart';
 import 'package:picturestovideos/core/preview/domain/clip_transition.dart';
+import 'package:picturestovideos/core/preview/domain/transition_visual.dart';
 import 'package:picturestovideos/core/composition/domain/composition_evaluator.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/caption_layout.dart';
@@ -192,6 +193,11 @@ class CompositionPreviewCanvas extends StatelessWidget {
                   offset: Offset(-constraints.maxWidth * progress, 0),
                   child: first,
                 )
+              else if (transition.type == ClipTransitionType.zoom)
+                Transform.scale(
+                  scale: TransitionVisual.zoomOutgoingScale(progress),
+                  child: first,
+                )
               else
                 first,
               if (transition.type == ClipTransitionType.slide)
@@ -200,7 +206,12 @@ class CompositionPreviewCanvas extends StatelessWidget {
                   child: second,
                 )
               else
-                Opacity(opacity: progress, child: second),
+                Opacity(
+                  opacity: transition.type == ClipTransitionType.zoom
+                      ? TransitionVisual.zoomIncomingOpacity(progress)
+                      : progress,
+                  child: second,
+                ),
             ],
           );
         },

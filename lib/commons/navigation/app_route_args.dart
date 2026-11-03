@@ -14,7 +14,7 @@ class PlannedScreenArgs {
   final String summary;
 }
 
-enum ImageSettingsSection { framing, motion, text, timing }
+enum ImageSettingsSection { framing, motion, transition, text, timing }
 
 class ImageSettingsRouteArgs {
   const ImageSettingsRouteArgs.forClip(

@@ -691,6 +691,7 @@ void main() {
       for (final type in [
         ClipTransitionType.dissolve,
         ClipTransitionType.slide,
+        ClipTransitionType.zoom,
       ]) {
         final clips = [
           MediaTrackClipPayload(
@@ -758,7 +759,7 @@ void main() {
         }
 
         final before = await hashAt('1.4');
-        final middle = await hashAt('2.0');
+        final middle = await hashAt('1.8');
         final after = await hashAt('2.6');
         expect(middle, isNot(before), reason: type.name);
         expect(middle, isNot(after), reason: type.name);
@@ -783,6 +784,7 @@ void main() {
         ClipMotionPreset.slowZoomIn,
         ClipMotionPreset.slowZoomOut,
         ClipMotionPreset.gentlePan,
+        ClipMotionPreset.gentlePanReverse,
       ]) {
         final clip = MediaTrackClipPayload(
           clipId: 'clip',

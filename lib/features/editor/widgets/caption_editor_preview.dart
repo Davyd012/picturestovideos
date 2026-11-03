@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:picturestovideos/core/preview/domain/caption_layout.dart';
 import 'package:picturestovideos/core/preview/domain/caption_render_colors.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
+import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
@@ -18,6 +19,8 @@ class CaptionEditorPreview extends StatelessWidget {
     required this.clipDuration,
     required this.previewTime,
     required this.width,
+    this.crop = ImageCropTransform.centered,
+    this.imageFit = VideoTemplateImageFit.cover,
     super.key,
   });
 
@@ -29,6 +32,8 @@ class CaptionEditorPreview extends StatelessWidget {
   final Duration clipDuration;
   final Duration previewTime;
   final double width;
+  final ImageCropTransform crop;
+  final VideoTemplateImageFit imageFit;
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +67,22 @@ class CaptionEditorPreview extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (sourcePath.isNotEmpty)
-                  Image.file(
-                    File(sourcePath),
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _PreviewPlaceholder(),
+                  ClipRect(
+                    child: Transform.scale(
+                      scale: imageFit == VideoTemplateImageFit.cover
+                          ? crop.zoom
+                          : 1,
+                      alignment: Alignment(crop.focalX, crop.focalY),
+                      child: Image.file(
+                        File(sourcePath),
+                        fit: imageFit == VideoTemplateImageFit.cover
+                            ? BoxFit.cover
+                            : BoxFit.contain,
+                        alignment: Alignment(crop.focalX, crop.focalY),
+                        errorBuilder: (context, error, stackTrace) =>
+                            _PreviewPlaceholder(),
+                      ),
+                    ),
                   )
                 else
                   _PreviewPlaceholder(),

@@ -10,9 +10,72 @@ import 'package:picturestovideos/core/preview/domain/editor_preview_frame.dart';
 import 'package:picturestovideos/core/preview/domain/image_crop_transform.dart';
 import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/templates/domain/video_templates.dart';
+import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/features/editor/widgets/mobile_editor_preview_card.dart';
 
 void main() {
+  testWidgets('canvas uses the zoom transition curve', (tester) async {
+    const outgoing = MediaTrackClipPayload(
+      mediaId: 'one',
+      title: 'One',
+      tagline: '',
+      sourcePath: '',
+      start: Duration.zero,
+      end: Duration(seconds: 2),
+      imageFit: VideoTemplateImageFit.cover,
+      motionOverride: ClipMotionPreset.none,
+      transitionOverride: ClipTransitionType.zoom,
+    );
+    const incoming = MediaTrackClipPayload(
+      mediaId: 'two',
+      title: 'Two',
+      tagline: '',
+      sourcePath: '',
+      start: Duration(seconds: 2),
+      end: Duration(seconds: 4),
+      imageFit: VideoTemplateImageFit.cover,
+      motionOverride: ClipMotionPreset.none,
+    );
+    final transition = ClipTransition.between(
+      outgoing,
+      incoming,
+      VideoTemplates.cleanMemories,
+    );
+    final frame = EditorPreviewFrame(
+      currentTime: const Duration(milliseconds: 1800),
+      activeIndex: 0,
+      progress: 0.9,
+      clips: const [outgoing, incoming],
+      activeClip: outgoing,
+      transition: transition,
+      transitionOutgoing: outgoing,
+      transitionIncoming: incoming,
+      transitionProgress: 0.25,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 320,
+            height: 180,
+            child: CompositionPreviewCanvas(
+              frame: frame,
+              template: VideoTemplates.cleanMemories,
+            ),
+          ),
+        ),
+      ),
+    );
+    final transform = tester.widget<Transform>(
+      find
+          .descendant(
+            of: find.byType(CompositionPreviewCanvas),
+            matching: find.byType(Transform),
+          )
+          .first,
+    );
+    expect(transform.transform.storage[0], closeTo(2, 0.001));
+  });
   testWidgets('canvas renders captions from the evaluator layer', (
     tester,
   ) async {

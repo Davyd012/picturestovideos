@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/core/audio/domain/beat.dart';
 import 'package:picturestovideos/core/audio/domain/beat_map.dart';
-import 'package:picturestovideos/core/templates/domain/video_template.dart';
 import 'package:picturestovideos/core/timeline/application/resolve_media_track_clips_use_case.dart';
 import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/playback/playback_state.dart';
+import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
+import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 
 class TimelineTabView extends StatelessWidget {
   const TimelineTabView({
@@ -21,6 +22,11 @@ class TimelineTabView extends StatelessWidget {
     required this.onTimelineScaleChanged,
     required this.onCurrentPointChanged,
     this.audioDuration,
+    this.selectedMarker,
+    this.onMarkerSelected,
+    this.onMarkerDragStarted,
+    this.onMarkerMoved,
+    this.onMarkerMoveFinished,
     super.key,
   });
 
@@ -33,12 +39,18 @@ class TimelineTabView extends StatelessWidget {
   final ValueChanged<double> onTimelineScaleChanged;
   final ValueChanged<Duration> onCurrentPointChanged;
   final Duration? audioDuration;
+  final TimelineMarkerSelection? selectedMarker;
+  final ValueChanged<Duration>? onMarkerSelected;
+  final ValueChanged<Duration>? onMarkerDragStarted;
+  final ValueChanged<Duration>? onMarkerMoved;
+  final VoidCallback? onMarkerMoveFinished;
 
   @override
   Widget build(BuildContext context) {
     final markers = _markers;
+    final beats = beatMap?.beats ?? project?.beatMap.beats ?? const <Beat>[];
     final clips = _clips;
-    final duration = _duration(markers, clips, audioDuration);
+    final duration = _duration(beats, markers, clips, audioDuration);
     final nextIndex = playback?.nextBeatIndex ?? 0;
     final scale = timelineScale
         .clamp(_minTimelineScale, _maxTimelineScale)
@@ -53,7 +65,7 @@ class TimelineTabView extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            Chip(label: Text('${markers.length} markers')),
+            Chip(label: Text(context.l10n.markerCount(markers.length))),
             Chip(label: Text('${selectedMedia.length} queued')),
             Chip(label: Text(_bpmLabel)),
             Chip(label: Text('Next $nextIndex')),
@@ -111,7 +123,7 @@ class TimelineTabView extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       _AudioTrack(
-                        markers: markers,
+                        markers: beats,
                         duration: duration,
                         trackWidth: trackWidth,
                       ),
@@ -120,6 +132,11 @@ class TimelineTabView extends StatelessWidget {
                         markers: markers,
                         duration: duration,
                         trackWidth: trackWidth,
+                        selectedMarker: selectedMarker,
+                        onSelected: onMarkerSelected,
+                        onDragStarted: onMarkerDragStarted,
+                        onMoved: onMarkerMoved,
+                        onMoveFinished: onMarkerMoveFinished,
                       ),
                       PositionedPlayhead(
                         currentTime: playback?.currentTime ?? Duration.zero,
@@ -144,28 +161,8 @@ class TimelineTabView extends StatelessWidget {
   static const double _trackGap = 12;
   static const double _trackStartOffset = _trackLabelWidth + _trackGap;
 
-  List<Beat> get _markers {
-    final resolvedProject = project;
-    if (resolvedProject != null) {
-      final projectMarkers = _projectMarkerEvents(resolvedProject);
-      return [
-        for (final event in projectMarkers) Beat(time: event.time, strength: 1),
-      ];
-    }
-    if (events.isNotEmpty) {
-      return [for (final event in events) Beat(time: event.time, strength: 1)];
-    }
-    if (beatMap?.beats.isNotEmpty ?? false) {
-      return beatMap!.beats;
-    }
-    return const [
-      Beat(time: Duration(seconds: 1), strength: 0.8),
-      Beat(time: Duration(seconds: 4), strength: 1),
-      Beat(time: Duration(seconds: 7), strength: 0.7),
-      Beat(time: Duration(seconds: 11), strength: 0.9),
-      Beat(time: Duration(seconds: 15), strength: 0.8),
-    ];
-  }
+  List<BeatEvent> get _markers =>
+      project == null ? const [] : _projectMarkerEvents(project!);
 
   List<BeatEvent> _projectMarkerEvents(ProjectTimeline project) {
     for (final track in project.tracks) {
@@ -191,35 +188,7 @@ class TimelineTabView extends StatelessWidget {
     if (resolvedProject != null) {
       return const [];
     }
-    return const [
-      MediaTrackClipPayload(
-        mediaId: 'sample-01',
-        title: 'IMG_1042.jpg',
-        tagline: 'Opening frame',
-        start: Duration.zero,
-        end: Duration(seconds: 3),
-        sourcePath: '',
-        imageFit: VideoTemplateImageFit.cover,
-      ),
-      MediaTrackClipPayload(
-        mediaId: 'sample-02',
-        title: 'IMG_1088.jpg',
-        tagline: 'Beat cut',
-        start: Duration(seconds: 3),
-        end: Duration(seconds: 6),
-        sourcePath: '',
-        imageFit: VideoTemplateImageFit.cover,
-      ),
-      MediaTrackClipPayload(
-        mediaId: 'sample-03',
-        title: 'IMG_1130.jpg',
-        tagline: 'Memory beat',
-        start: Duration(seconds: 6),
-        end: Duration(seconds: 9),
-        sourcePath: '',
-        imageFit: VideoTemplateImageFit.cover,
-      ),
-    ];
+    return const [];
   }
 
   String get _bpmLabel {
@@ -337,11 +306,21 @@ class _MarkerTrack extends StatelessWidget {
     required this.markers,
     required this.duration,
     required this.trackWidth,
+    required this.selectedMarker,
+    required this.onSelected,
+    required this.onDragStarted,
+    required this.onMoved,
+    required this.onMoveFinished,
   });
 
-  final List<Beat> markers;
+  final List<BeatEvent> markers;
   final Duration duration;
   final double trackWidth;
+  final TimelineMarkerSelection? selectedMarker;
+  final ValueChanged<Duration>? onSelected;
+  final ValueChanged<Duration>? onDragStarted;
+  final ValueChanged<Duration>? onMoved;
+  final VoidCallback? onMoveFinished;
 
   @override
   Widget build(BuildContext context) {
@@ -353,23 +332,99 @@ class _MarkerTrack extends StatelessWidget {
         children: [
           for (var index = 0; index < markers.length; index++)
             Positioned(
-              left: _positionForTime(markers[index].time, duration, trackWidth),
-              top: 10,
-              bottom: 10,
-              child: Column(
-                children: [
-                  Expanded(
-                    child: Container(width: 2, color: context.colors.primary),
-                  ),
-                  const SizedBox(height: 4),
-                  Text('B${index + 1}', style: context.textTheme.labelSmall),
-                ],
+              left:
+                  (_positionForTime(markers[index].time, duration, trackWidth) -
+                          18)
+                      .clamp(0, trackWidth - 36)
+                      .toDouble(),
+              top: 0,
+              bottom: 0,
+              child: _TimelineMarkerPin(
+                marker: markers[index],
+                index: index,
+                duration: duration,
+                trackWidth: trackWidth,
+                selected: selectedMarker?.time == markers[index].time,
+                onSelected: onSelected,
+                onDragStarted: onDragStarted,
+                onMoved: onMoved,
+                onMoveFinished: onMoveFinished,
               ),
             ),
         ],
       ),
     );
   }
+}
+
+class _TimelineMarkerPin extends StatelessWidget {
+  const _TimelineMarkerPin({
+    required this.marker,
+    required this.index,
+    required this.duration,
+    required this.trackWidth,
+    required this.selected,
+    required this.onSelected,
+    required this.onDragStarted,
+    required this.onMoved,
+    required this.onMoveFinished,
+  });
+
+  final BeatEvent marker;
+  final int index;
+  final Duration duration;
+  final double trackWidth;
+  final bool selected;
+  final ValueChanged<Duration>? onSelected;
+  final ValueChanged<Duration>? onDragStarted;
+  final ValueChanged<Duration>? onMoved;
+  final VoidCallback? onMoveFinished;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () => onSelected?.call(marker.time),
+    onPanStart: (_) => onDragStarted?.call(marker.time),
+    onPanEnd: (_) => onMoveFinished?.call(),
+    onPanUpdate: onMoved == null
+        ? null
+        : (details) {
+            final delta =
+                (duration.inMilliseconds * details.delta.dx / trackWidth)
+                    .round();
+            onMoved?.call(
+              Duration(
+                milliseconds: (marker.time.inMilliseconds + delta).clamp(
+                  0,
+                  duration.inMilliseconds,
+                ),
+              ),
+            );
+          },
+    child: SizedBox(
+      width: 36,
+      child: Column(
+        children: [
+          Icon(
+            Icons.bookmark,
+            size: 24,
+            color: selected
+                ? context.colors.primary
+                : context.colors.onSurfaceVariant,
+          ),
+          Expanded(
+            child: Container(
+              width: selected ? 3 : 2,
+              color: selected
+                  ? context.colors.primary
+                  : context.colors.outlineVariant,
+            ),
+          ),
+          Text('${index + 1}', style: context.textTheme.labelSmall),
+        ],
+      ),
+    ),
+  );
 }
 
 class _TrackShell extends StatelessWidget {
@@ -460,6 +515,7 @@ class PositionedPlayhead extends StatelessWidget {
 
 Duration _duration(
   List<Beat> markers,
+  List<BeatEvent> markerEvents,
   List<MediaTrackClipPayload> clips,
   Duration? audioDuration,
 ) {
@@ -470,6 +526,9 @@ Duration _duration(
     if (marker.time > duration) {
       duration = marker.time;
     }
+  }
+  for (final marker in markerEvents) {
+    if (marker.time > duration) duration = marker.time;
   }
   for (final clip in clips) {
     if (clip.end > duration) {

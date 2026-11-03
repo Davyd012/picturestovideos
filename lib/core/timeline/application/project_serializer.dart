@@ -8,6 +8,7 @@ import 'package:picturestovideos/core/timeline/domain/beat_event.dart';
 import 'package:picturestovideos/core/timeline/domain/media_track_clip_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
+import 'package:picturestovideos/core/timeline/domain/timeline_marker_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/sequence_pacing.dart';
 
 final projectSerializerProvider = Provider<ProjectSerializer>(
@@ -17,7 +18,7 @@ final projectSerializerProvider = Provider<ProjectSerializer>(
 class ProjectSerializer {
   const ProjectSerializer();
 
-  static const currentSchemaVersion = 10;
+  static const currentSchemaVersion = 11;
 
   Map<String, Object?> serialize(ProjectTimeline project) {
     return {
@@ -144,14 +145,19 @@ class ProjectSerializer {
     String legacyClipId,
     int version,
   ) {
+    final payload = _deserializePayload(json['payload'], legacyClipId, version);
+    final resolvedPayload = json['type'] == 'marker' && payload is String
+        ? TimelineMarkerPayload(id: 'marker-$legacyClipId', name: payload)
+        : payload;
     return BeatEvent(
       time: Duration(milliseconds: json['timeMs']! as int),
       type: json['type']! as String,
-      payload: _deserializePayload(json['payload'], legacyClipId, version),
+      payload: resolvedPayload,
     );
   }
 
   Object? _serializePayload(Object? payload) {
+    if (payload is TimelineMarkerPayload) return payload.toJson();
     if (payload is MediaTrackClipPayload) {
       return payload.toJson();
     }
@@ -171,6 +177,10 @@ class ProjectSerializer {
             : payload,
         legacyClipId: legacyClipId,
       );
+    }
+    if (payload is Map<String, Object?> &&
+        payload['kind'] == 'timeline-marker') {
+      return TimelineMarkerPayload.fromJson(payload);
     }
     return payload;
   }

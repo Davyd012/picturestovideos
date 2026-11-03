@@ -70,6 +70,32 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get editorSave => 'Сохранить';
   @override
+  String get editorScope => 'Применить к';
+  @override
+  String get editorScopeClip => 'Это изображение';
+  @override
+  String get editorScopeAll => 'Все изображения';
+  @override
+  String get editorBulkSaved => 'Настройки применены к выбранной области';
+  @override
+  String get transitionDemo => 'Предпросмотр перехода';
+  @override
+  String get transitionZoom => 'Приближение';
+  @override
+  String get editorTransitionScopeOne => 'Этот переход';
+  @override
+  String get editorTransitionScopeAll => 'Все переходы';
+  @override
+  String get motionPanForward => 'Панорама вправо';
+  @override
+  String get motionPanReverse => 'Панорама влево';
+  @override
+  String editorImageIndex(int index, int total) =>
+      'Изображение $index из $total';
+  @override
+  String get editorBulkConfirm =>
+      'Выбранные настройки заменят индивидуальные настройки в выбранной области. Продолжить?';
+  @override
   String get editorDiscardChanges => 'Отменить несохранённые изменения?';
   @override
   String get editorOutputRatio => 'Соотношение сторон видео';
@@ -168,6 +194,56 @@ class AppLocalizationRu extends AppLocalizationEn {
       'Импортируйте изображения в библиотеку, чтобы увидеть их здесь.';
   @override
   String markerCount(int count) => 'Маркеры: $count';
+  @override
+  String get markersEmptyTitle => 'Маркеров пока нет';
+  @override
+  String get markersEmptyHint =>
+      'Включите музыку и добавьте маркер в месте начала изображения.';
+  @override
+  String get addMarker => 'Добавить маркер';
+  @override
+  String get editMarkerTime => 'Изменить время';
+  @override
+  String get markerTimeFormatHint => 'Формат мм:сс.МСС';
+  @override
+  String get markerLinkedImageMoves =>
+      'При перемещении маркера изменится и начало изображения.';
+  @override
+  String get unassignedMarker => 'Не назначен';
+  @override
+  String get goToMarker => 'Перейти к маркеру';
+  @override
+  String markerNudge(String amount) => 'Переместить маркер $amount';
+  @override
+  String get marker => 'Маркер';
+  @override
+  String get saveMarkerPreset => 'Сохранить набор маркеров';
+  @override
+  String get clearMarkers => 'Удалить все маркеры';
+  @override
+  String get deleteMarkerAtPlayhead => 'Удалить маркер у курсора';
+  @override
+  String get deleteSelected => 'Удалить выбранный';
+  @override
+  String get applyMarkersToImages => 'Расставить изображения по маркерам';
+  @override
+  String get applyMarkersDescription =>
+      'Начало изображений переместится ко времени маркеров. Это действие можно отменить.';
+  @override
+  String get markerAssignmentPreview => 'Предпросмотр привязки';
+  @override
+  String markersUnassignedCount(int count) =>
+      'Маркеров без изображения: $count';
+  @override
+  String imagesUnassignedCount(int count) =>
+      'Изображений с прежним временем: $count';
+  @override
+  String get clearMarkersConfirmation =>
+      'Удалить все маркеры и связи? Время изображений останется прежним.';
+  @override
+  String get markerChangeApplied => 'Изменение маркера применено';
+  @override
+  String get invalidMarkerTime => 'Введите время в формате мм:сс.МСС.';
   @override
   String get open => 'Открыть';
   @override

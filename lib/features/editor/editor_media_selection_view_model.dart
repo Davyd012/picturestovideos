@@ -257,6 +257,40 @@ class EditorMediaSelectionViewModel
         .updateMediaCropTransform(mediaId: mediaId, transform: transform);
   }
 
+  void queuedFramingRestored({
+    required EditorMediaSelectionState expected,
+    required EditorMediaSelectionState previous,
+  }) {
+    final fits = Map<String, VideoTemplateImageFit>.from(
+      state.selectedImageFits,
+    );
+    final crops = Map<String, ImageCropTransform>.from(
+      state.selectedCropTransforms,
+    );
+    for (final item in previous.selectedMedia) {
+      final id = item.id;
+      if (!state.containsMedia(id) ||
+          state.imageFitFor(id) != expected.imageFitFor(id) ||
+          state.cropTransformFor(id) != expected.cropTransformFor(id)) {
+        continue;
+      }
+      if (previous.selectedImageFits.containsKey(id)) {
+        fits[id] = previous.imageFitFor(id);
+      } else {
+        fits.remove(id);
+      }
+      if (previous.selectedCropTransforms.containsKey(id)) {
+        crops[id] = previous.cropTransformFor(id);
+      } else {
+        crops.remove(id);
+      }
+    }
+    state = state.copyWith(
+      selectedImageFits: Map.unmodifiable(fits),
+      selectedCropTransforms: Map.unmodifiable(crops),
+    );
+  }
+
   void removeAllMedia(Set<String> mediaIds) {
     if (mediaIds.isEmpty) {
       return;

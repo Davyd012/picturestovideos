@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/core/preview/domain/caption_settings.dart';
 import 'package:picturestovideos/core/preview/domain/caption_render_colors.dart';
+import 'package:picturestovideos/features/editor/caption_editor_section.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
-enum CaptionEditorSection { text, style, position, timing }
+export 'package:picturestovideos/features/editor/caption_editor_section.dart';
 
 class CaptionSettingsFields extends StatelessWidget {
   const CaptionSettingsFields({
@@ -16,6 +17,7 @@ class CaptionSettingsFields extends StatelessWidget {
     this.onSectionChanged,
     this.clipDuration = Duration.zero,
     this.supportsBackdrop = true,
+    this.inheritedPlacement,
     this.enabled = true,
     super.key,
   });
@@ -28,34 +30,38 @@ class CaptionSettingsFields extends StatelessWidget {
   final Duration clipDuration;
   final bool supportsBackdrop;
   final bool enabled;
+  final CaptionPlacement? inheritedPlacement;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      SegmentedButton<CaptionEditorSection>(
-        showSelectedIcon: false,
-        segments: [
-          ButtonSegment(
-            value: CaptionEditorSection.text,
-            label: Text(context.l10n.captionSectionText),
-          ),
-          ButtonSegment(
-            value: CaptionEditorSection.style,
-            label: Text(context.l10n.captionSectionStyle),
-          ),
-          ButtonSegment(
-            value: CaptionEditorSection.position,
-            label: Text(context.l10n.captionSectionPosition),
-          ),
-          ButtonSegment(
-            value: CaptionEditorSection.timing,
-            label: Text(context.l10n.captionSectionTiming),
-          ),
-        ],
-        selected: {section},
-        onSelectionChanged: (selection) =>
-            onSectionChanged?.call(selection.first),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SegmentedButton<CaptionEditorSection>(
+          showSelectedIcon: false,
+          segments: [
+            ButtonSegment(
+              value: CaptionEditorSection.text,
+              label: Text(context.l10n.captionSectionText),
+            ),
+            ButtonSegment(
+              value: CaptionEditorSection.style,
+              label: Text(context.l10n.captionSectionStyle),
+            ),
+            ButtonSegment(
+              value: CaptionEditorSection.position,
+              label: Text(context.l10n.captionSectionPosition),
+            ),
+            ButtonSegment(
+              value: CaptionEditorSection.timing,
+              label: Text(context.l10n.captionSectionTiming),
+            ),
+          ],
+          selected: {section},
+          onSelectionChanged: (selection) =>
+              onSectionChanged?.call(selection.first),
+        ),
       ),
       if (section == CaptionEditorSection.style) ...[
         Text(context.l10n.captionStyle, style: context.textTheme.labelLarge),
@@ -239,7 +245,12 @@ class CaptionSettingsFields extends StatelessWidget {
           items: [
             DropdownMenuItem(
               value: null,
-              child: Text(context.l10n.styleDefault),
+              child: Text(
+                inheritedPlacement == null
+                    ? context.l10n.styleDefault
+                    : '${context.l10n.styleDefault}: ${_placementLabel(context, inheritedPlacement!)}',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             DropdownMenuItem(
               value: CaptionPlacement.bottom,
@@ -255,7 +266,12 @@ class CaptionSettingsFields extends StatelessWidget {
             ),
           ],
           onChanged: enabled
-              ? (value) => onChanged(settings.copyWith(placement: value))
+              ? (value) => onChanged(
+                  settings.copyWith(
+                    placement: value,
+                    clearPlacement: value == null,
+                  ),
+                )
               : null,
         ),
       if (section == CaptionEditorSection.timing) ...[
@@ -312,7 +328,7 @@ class CaptionSettingsFields extends StatelessWidget {
           ),
         ),
         Text(
-          '${_timeLabel(clipDuration, settings.startFraction)} – ${_timeLabel(clipDuration, settings.endFraction)}',
+          '${_timeLabel(clipDuration, settings.startFraction)} (${(settings.startFraction * 100).round()}%) – ${_timeLabel(clipDuration, settings.endFraction)} (${(settings.endFraction * 100).round()}%)',
           style: context.textTheme.bodyMedium,
         ),
         if (overflow)
@@ -336,6 +352,13 @@ class CaptionSettingsFields extends StatelessWidget {
     final tenths = totalTenths % 10;
     return '$seconds.$tenths s';
   }
+
+  String _placementLabel(BuildContext context, CaptionPlacement placement) =>
+      switch (placement) {
+        CaptionPlacement.bottom => context.l10n.captionBottom,
+        CaptionPlacement.center => context.l10n.captionCenter,
+        CaptionPlacement.top => context.l10n.captionTop,
+      };
 }
 
 class _CaptionTextColorChoice extends StatelessWidget {
