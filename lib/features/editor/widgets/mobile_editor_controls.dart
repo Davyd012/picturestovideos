@@ -158,10 +158,12 @@ class EditorToolbar extends StatelessWidget {
     required this.enabled,
     required this.onSettings,
     required this.onAudio,
+    required this.onMarkers,
   });
   final bool enabled;
   final ValueChanged<ImageSettingsSection> onSettings;
   final VoidCallback onAudio;
+  final VoidCallback onMarkers;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.all(8),
@@ -169,6 +171,12 @@ class EditorToolbar extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          _button(
+            context,
+            Icons.bookmark_border,
+            context.l10n.editorMarkers,
+            onMarkers,
+          ),
           _button(
             context,
             Icons.image_outlined,

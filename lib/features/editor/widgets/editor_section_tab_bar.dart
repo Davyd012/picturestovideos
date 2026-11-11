@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:picturestovideos/features/editor/editor_tab_state.dart';
+import 'package:picturestovideos/features/editor/editor_tab_label.dart';
 
 class EditorSectionTabBar extends StatelessWidget {
   const EditorSectionTabBar({
@@ -22,7 +23,10 @@ class EditorSectionTabBar extends StatelessWidget {
         onSelectionChanged: (tabs) => onTabSelected(tabs.single),
         segments: [
           for (final tab in EditorTab.values)
-            ButtonSegment(value: tab, label: Text(tab.label)),
+            ButtonSegment(
+              value: tab,
+              label: Text(editorTabLabel(context, tab)),
+            ),
         ],
       ),
     );

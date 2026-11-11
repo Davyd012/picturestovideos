@@ -27,15 +27,20 @@ class AudioAnalysisViewModel extends AsyncNotifier<AudioAnalysisState> {
     ref
         .read(appLoggerProvider)
         .info(_tag, 'Running analysis for ${audioData.samples.length} samples');
-    state = const AsyncLoading();
+    final keepAliveLink = ref.keepAlive();
+    try {
+      state = const AsyncLoading();
 
-    state = await AsyncValue.guard(() async {
-      final frames = await ref
-          .read(analyzeAudioFramesUseCaseProvider)
-          .call(audioData: audioData, config: config);
+      state = await AsyncValue.guard(() async {
+        final frames = await ref
+            .read(analyzeAudioFramesUseCaseProvider)
+            .call(audioData: audioData, config: config);
 
-      return AudioAnalysisState(config: config, frames: frames);
-    });
+        return AudioAnalysisState(config: config, frames: frames);
+      });
+    } finally {
+      keepAliveLink.close();
+    }
   }
 
   void reset() {

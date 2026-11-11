@@ -6,6 +6,7 @@ import 'package:picturestovideos/core/timeline/domain/project_timeline.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_marker_payload.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
 import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
+import 'package:picturestovideos/features/timeline/marker_assignment_targets.dart';
 import 'package:picturestovideos/shared/extensions/build_context_localization_extensions.dart';
 import 'package:picturestovideos/shared/extensions/build_context_theme_extensions.dart';
 
@@ -50,6 +51,7 @@ class MarkersTabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final markers = _markers;
+    final targets = markerAssignmentTargets(project, selectedMedia);
     final selected = markers.where(_isSelected).firstOrNull;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,13 +124,11 @@ class MarkersTabView extends StatelessWidget {
                   ],
                 ),
         ),
-        if (markers.isNotEmpty &&
-            selectedMedia.isNotEmpty &&
-            onApplyMarkers != null)
+        if (markers.isNotEmpty && targets.isNotEmpty && onApplyMarkers != null)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => _showApplyPreview(context, markers),
+            child: OutlinedButton.icon(
+              onPressed: () => _showApplyPreview(context, markers, targets),
               icon: const Icon(Icons.auto_fix_high_outlined),
               label: Text(context.l10n.applyMarkersToImages),
             ),
@@ -220,9 +220,10 @@ class MarkersTabView extends StatelessWidget {
   Future<void> _showApplyPreview(
     BuildContext context,
     List<BeatEvent> markers,
+    List<MarkerAssignmentTarget> targets,
   ) async {
-    final count = selectedMedia.length < markers.length
-        ? selectedMedia.length
+    final count = targets.length < markers.length
+        ? targets.length
         : markers.length;
     final apply = await showDialog<bool>(
       context: context,
@@ -243,7 +244,7 @@ class MarkersTabView extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     leading: Text(_formatDuration(markers[index].time)),
                     title: Text(
-                      selectedMedia[index].title,
+                      targets[index].clip?.title ?? targets[index].item!.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -252,11 +253,9 @@ class MarkersTabView extends StatelessWidget {
                   Text(
                     context.l10n.markersUnassignedCount(markers.length - count),
                   ),
-                if (selectedMedia.length > count)
+                if (targets.length > count)
                   Text(
-                    context.l10n.imagesUnassignedCount(
-                      selectedMedia.length - count,
-                    ),
+                    context.l10n.imagesUnassignedCount(targets.length - count),
                   ),
               ],
             ),

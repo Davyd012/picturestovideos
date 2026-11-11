@@ -27,15 +27,20 @@ class BeatDetectionViewModel extends AsyncNotifier<BeatDetectionState> {
     ref
         .read(appLoggerProvider)
         .info(_tag, 'Detecting beats from ${frames.length} frames');
-    state = const AsyncLoading();
+    final keepAliveLink = ref.keepAlive();
+    try {
+      state = const AsyncLoading();
 
-    state = await AsyncValue.guard(() async {
-      final beats = await ref
-          .read(detectBeatsUseCaseProvider)
-          .call(frames: frames, config: config);
+      state = await AsyncValue.guard(() async {
+        final beats = await ref
+            .read(detectBeatsUseCaseProvider)
+            .call(frames: frames, config: config);
 
-      return BeatDetectionState(config: config, beats: beats);
-    });
+        return BeatDetectionState(config: config, beats: beats);
+      });
+    } finally {
+      keepAliveLink.close();
+    }
   }
 
   void reset() {

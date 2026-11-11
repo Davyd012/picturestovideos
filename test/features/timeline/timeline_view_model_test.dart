@@ -443,6 +443,88 @@ void main() {
       );
     },
   );
+  test('applying markers preserves the reordered timeline photos', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final vm = container.read(timelineViewModelProvider.notifier);
+    const map = BeatMap(beats: [], bpm: 0, averageBeatInterval: Duration.zero);
+    const markers = [
+      BeatEvent(time: Duration.zero, type: 'marker'),
+      BeatEvent(time: Duration(seconds: 3), type: 'marker'),
+    ];
+    final first = _mediaItem('one', 'one.jpg');
+    final second = _mediaItem('two', 'two.jpg');
+    for (final marker in markers) {
+      vm.addImageMarkerAt(
+        time: marker.time,
+        beatMap: map,
+        fallbackMarkerEvents: const [],
+      );
+    }
+    await vm.buildProjectTimeline(
+      beatMap: map,
+      events: markers,
+      selectedMedia: [first, second],
+    );
+
+    final originalClips = _trackEvents(
+      container.read(timelineViewModelProvider).value!.project,
+      'track-media',
+    )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+    expect(vm.clipMoved(clipId: originalClips[1].clipId, position: 1), isTrue);
+    expect(vm.applyMarkersToImages(selectedMedia: [first, second]), 2);
+    final clips = _trackEvents(
+      container.read(timelineViewModelProvider).value!.project,
+      'track-media',
+    )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+    expect(clips.map((clip) => clip.mediaId), ['two', 'one']);
+    expect(clips.map((clip) => clip.clipId), [
+      originalClips[1].clipId,
+      originalClips[0].clipId,
+    ]);
+    expect(clips.map((clip) => clip.start), [
+      Duration.zero,
+      const Duration(seconds: 3),
+    ]);
+    expect(vm.undoMarkerEdit(), isTrue);
+  });
+  test('applying fewer markers retains later photos in order', () async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(timelineViewModelProvider.future);
+    final vm = container.read(timelineViewModelProvider.notifier);
+    const map = BeatMap(beats: [], bpm: 0, averageBeatInterval: Duration.zero);
+    final photos = [
+      _mediaItem('one', 'one.jpg'),
+      _mediaItem('two', 'two.jpg'),
+      _mediaItem('three', 'three.jpg'),
+    ];
+    for (final seconds in [0, 3, 6]) {
+      vm.addImageMarkerAt(
+        time: Duration(seconds: seconds),
+        beatMap: map,
+        fallbackMarkerEvents: const [],
+      );
+    }
+    await vm.buildProjectTimeline(
+      beatMap: map,
+      events: const [
+        BeatEvent(time: Duration.zero, type: 'marker'),
+        BeatEvent(time: Duration(seconds: 3), type: 'marker'),
+        BeatEvent(time: Duration(seconds: 6), type: 'marker'),
+      ],
+      selectedMedia: photos,
+    );
+    vm.deleteImageMarkerAt(const Duration(seconds: 6));
+    expect(vm.applyMarkersToImages(selectedMedia: photos), 2);
+    final clips = _trackEvents(
+      container.read(timelineViewModelProvider).value!.project,
+      'track-media',
+    )!.map((event) => event.payload as MediaTrackClipPayload).toList();
+    expect(clips.map((clip) => clip.mediaId), ['one', 'two', 'three']);
+    expect(clips[2].start, greaterThanOrEqualTo(clips[1].end));
+  });
   test(
     'buildProjectTimeline creates a project with serialized payload',
     () async {

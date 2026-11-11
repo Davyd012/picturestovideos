@@ -638,10 +638,10 @@ class AppLocalizationEn extends AppLocalizations {
   @override
   String get deleteSelected => 'Delete selected';
   @override
-  String get applyMarkersToImages => 'Apply markers to images';
+  String get applyMarkersToImages => 'Force apply markers to photos';
   @override
   String get applyMarkersDescription =>
-      'Image starts will move to the marker times. You can undo this change.';
+      'Photos are assigned to markers in order, regardless of their current timing. You can undo this change.';
   @override
   String get markerAssignmentPreview => 'Assignment preview';
   @override

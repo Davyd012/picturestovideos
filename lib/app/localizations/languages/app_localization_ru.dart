@@ -225,10 +225,11 @@ class AppLocalizationRu extends AppLocalizationEn {
   @override
   String get deleteSelected => 'Удалить выбранный';
   @override
-  String get applyMarkersToImages => 'Расставить изображения по маркерам';
+  String get applyMarkersToImages =>
+      'Принудительно расставить фото по маркерам';
   @override
   String get applyMarkersDescription =>
-      'Начало изображений переместится ко времени маркеров. Это действие можно отменить.';
+      'Фото привязываются к маркерам по порядку независимо от текущего времени. Это действие можно отменить.';
   @override
   String get markerAssignmentPreview => 'Предпросмотр привязки';
   @override

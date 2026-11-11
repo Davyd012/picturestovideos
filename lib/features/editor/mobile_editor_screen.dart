@@ -124,6 +124,7 @@ class MobileEditorScreen extends ConsumerWidget {
                   onAdd: () => queueCount > 0
                       ? context.appNavigator.goToEditorQueue()
                       : context.appNavigator.goToLibrary(),
+                  onOpenMarkers: () => openAdvanced(EditorTab.markers),
                 )
               : LayoutBuilder(
                   key: const ValueKey('workspace'),
@@ -303,6 +304,7 @@ class MobileEditorScreen extends ConsumerWidget {
                           enabled: true,
                           onSettings: settings,
                           onAudio: () => context.appNavigator.goToAudioEditor(),
+                          onMarkers: () => openAdvanced(EditorTab.markers),
                         ),
                       ],
                     );

@@ -317,12 +317,15 @@ class _AdvancedEditorSheet extends ConsumerWidget {
     final timeline = ref.watch(timelineViewModelProvider).asData?.value;
     final playback = ref.watch(playbackViewModelProvider).asData?.value;
     final imported = ref.watch(audioImportViewModelProvider).asData?.value;
+    final preview = ref.watch(editorPreviewViewModelProvider);
     final media = ref.watch(editorMediaSelectionViewModelProvider);
     final events = ref.watch(eventSystemViewModelProvider);
     final beatMap =
         timeline?.project?.beatMap ??
         playback?.beatMap ??
         ref.watch(beatMapViewModelProvider).asData?.value.beatMap;
+    final audioSourcePath =
+        timeline?.project?.audioSourcePath ?? imported?.source?.path;
     final body = _EditorTabBody(
       selectedTab: tab,
       beatMap: beatMap,
@@ -336,8 +339,7 @@ class _AdvancedEditorSheet extends ConsumerWidget {
       audioDuration: imported?.audioData?.duration ?? playback?.sourceDuration,
       audioData: imported?.audioData,
       audioSource: imported?.source,
-      audioSourcePath:
-          timeline?.project?.audioSourcePath ?? imported?.source?.path,
+      audioSourcePath: audioSourcePath,
     );
     return FractionallySizedBox(
       heightFactor: 0.95,
@@ -351,7 +353,33 @@ class _AdvancedEditorSheet extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: tab == EditorTab.clips
                 ? body
-                : SingleChildScrollView(child: body),
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (tab == EditorTab.markers) ...[
+                          MobileEditorPreviewCard(
+                            beatMap: beatMap,
+                            project: timeline?.project,
+                            playback: playback,
+                            previewState: preview,
+                            audioSourcePath: audioSourcePath,
+                            compact: true,
+                          ),
+                          PlaybackControls(
+                            beatMap: beatMap,
+                            playback: playback,
+                            audioSourcePath: audioSourcePath,
+                            audioMix:
+                                timeline?.project?.audioMix ?? const AudioMix(),
+                            videoDuration: timeline?.project?.videoDuration,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        body,
+                      ],
+                    ),
+                  ),
           ),
         ),
       ),

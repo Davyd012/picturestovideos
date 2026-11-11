@@ -22,6 +22,7 @@ import 'package:picturestovideos/core/timeline/domain/timeline_track.dart';
 import 'package:picturestovideos/core/timeline/domain/timeline_marker_payload.dart';
 import 'package:picturestovideos/core/timeline/domain/sequence_pacing.dart';
 import 'package:picturestovideos/features/library/library_media_item.dart';
+import 'package:picturestovideos/features/timeline/marker_assignment_targets.dart';
 import 'package:picturestovideos/features/timeline/timeline_marker_selection.dart';
 import 'package:picturestovideos/features/timeline/timeline_state.dart';
 
@@ -420,31 +421,25 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
   }) {
     final current = _currentState;
     final project = current.project;
-    if (project == null || selectedMedia.isEmpty) return 0;
+    if (project == null) return 0;
     final markers = _markerEventsFromProject(project);
     if (markers.isEmpty) return 0;
     final mediaTrack =
         _trackById(project.tracks, 'track-media') ??
         const TimelineTrack(id: 'track-media', name: 'Images', events: []);
-    final oldClips = [
-      for (final event in mediaTrack.events)
-        if (event.payload is MediaTrackClipPayload)
-          event.payload as MediaTrackClipPayload,
-    ];
-    final available = [...oldClips];
+    final targets = markerAssignmentTargets(project, selectedMedia);
     final assignments = <({BeatEvent marker, MediaTrackClipPayload clip})>[];
-    final count = selectedMedia.length < markers.length
-        ? selectedMedia.length
+    final count = targets.length < markers.length
+        ? targets.length
         : markers.length;
     for (var index = 0; index < count; index++) {
-      final item = selectedMedia[index];
-      final oldIndex = available.indexWhere((clip) => clip.mediaId == item.id);
-      final existing = oldIndex < 0 ? null : available.removeAt(oldIndex);
+      final target = targets[index];
+      final item = target.item;
       final clip =
-          existing ??
+          target.clip ??
           MediaTrackClipPayload(
             clipId: newClipId(),
-            mediaId: item.id,
+            mediaId: item!.id,
             title: item.title,
             tagline: item.tagline,
             start: markers[index].time,
@@ -486,6 +481,24 @@ class TimelineViewModel extends AsyncNotifier<TimelineState> {
     final assignedClipIds = assignments
         .map((value) => value.clip.clipId)
         .toSet();
+    var nextStart = newMediaEvents.isEmpty
+        ? Duration.zero
+        : (newMediaEvents.last.payload as MediaTrackClipPayload).end;
+    for (final target in targets.skip(count)) {
+      final clip = target.clip;
+      if (clip == null) continue;
+      final start = clip.start > nextStart ? clip.start : nextStart;
+      final end = start + (clip.end - clip.start);
+      newMediaEvents.add(
+        BeatEvent(
+          time: start,
+          type: 'image',
+          payload: clip.copyWith(start: start, end: end),
+        ),
+      );
+      assignedClipIds.add(clip.clipId);
+      nextStart = end;
+    }
     newMediaEvents.addAll([
       for (final event in mediaTrack.events)
         if (event.payload is! MediaTrackClipPayload ||

@@ -224,10 +224,10 @@ class AppLocalizationNo extends AppLocalizationEn {
   @override
   String get deleteSelected => 'Slett valgte';
   @override
-  String get applyMarkersToImages => 'Plasser bilder ved markører';
+  String get applyMarkersToImages => 'Tving bilder til markører';
   @override
   String get applyMarkersDescription =>
-      'Bildestartene flyttes til markørtidene. Du kan angre endringen.';
+      'Bilder tilordnes markører i rekkefølge, uavhengig av gjeldende tidspunkt. Du kan angre endringen.';
   @override
   String get markerAssignmentPreview => 'Forhåndsvis tilordning';
   @override

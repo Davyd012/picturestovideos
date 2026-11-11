@@ -7,10 +7,12 @@ class EmptyEditorState extends StatelessWidget {
     super.key,
     required this.hasQueuedImages,
     required this.onAdd,
+    this.onOpenMarkers,
   });
 
   final bool hasQueuedImages;
   final VoidCallback onAdd;
+  final VoidCallback? onOpenMarkers;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +56,14 @@ class EmptyEditorState extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (onOpenMarkers != null) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: onOpenMarkers,
+                    icon: const Icon(Icons.bookmark_border),
+                    label: Text(l10n.editorMarkers),
+                  ),
+                ],
               ],
             ),
           ),
